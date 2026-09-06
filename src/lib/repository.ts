@@ -3,7 +3,11 @@ import { readJson, STORAGE_KEYS, writeJson } from '@/lib/storage';
 import { isSupabaseConfigured, requireSupabase, TABLES } from '@/lib/supabase';
 import type {
   Contact,
+  ContactInsert,
   Event,
+  EventInsert,
+  NewContactInput,
+  NewEventInput,
   NewTransactionInput,
   Transaction,
   TransactionInsert,
@@ -110,60 +114,122 @@ export async function fetchLedgerData(): Promise<LedgerData> {
 }
 
 /**
- * يضيف حركة جديدة. يحاول الحفظ في Supabase أولاً، ثم يحدّث النسخة المحلية.
- * يعيد الحركة كما ستُعرض في الواجهة.
+ * يحفظ صفاً جديداً: في Supabase عند توفره، ثم يضيفه إلى النسخة المحلية.
+ *
+ * الحمولة لا تحمل id أو created_at أو user_id إطلاقاً؛ تملؤها قاعدة
+ * البيانات، و user_id تحديداً من `default auth.uid()` الذي تقوم عليه RLS.
+ * أخطاء الخادم تصعد إلى الواجهة بدل أن تُدفن في نسخة محلية.
  */
+async function persist<TRow extends { id: string }, TInsert>(
+  table: string,
+  storageKey: string,
+  draft: TRow,
+  payload: TInsert,
+): Promise<TRow> {
+  let saved = draft;
+
+  if (isSupabaseConfigured) {
+    const client = requireSupabase();
+    const { data, error } = await client
+      .from(table)
+      .insert(payload as Record<string, unknown>)
+      .select()
+      .single();
+
+    if (error) throw error;
+    if (data) saved = data as TRow;
+  }
+
+  const cached = await readJson<TRow[]>(storageKey, []);
+  await writeJson(storageKey, [saved, ...cached]);
+
+  return saved;
+}
+
+/** يضيف جهة اتصال جديدة. */
+export async function createContact(
+  input: NewContactInput,
+): Promise<Contact> {
+  const nowIso = new Date().toISOString();
+
+  const payload: ContactInsert = {
+    full_name: input.full_name.trim(),
+    phone: input.phone?.trim() || null,
+    relation: input.relation?.trim() || null,
+    notes: input.notes?.trim() || null,
+  };
+
+  const draft: Contact = {
+    ...payload,
+    id: createId('c'),
+    user_id: null,
+    created_at: nowIso,
+  };
+
+  return persist<Contact, ContactInsert>(
+    TABLES.contacts,
+    STORAGE_KEYS.contacts,
+    draft,
+    payload,
+  );
+}
+
+/** يضيف مناسبة جديدة. */
+export async function createEvent(input: NewEventInput): Promise<Event> {
+  const nowIso = new Date().toISOString();
+
+  const payload: EventInsert = {
+    title: input.title.trim(),
+    event_type: input.event_type,
+    host_contact_id: input.host_contact_id ?? null,
+    event_date: input.event_date,
+    location: input.location?.trim() || null,
+    notes: input.notes?.trim() || null,
+  };
+
+  const draft: Event = {
+    ...payload,
+    id: createId('e'),
+    user_id: null,
+    created_at: nowIso,
+  };
+
+  return persist<Event, EventInsert>(
+    TABLES.events,
+    STORAGE_KEYS.events,
+    draft,
+    payload,
+  );
+}
+
+/** يضيف حركة جديدة (نقوط واردة أو صادرة). */
 export async function createTransaction(
   input: NewTransactionInput,
 ): Promise<Transaction> {
   const nowIso = new Date().toISOString();
 
-  const draft: Transaction = {
-    id: createId('t'),
-    user_id: null,
+  const payload: TransactionInsert = {
     contact_id: input.contact_id,
     event_id: input.event_id,
     direction: input.direction,
+    // المبلغ موجب دائماً؛ الاتجاه وحده يحدد الإشارة.
     amount: Math.abs(input.amount),
     currency: input.currency ?? DEFAULT_CURRENCY,
     occurred_at: input.occurred_at ?? nowIso,
     note: input.note ?? null,
+  };
+
+  const draft: Transaction = {
+    ...payload,
+    id: createId('t'),
+    user_id: null,
     created_at: nowIso,
   };
 
-  let saved = draft;
-
-  if (isSupabaseConfigured) {
-    const client = requireSupabase();
-
-    // نحذف id و created_at و user_id عمداً: القيم الافتراضية في قاعدة
-    // البيانات هي التي تملأها، و user_id تحديداً يأخذ auth.uid() الذي
-    // تعتمد عليه سياسات RLS. إرسال null صراحةً يتجاوز القيمة الافتراضية
-    // ويكسر قيد NOT NULL.
-    const payload: TransactionInsert = {
-      contact_id: draft.contact_id,
-      event_id: draft.event_id,
-      direction: draft.direction,
-      amount: draft.amount,
-      currency: draft.currency,
-      occurred_at: draft.occurred_at,
-      note: draft.note,
-    };
-
-    // نترك الخطأ يصعد إلى الواجهة: فشل الحفظ على الخادم (انتهاء الجلسة أو
-    // رفض RLS) يجب أن يظهر للمستخدم لا أن يُدفن في نسخة محلية.
-    const { data, error } = await client
-      .from(TABLES.transactions)
-      .insert(payload)
-      .select()
-      .single();
-
-    if (error) throw error;
-    if (data) saved = data as Transaction;
-  }
-
-  const cached = await readJson<Transaction[]>(STORAGE_KEYS.transactions, []);
-  await writeJson(STORAGE_KEYS.transactions, [saved, ...cached]);
-
-  return saved;
+  return persist<Transaction, TransactionInsert>(
+    TABLES.transactions,
+    STORAGE_KEYS.transactions,
+    draft,
+    payload,
+  );
 }

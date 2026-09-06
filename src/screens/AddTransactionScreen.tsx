@@ -1,8 +1,14 @@
 import type { RouteProp } from '@react-navigation/native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ArrowDownLeft, ArrowUpRight, Check } from 'lucide-react-native';
-import React, { useMemo, useState } from 'react';
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Check,
+  Plus,
+  UserPlus,
+} from 'lucide-react-native';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -37,6 +43,19 @@ export function AddTransactionScreen() {
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // العودة من شاشة الإنشاء تمرّ عبر تحديث المعاملات، لا عبر إعادة التركيب،
+  // لذا نزامن الاختيار يدوياً. نتجاهل القيم الفارغة حتى لا يُمسح اختيار قائم.
+  const paramContactId = params?.contactId;
+  const paramEventId = params?.eventId;
+
+  useEffect(() => {
+    if (paramContactId) setContactId(paramContactId);
+  }, [paramContactId]);
+
+  useEffect(() => {
+    if (paramEventId) setEventId(paramEventId);
+  }, [paramEventId]);
 
   const sortedContacts = useMemo(
     () =>
@@ -126,14 +145,44 @@ export function AddTransactionScreen() {
           className={`rounded-xl border bg-white px-4 py-3 text-right text-xl font-bold ${previewTheme.textClass} border-gray-200`}
         />
 
-        <Text className="mb-2 mt-6 text-right text-sm font-bold text-gray-900">
-          جهة الاتصال
-        </Text>
+        <View className="mb-2 mt-6 flex-row-reverse items-center justify-between">
+          <Text className="text-right text-sm font-bold text-gray-900">
+            جهة الاتصال
+          </Text>
+          <Pressable
+            onPress={() =>
+              navigation.navigate('AddContact', { returnTo: 'AddTransaction' })
+            }
+            accessibilityRole="button"
+            className="flex-row-reverse items-center rounded-full border border-green-200 bg-green-50 px-3 py-1">
+            <UserPlus size={14} color="#16a34a" />
+            <Text className="mr-1 text-xs font-semibold text-green-700">
+              جديدة
+            </Text>
+          </Pressable>
+        </View>
         <View className="rounded-2xl border border-gray-100 bg-white p-2">
           {sortedContacts.length === 0 ? (
-            <Text className="p-2 text-right text-sm text-gray-500">
-              لا توجد جهات اتصال بعد.
-            </Text>
+            <View className="items-center p-4">
+              <Text className="text-center text-sm text-gray-600">
+                لا توجد جهات اتصال بعد.
+              </Text>
+              <Text className="mt-1 text-center text-xs text-gray-500">
+                أضف جهة اتصال أولاً لتتمكن من تسجيل حركة.
+              </Text>
+              <Pressable
+                onPress={() =>
+                  navigation.navigate('AddContact', {
+                    returnTo: 'AddTransaction',
+                  })
+                }
+                accessibilityRole="button"
+                className="mt-3 rounded-2xl bg-green-600 px-5 py-2">
+                <Text className="text-sm font-bold text-white">
+                  إضافة جهة اتصال
+                </Text>
+              </Pressable>
+            </View>
           ) : (
             sortedContacts.map((contact) => (
               <Pressable
@@ -154,9 +203,25 @@ export function AddTransactionScreen() {
           )}
         </View>
 
-        <Text className="mb-2 mt-6 text-right text-sm font-bold text-gray-900">
-          المناسبة (اختياري)
-        </Text>
+        <View className="mb-2 mt-6 flex-row-reverse items-center justify-between">
+          <Text className="text-right text-sm font-bold text-gray-900">
+            المناسبة (اختياري)
+          </Text>
+          <Pressable
+            onPress={() =>
+              navigation.navigate('AddEvent', {
+                returnTo: 'AddTransaction',
+                hostContactId: contactId ?? undefined,
+              })
+            }
+            accessibilityRole="button"
+            className="flex-row-reverse items-center rounded-full border border-green-200 bg-green-50 px-3 py-1">
+            <Plus size={14} color="#16a34a" />
+            <Text className="mr-1 text-xs font-semibold text-green-700">
+              جديدة
+            </Text>
+          </Pressable>
+        </View>
         <View className="rounded-2xl border border-gray-100 bg-white p-2">
           <Pressable
             onPress={() => setEventId(null)}

@@ -5,6 +5,8 @@ import { CalendarDays, Home, Users } from 'lucide-react-native';
 import React from 'react';
 
 import type { RootStackParamList, TabParamList } from '@/navigation/types';
+import { AddContactScreen } from '@/screens/AddContactScreen';
+import { AddEventScreen } from '@/screens/AddEventScreen';
 import { AddTransactionScreen } from '@/screens/AddTransactionScreen';
 import { ContactProfileScreen } from '@/screens/ContactProfileScreen';
 import { ContactsListScreen } from '@/screens/ContactsListScreen';
@@ -76,6 +78,16 @@ export function RootNavigator() {
           name="AddTransaction"
           component={AddTransactionScreen}
           options={{ title: 'إضافة حركة', presentation: 'modal' }}
+        />
+        <Stack.Screen
+          name="AddContact"
+          component={AddContactScreen}
+          options={{ title: 'جهة اتصال جديدة', presentation: 'modal' }}
+        />
+        <Stack.Screen
+          name="AddEvent"
+          component={AddEventScreen}
+          options={{ title: 'مناسبة جديدة', presentation: 'modal' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

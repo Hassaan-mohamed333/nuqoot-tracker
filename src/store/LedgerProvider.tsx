@@ -7,7 +7,12 @@ import React, {
   useState,
 } from 'react';
 
-import { createTransaction, fetchLedgerData } from '@/lib/repository';
+import {
+  createContact,
+  createEvent,
+  createTransaction,
+  fetchLedgerData,
+} from '@/lib/repository';
 import { useAuth } from '@/store/AuthProvider';
 import type {
   Contact,
@@ -15,6 +20,8 @@ import type {
   ContactWithSummary,
   Event,
   LedgerSummary,
+  NewContactInput,
+  NewEventInput,
   NewTransactionInput,
   Transaction,
 } from '@/types';
@@ -38,6 +45,8 @@ interface LedgerContextValue {
   /** true عندما تكون البيانات محلية (Supabase غير مُعدّ أو غير متاح). */
   offline: boolean;
   refresh: () => Promise<void>;
+  addContact: (input: NewContactInput) => Promise<Contact>;
+  addEvent: (input: NewEventInput) => Promise<Event>;
   addTransaction: (input: NewTransactionInput) => Promise<Transaction>;
   getContactById: (contactId: string) => ContactWithSummary | undefined;
   getContactTransactions: (contactId: string) => Transaction[];
@@ -73,6 +82,18 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
     void refresh();
   }, [refresh]);
 
+  const addContact = useCallback(async (input: NewContactInput) => {
+    const saved = await createContact(input);
+    setContacts((current) => [saved, ...current]);
+    return saved;
+  }, []);
+
+  const addEvent = useCallback(async (input: NewEventInput) => {
+    const saved = await createEvent(input);
+    setEvents((current) => [saved, ...current]);
+    return saved;
+  }, []);
+
   const addTransaction = useCallback(async (input: NewTransactionInput) => {
     const saved = await createTransaction(input);
     setTransactions((current) => [saved, ...current]);
@@ -102,6 +123,8 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       loading,
       offline,
       refresh,
+      addContact,
+      addEvent,
       addTransaction,
       getContactById: (contactId) =>
         contactsWithSummary.find((contact) => contact.id === contactId),
@@ -132,6 +155,8 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       loading,
       offline,
       refresh,
+      addContact,
+      addEvent,
       addTransaction,
     ],
   );

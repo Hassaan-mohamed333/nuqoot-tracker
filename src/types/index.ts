@@ -90,6 +90,25 @@ export interface ContactSection {
   data: ContactWithSummary[];
 }
 
+/** بيانات إنشاء جهة اتصال جديدة. */
+export interface NewContactInput {
+  full_name: string;
+  phone?: string | null;
+  relation?: string | null;
+  notes?: string | null;
+}
+
+/** بيانات إنشاء مناسبة جديدة. */
+export interface NewEventInput {
+  title: string;
+  event_type: EventType;
+  host_contact_id?: string | null;
+  /** تاريخ المناسبة بصيغة ISO. */
+  event_date: string;
+  location?: string | null;
+  notes?: string | null;
+}
+
 /** بيانات إنشاء حركة جديدة قبل حفظها. */
 export interface NewTransactionInput {
   contact_id: string;
@@ -111,3 +130,9 @@ export type TransactionInsert = Omit<
   Transaction,
   'id' | 'created_at' | 'user_id'
 >;
+
+/** حمولة إدراج جهة اتصال (user_id مستبعد كما في الحركات). */
+export type ContactInsert = Omit<Contact, 'id' | 'created_at' | 'user_id'>;
+
+/** حمولة إدراج مناسبة (user_id مستبعد كما في الحركات). */
+export type EventInsert = Omit<Event, 'id' | 'created_at' | 'user_id'>;

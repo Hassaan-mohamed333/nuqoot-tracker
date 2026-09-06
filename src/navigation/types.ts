@@ -12,6 +12,9 @@ export type RootStackParamList = {
   Tabs: NavigatorScreenParams<TabParamList>;
   ContactProfile: { contactId: string };
   AddTransaction: { contactId?: string; eventId?: string } | undefined;
+  /** returnTo: يعود إلى شاشة الحركة ويختار ما أُنشئ للتوّ. */
+  AddContact: { returnTo?: 'AddTransaction' } | undefined;
+  AddEvent: { returnTo?: 'AddTransaction'; hostContactId?: string } | undefined;
 };
 
 declare global {

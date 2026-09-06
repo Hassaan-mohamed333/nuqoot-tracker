@@ -1,6 +1,6 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { CloudOff, LogOut, Plus } from 'lucide-react-native';
+import { CalendarPlus, CloudOff, LogOut, Plus, UserPlus } from 'lucide-react-native';
 import React, { useMemo } from 'react';
 import {
   ActivityIndicator,
@@ -125,6 +125,37 @@ export function HomeScreen() {
                 ? 'وضع محلي: البيانات محفوظة على الجهاز. اضبط مفاتيح Supabase للمزامنة.'
                 : 'تعذّر الوصول إلى الخادم. تُعرض آخر نسخة محفوظة على الجهاز.'}
             </Text>
+          </View>
+        ) : null}
+
+        {!loading && contacts.length === 0 ? (
+          <View className="mt-4 rounded-2xl border border-gray-100 bg-white p-5">
+            <Text className="text-right text-base font-bold text-gray-900">
+              لنبدأ من الصفر
+            </Text>
+            <Text className="mt-1 text-right text-xs text-gray-500">
+              أضف جهات الاتصال والمناسبات، ثم سجّل النقوط والواجبات بينكم.
+            </Text>
+
+            <Pressable
+              onPress={() => navigation.navigate('AddContact')}
+              accessibilityRole="button"
+              className="mt-4 flex-row-reverse items-center justify-center rounded-2xl bg-green-600 py-3">
+              <UserPlus size={18} color="#ffffff" />
+              <Text className="mr-2 text-sm font-bold text-white">
+                إضافة جهة اتصال
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => navigation.navigate('AddEvent')}
+              accessibilityRole="button"
+              className="mt-2 flex-row-reverse items-center justify-center rounded-2xl border border-gray-200 bg-white py-3">
+              <CalendarPlus size={18} color="#16a34a" />
+              <Text className="mr-2 text-sm font-bold text-green-700">
+                إضافة مناسبة
+              </Text>
+            </Pressable>
           </View>
         ) : null}
 

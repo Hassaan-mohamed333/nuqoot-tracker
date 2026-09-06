@@ -1,6 +1,6 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Plus, Search } from 'lucide-react-native';
+import { Plus, Search, UserPlus } from 'lucide-react-native';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, SectionList, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -71,9 +71,9 @@ export function ContactsListScreen() {
           جهات الاتصال
         </Text>
         <Pressable
-          onPress={() => navigation.navigate('AddTransaction')}
+          onPress={() => navigation.navigate('AddContact')}
           accessibilityRole="button"
-          accessibilityLabel="إضافة حركة جديدة"
+          accessibilityLabel="إضافة جهة اتصال"
           className="h-10 w-10 items-center justify-center rounded-full bg-green-600">
           <Plus size={20} color="#ffffff" />
         </Pressable>
@@ -124,9 +124,31 @@ export function ContactsListScreen() {
             />
           )}
           ListEmptyComponent={
-            <Text className="mt-8 text-center text-sm text-gray-500">
-              لا توجد نتائج مطابقة.
-            </Text>
+            query.trim() ? (
+              <Text className="mt-8 text-center text-sm text-gray-500">
+                لا توجد نتائج مطابقة.
+              </Text>
+            ) : (
+              <View className="mt-10 items-center">
+                <View className="h-14 w-14 items-center justify-center rounded-full bg-green-100">
+                  <UserPlus size={26} color="#16a34a" />
+                </View>
+                <Text className="mt-3 text-center text-sm font-semibold text-gray-800">
+                  ابدأ بإضافة أول جهة اتصال
+                </Text>
+                <Text className="mt-1 text-center text-xs text-gray-500">
+                  بعدها يمكنك تسجيل النقوط والواجبات الخاصة بها.
+                </Text>
+                <Pressable
+                  onPress={() => navigation.navigate('AddContact')}
+                  accessibilityRole="button"
+                  className="mt-4 rounded-2xl bg-green-600 px-5 py-2.5">
+                  <Text className="text-sm font-bold text-white">
+                    إضافة جهة اتصال
+                  </Text>
+                </Pressable>
+              </View>
+            )
           }
         />
       </View>
