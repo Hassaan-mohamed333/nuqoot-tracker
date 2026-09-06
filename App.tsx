@@ -4,16 +4,16 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import './global.css';
 
-import { RootNavigator } from '@/navigation/RootNavigator';
-import { LedgerProvider } from '@/store/LedgerProvider';
+import { AppGate } from '@/navigation/AppGate';
+import { AuthProvider } from '@/store/AuthProvider';
 
 export default function App() {
   return (
     <SafeAreaProvider>
-      <LedgerProvider>
+      <AuthProvider>
         <StatusBar style="dark" />
-        <RootNavigator />
-      </LedgerProvider>
+        <AppGate />
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

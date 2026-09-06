@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 
 import { createTransaction, fetchLedgerData } from '@/lib/repository';
+import { useAuth } from '@/store/AuthProvider';
 import type {
   Contact,
   ContactSection,
@@ -47,6 +48,7 @@ interface LedgerContextValue {
 const LedgerContext = createContext<LedgerContextValue | null>(null);
 
 export function LedgerProvider({ children }: { children: React.ReactNode }) {
+  const { userId } = useAuth();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -64,7 +66,8 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+    // userId ضمن الاعتماديات حتى تُعاد القراءة عند تبديل الحساب.
+  }, [userId]);
 
   useEffect(() => {
     void refresh();

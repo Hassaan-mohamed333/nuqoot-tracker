@@ -100,3 +100,14 @@ export interface NewTransactionInput {
   occurred_at?: string;
   note?: string | null;
 }
+
+/**
+ * حمولة إدراج حركة في Supabase.
+ *
+ * user_id مستبعد عمداً: القيمة الافتراضية في قاعدة البيانات هي auth.uid()،
+ * وهي أساس سياسات RLS. النوع يمنع إرساله من التطبيق أصلاً.
+ */
+export type TransactionInsert = Omit<
+  Transaction,
+  'id' | 'created_at' | 'user_id'
+>;

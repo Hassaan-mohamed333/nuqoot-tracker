@@ -6,6 +6,7 @@ import type {
   Event,
   NewTransactionInput,
   Transaction,
+  TransactionInsert,
 } from '@/types';
 import { DEFAULT_CURRENCY } from '@/utils/ledger';
 
@@ -23,8 +24,14 @@ function createId(prefix: string): string {
     .slice(2, 8)}`;
 }
 
-/** يحمّل البيانات المحلية، ويزرع البيانات التجريبية عند أول تشغيل. */
-async function loadLocal(): Promise<LedgerData> {
+/**
+ * يحمّل النسخة المحلية.
+ *
+ * البيانات التجريبية تُزرع فقط في الوضع المحلي (بلا Supabase). عند وجود
+ * حساب حقيقي لا يجوز أن يرى المستخدم بيانات وهمية إذا فشل الطلب، لذا
+ * نعيد ما هو مخزَّن فعلاً أو قوائم فارغة.
+ */
+async function loadLocal(seedWhenEmpty: boolean): Promise<LedgerData> {
   const [contacts, events, transactions] = await Promise.all([
     readJson<Contact[] | null>(STORAGE_KEYS.contacts, null),
     readJson<Event[] | null>(STORAGE_KEYS.events, null),
@@ -33,6 +40,15 @@ async function loadLocal(): Promise<LedgerData> {
 
   if (contacts && events && transactions) {
     return { contacts, events, transactions, offline: true };
+  }
+
+  if (!seedWhenEmpty) {
+    return {
+      contacts: contacts ?? [],
+      events: events ?? [],
+      transactions: transactions ?? [],
+      offline: true,
+    };
   }
 
   await Promise.all([
@@ -55,7 +71,7 @@ async function loadLocal(): Promise<LedgerData> {
  */
 export async function fetchLedgerData(): Promise<LedgerData> {
   if (!isSupabaseConfigured) {
-    return loadLocal();
+    return loadLocal(true);
   }
 
   try {
@@ -88,7 +104,8 @@ export async function fetchLedgerData(): Promise<LedgerData> {
 
     return data;
   } catch {
-    return loadLocal();
+    // تعذّر الوصول للخادم: نعرض آخر نسخة محفوظة لهذا الحساب بلا زرع بيانات.
+    return loadLocal(false);
   }
 }
 
@@ -117,20 +134,32 @@ export async function createTransaction(
   let saved = draft;
 
   if (isSupabaseConfigured) {
-    try {
-      const client = requireSupabase();
-      const { id: _localId, created_at: _localCreatedAt, ...payload } = draft;
-      const { data, error } = await client
-        .from(TABLES.transactions)
-        .insert(payload)
-        .select()
-        .single();
+    const client = requireSupabase();
 
-      if (error) throw error;
-      if (data) saved = data as Transaction;
-    } catch {
-      // نُبقي المسودة المحلية حتى لا تضيع مدخلات المستخدم.
-    }
+    // نحذف id و created_at و user_id عمداً: القيم الافتراضية في قاعدة
+    // البيانات هي التي تملأها، و user_id تحديداً يأخذ auth.uid() الذي
+    // تعتمد عليه سياسات RLS. إرسال null صراحةً يتجاوز القيمة الافتراضية
+    // ويكسر قيد NOT NULL.
+    const payload: TransactionInsert = {
+      contact_id: draft.contact_id,
+      event_id: draft.event_id,
+      direction: draft.direction,
+      amount: draft.amount,
+      currency: draft.currency,
+      occurred_at: draft.occurred_at,
+      note: draft.note,
+    };
+
+    // نترك الخطأ يصعد إلى الواجهة: فشل الحفظ على الخادم (انتهاء الجلسة أو
+    // رفض RLS) يجب أن يظهر للمستخدم لا أن يُدفن في نسخة محلية.
+    const { data, error } = await client
+      .from(TABLES.transactions)
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) throw error;
+    if (data) saved = data as Transaction;
   }
 
   const cached = await readJson<Transaction[]>(STORAGE_KEYS.transactions, []);

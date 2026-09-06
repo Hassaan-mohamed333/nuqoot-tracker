@@ -1,9 +1,10 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { CloudOff, Plus } from 'lucide-react-native';
+import { CloudOff, LogOut, Plus } from 'lucide-react-native';
 import React, { useMemo } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -16,6 +17,7 @@ import { EventCard } from '@/components/EventCard';
 import { LedgerSummaryBar } from '@/components/LedgerSummaryBar';
 import { TransactionCard } from '@/components/TransactionCard';
 import type { RootStackParamList } from '@/navigation/types';
+import { useAuth } from '@/store/AuthProvider';
 import { useLedger } from '@/store/LedgerProvider';
 import { formatAmount } from '@/utils/ledger';
 
@@ -24,6 +26,7 @@ type Navigation = NativeStackNavigationProp<RootStackParamList>;
 /** الشاشة الرئيسية: نظرة عامة على الواجبات، آخر الحركات، والمناسبات القادمة. */
 export function HomeScreen() {
   const navigation = useNavigation<Navigation>();
+  const { authDisabled, user, signOut } = useAuth();
   const {
     totals,
     transactions,
@@ -47,6 +50,21 @@ export function HomeScreen() {
         .slice(0, 5),
     [transactions],
   );
+
+  function confirmSignOut() {
+    Alert.alert(
+      'تسجيل الخروج',
+      'ستُحذف النسخة المحفوظة على هذا الجهاز، وتبقى بياناتك على الخادم.',
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'خروج',
+          style: 'destructive',
+          onPress: () => void signOut(),
+        },
+      ],
+    );
+  }
 
   const upcomingEvents = useMemo(
     () =>
@@ -73,21 +91,39 @@ export function HomeScreen() {
             <Text className="text-right text-xs text-gray-500">
               {contacts.length} جهة اتصال · {transactions.length} حركة
             </Text>
+            {user ? (
+              <Text className="text-right text-[11px] text-gray-400">
+                {user.email ?? 'حساب ضيف'}
+              </Text>
+            ) : null}
           </View>
-          <Pressable
-            onPress={() => navigation.navigate('AddTransaction')}
-            accessibilityRole="button"
-            accessibilityLabel="إضافة حركة جديدة"
-            className="h-11 w-11 items-center justify-center rounded-full bg-green-600">
-            <Plus size={22} color="#ffffff" />
-          </Pressable>
+          <View className="flex-row-reverse items-center">
+            <Pressable
+              onPress={() => navigation.navigate('AddTransaction')}
+              accessibilityRole="button"
+              accessibilityLabel="إضافة حركة جديدة"
+              className="h-11 w-11 items-center justify-center rounded-full bg-green-600">
+              <Plus size={22} color="#ffffff" />
+            </Pressable>
+            {authDisabled ? null : (
+              <Pressable
+                onPress={confirmSignOut}
+                accessibilityRole="button"
+                accessibilityLabel="تسجيل الخروج"
+                className="mr-2 h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white">
+                <LogOut size={20} color="#6b7280" />
+              </Pressable>
+            )}
+          </View>
         </View>
 
         {offline ? (
           <View className="mt-3 flex-row-reverse items-center rounded-xl bg-amber-50 p-3">
             <CloudOff size={16} color="#b45309" />
             <Text className="mr-2 flex-1 text-right text-xs text-amber-800">
-              وضع محلي: البيانات محفوظة على الجهاز. اضبط مفاتيح Supabase للمزامنة.
+              {authDisabled
+                ? 'وضع محلي: البيانات محفوظة على الجهاز. اضبط مفاتيح Supabase للمزامنة.'
+                : 'تعذّر الوصول إلى الخادم. تُعرض آخر نسخة محفوظة على الجهاز.'}
             </Text>
           </View>
         ) : null}

@@ -25,6 +25,7 @@
 - شاشة المناسبات مقسّمة إلى قادمة وسابقة مع إجمالي النقوط لكل مناسبة.
 - شريط ملخص ثابت أسفل الشاشة يعرض الحالة المالية (دائن / مدين).
 - إضافة حركة جديدة مع ربطها بجهة اتصال ومناسبة.
+- تسجيل دخول بالبريد أو كضيف (Anonymous)، مع عزل بيانات كل حساب عبر RLS.
 - يعمل بدون إعداد Supabase باستخدام تخزين محلي (AsyncStorage) وبيانات تجريبية.
 
 ## التقنيات
@@ -57,11 +58,14 @@ src/
 ├── navigation/                # التبويبات والمكدس
 ├── screens/
 │   ├── AddTransactionScreen.tsx
+│   ├── AuthScreen.tsx
 │   ├── ContactProfileScreen.tsx
 │   ├── ContactsListScreen.tsx
 │   ├── EventsScreen.tsx
 │   └── HomeScreen.tsx
-├── store/LedgerProvider.tsx   # حالة التطبيق المشتركة
+├── store/
+│   ├── AuthProvider.tsx       # جلسة Supabase ودوال الدخول والخروج
+│   └── LedgerProvider.tsx     # حالة التطبيق المشتركة
 ├── types/index.ts             # Contact, Event, Transaction, LedgerSummary
 └── utils/ledger.ts            # حسابات الرصيد والترتيب الأبجدي
 supabase/schema.sql            # جداول قاعدة البيانات وسياسات RLS
@@ -83,12 +87,24 @@ npm run typecheck
 ## ربط Supabase (اختياري)
 
 1. أنشئ مشروعاً على [supabase.com](https://supabase.com).
-2. شغّل `supabase/schema.sql` من SQL Editor.
-3. انسخ `.env.example` إلى `.env` واملأ:
+2. شغّل `supabase/schema.sql` من SQL Editor (ينشئ الجداول ويفعّل RLS).
+3. لتفعيل زر «متابعة كضيف»: Authentication → Sign In / Providers → **Anonymous sign-ins**.
+4. انسخ `.env.example` إلى `.env` واملأ **عنوان المشروع الأساسي** (بدون `/rest/v1`):
 
 ```
-EXPO_PUBLIC_SUPABASE_URL=...
+EXPO_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=...
 ```
 
-بدون هذه المتغيرات يعمل التطبيق في **الوضع المحلي** على بيانات الجهاز فقط.
+بدون هذه المتغيرات يعمل التطبيق في **الوضع المحلي** على بيانات الجهاز فقط
+وبدون شاشة دخول.
+
+## الحسابات وأمن البيانات
+
+- عند ضبط مفاتيح Supabase تظهر شاشة الدخول أولاً، لأن سياسات RLS تربط كل صف
+  بـ `auth.uid()` فلا تُقرأ أو تُكتب أي بيانات بلا جلسة.
+- الجلسة محفوظة في AsyncStorage، فيبقى المستخدم مسجّلاً بعد إغلاق التطبيق.
+- التطبيق **لا يرسل `user_id`** عند الإدراج؛ تملؤه قاعدة البيانات من
+  `default auth.uid()`. إرسال `null` صراحةً كان سيتجاوز القيمة الافتراضية
+  ويكسر قيد `NOT NULL`.
+- عند تسجيل الخروج تُمسح النسخة المحلية حتى لا يراها الحساب التالي على الجهاز.
