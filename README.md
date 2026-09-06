@@ -1,1 +1,94 @@
-# nuqoot-tracker
+# نقوط — Nuqoot Tracker
+
+تطبيق React Native (Expo + TypeScript) لتتبّع **النقوط والواجبات**: مَن دفعت له، ومَن دفع لك،
+وفي أي مناسبة، مع رصيد صافٍ واضح لكل جهة اتصال وللحساب كاملاً.
+
+## المفهوم المحاسبي
+
+| الاتجاه | المعنى | الأثر على الصافي |
+| --- | --- | --- |
+| `OUT` | نقوط **دفعتها** لجهة الاتصال | يزيد الصافي (لك واجب عندهم) |
+| `IN` | نقوط **استلمتها** من جهة الاتصال | ينقص الصافي (عليك واجب لهم) |
+
+الصافي = `مجموع OUT - مجموع IN`، ولونه:
+
+- **أخضر** عندما يكون الصافي > 0 → **دائن**
+- **أحمر** عندما يكون الصافي < 0 → **مدين**
+- **رمادي** عندما يكون الصافي = 0 → **متعادل**
+
+المنطق كله في `src/utils/ledger.ts`.
+
+## المزايا
+
+- قائمة جهات اتصال مرتّبة أبجدياً مع فهرس جانبي (ا-ي و A-Z) للقفز السريع.
+- ملف لكل جهة اتصال: الرصيد، سجل الحركات مع تصفية (دفعت / استلمت)، والمناسبات المرتبطة.
+- شاشة المناسبات مقسّمة إلى قادمة وسابقة مع إجمالي النقوط لكل مناسبة.
+- شريط ملخص ثابت أسفل الشاشة يعرض الحالة المالية (دائن / مدين).
+- إضافة حركة جديدة مع ربطها بجهة اتصال ومناسبة.
+- يعمل بدون إعداد Supabase باستخدام تخزين محلي (AsyncStorage) وبيانات تجريبية.
+
+## التقنيات
+
+| الغرض | الحزمة |
+| --- | --- |
+| الإطار | Expo SDK 57 + React Native 0.86 + TypeScript |
+| الخلفية | `@supabase/supabase-js` |
+| التنسيق | `nativewind` + `tailwindcss` |
+| التنقل | `@react-navigation/native` + `bottom-tabs` + `native-stack` |
+| الأيقونات | `lucide-react-native` |
+| التخزين المحلي | `@react-native-async-storage/async-storage` |
+
+## هيكل المشروع
+
+```
+src/
+├── components/
+│   ├── AlphabetIndex.tsx      # الفهرس الأبجدي الجانبي
+│   ├── ContactRow.tsx         # صف جهة اتصال
+│   ├── EventCard.tsx          # بطاقة مناسبة
+│   ├── LedgerSummaryBar.tsx   # الشريط الثابت أسفل الشاشة
+│   ├── NetBalanceBadge.tsx    # شارة الرصيد الصافي
+│   └── TransactionCard.tsx    # بطاقة حركة
+├── data/seed.ts               # بيانات تجريبية
+├── lib/
+│   ├── repository.ts          # جلب/حفظ البيانات (Supabase + محلي)
+│   ├── storage.ts             # مساعدات AsyncStorage
+│   └── supabase.ts            # إعداد عميل Supabase
+├── navigation/                # التبويبات والمكدس
+├── screens/
+│   ├── AddTransactionScreen.tsx
+│   ├── ContactProfileScreen.tsx
+│   ├── ContactsListScreen.tsx
+│   ├── EventsScreen.tsx
+│   └── HomeScreen.tsx
+├── store/LedgerProvider.tsx   # حالة التطبيق المشتركة
+├── types/index.ts             # Contact, Event, Transaction, LedgerSummary
+└── utils/ledger.ts            # حسابات الرصيد والترتيب الأبجدي
+supabase/schema.sql            # جداول قاعدة البيانات وسياسات RLS
+```
+
+## التشغيل
+
+```bash
+npm install
+npm start        # ثم اختر a للأندرويد أو i لـ iOS
+```
+
+للتحقق من الأنواع:
+
+```bash
+npm run typecheck
+```
+
+## ربط Supabase (اختياري)
+
+1. أنشئ مشروعاً على [supabase.com](https://supabase.com).
+2. شغّل `supabase/schema.sql` من SQL Editor.
+3. انسخ `.env.example` إلى `.env` واملأ:
+
+```
+EXPO_PUBLIC_SUPABASE_URL=...
+EXPO_PUBLIC_SUPABASE_ANON_KEY=...
+```
+
+بدون هذه المتغيرات يعمل التطبيق في **الوضع المحلي** على بيانات الجهاز فقط.
