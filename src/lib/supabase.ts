@@ -19,6 +19,25 @@ export const isSupabaseConfigured =
   supabaseUrl.length > 0 && supabaseAnonKey.length > 0;
 
 /**
+ * مهلة أي طلب شبكة يخرج من العميل.
+ *
+ * fetch في React Native بلا مهلة افتراضية: شبكة بطيئة أو محجوبة تُبقي
+ * الوعد معلّقاً إلى الأبد. هذا ما كان يجمّد شاشة الإقلاع، لأن
+ * getSession() يجدّد الرمز المنتهي عبر الشبكة قبل أن يعود.
+ */
+export const REQUEST_TIMEOUT_MS = 15000;
+
+const fetchWithTimeout: typeof fetch = async (input, init) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+/**
  * العميل يكون null عندما لا تتوفر بيانات الاتصال، حتى لا ينهار التطبيق
  * أثناء التطوير قبل ربط قاعدة البيانات.
  */
@@ -31,6 +50,7 @@ export const supabase: SupabaseClient | null = isSupabaseConfigured
         // لا يوجد شريط عنوان في التطبيقات الأصلية.
         detectSessionInUrl: false,
       },
+      global: { fetch: fetchWithTimeout },
     })
   : null;
 

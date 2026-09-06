@@ -60,7 +60,14 @@ export function HomeScreen() {
         {
           text: 'خروج',
           style: 'destructive',
-          onPress: () => void signOut(),
+          onPress: () => {
+            signOut().catch((error: unknown) =>
+              Alert.alert(
+                'تعذّر تسجيل الخروج',
+                error instanceof Error ? error.message : 'حدث خطأ غير متوقع.',
+              ),
+            );
+          },
         },
       ],
     );

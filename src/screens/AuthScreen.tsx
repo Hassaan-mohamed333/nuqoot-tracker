@@ -1,4 +1,4 @@
-import { LogIn, Mail, UserRound } from 'lucide-react-native';
+import { LogIn, Mail, TriangleAlert, UserRound } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -22,7 +22,8 @@ type Mode = 'signIn' | 'signUp';
  * فلا تُقرأ أو تُكتب أي بيانات قبل وجود جلسة.
  */
 export function AuthScreen() {
-  const { signInWithEmail, signUpWithEmail, signInAnonymously } = useAuth();
+  const { signInWithEmail, signUpWithEmail, signInAnonymously, initError } =
+    useAuth();
   const [mode, setMode] = useState<Mode>('signIn');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -89,6 +90,15 @@ export function AuthScreen() {
               سجّل الدخول لحفظ نقوطك وواجباتك ومزامنتها بين أجهزتك.
             </Text>
           </View>
+
+          {initError ? (
+            <View className="mt-6 flex-row-reverse items-center rounded-xl bg-amber-50 p-3">
+              <TriangleAlert size={16} color="#b45309" />
+              <Text className="mr-2 flex-1 text-right text-xs text-amber-800">
+                تعذّر استعادة جلستك السابقة ({initError}) — سجّل الدخول مجدداً.
+              </Text>
+            </View>
+          ) : null}
 
           <View className="mt-8 flex-row-reverse">
             {(
