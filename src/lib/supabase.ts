@@ -69,4 +69,7 @@ export const TABLES = {
   contacts: 'contacts',
   events: 'events',
   transactions: 'transactions',
+  eventParticipants: 'event_participants',
+  sharedExpenses: 'shared_expenses',
+  expenseShares: 'expense_shares',
 } as const;

@@ -5,6 +5,9 @@ export const STORAGE_KEYS = {
   contacts: 'nuqoot:contacts',
   events: 'nuqoot:events',
   transactions: 'nuqoot:transactions',
+  participants: 'nuqoot:event-participants',
+  sharedExpenses: 'nuqoot:shared-expenses',
+  expenseShares: 'nuqoot:expense-shares',
 } as const;
 
 /** يقرأ قيمة JSON من التخزين المحلي، ويعيد fallback عند الفشل. */

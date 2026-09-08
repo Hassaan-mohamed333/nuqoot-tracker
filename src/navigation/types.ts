@@ -15,6 +15,10 @@ export type RootStackParamList = {
   /** returnTo: يعود إلى شاشة الحركة ويختار ما أُنشئ للتوّ. */
   AddContact: { returnTo?: 'AddTransaction' } | undefined;
   AddEvent: { returnTo?: 'AddTransaction'; hostContactId?: string } | undefined;
+  /** الدفتر الجماعي لمناسبة: المشاركون، المصاريف، ومن يدين لمن. */
+  EventLedger: { eventId: string };
+  AddSharedExpense: { eventId: string };
+  EventParticipants: { eventId: string };
 };
 
 declare global {

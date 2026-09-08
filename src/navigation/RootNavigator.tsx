@@ -7,9 +7,12 @@ import React from 'react';
 import type { RootStackParamList, TabParamList } from '@/navigation/types';
 import { AddContactScreen } from '@/screens/AddContactScreen';
 import { AddEventScreen } from '@/screens/AddEventScreen';
+import { AddSharedExpenseScreen } from '@/screens/AddSharedExpenseScreen';
 import { AddTransactionScreen } from '@/screens/AddTransactionScreen';
 import { ContactProfileScreen } from '@/screens/ContactProfileScreen';
 import { ContactsListScreen } from '@/screens/ContactsListScreen';
+import { EventLedgerScreen } from '@/screens/EventLedgerScreen';
+import { EventParticipantsScreen } from '@/screens/EventParticipantsScreen';
 import { EventsScreen } from '@/screens/EventsScreen';
 import { HomeScreen } from '@/screens/HomeScreen';
 
@@ -88,6 +91,21 @@ export function RootNavigator() {
           name="AddEvent"
           component={AddEventScreen}
           options={{ title: 'مناسبة جديدة', presentation: 'modal' }}
+        />
+        <Stack.Screen
+          name="EventLedger"
+          component={EventLedgerScreen}
+          options={{ title: 'دفتر المناسبة' }}
+        />
+        <Stack.Screen
+          name="EventParticipants"
+          component={EventParticipantsScreen}
+          options={{ title: 'المشاركون', presentation: 'modal' }}
+        />
+        <Stack.Screen
+          name="AddSharedExpense"
+          component={AddSharedExpenseScreen}
+          options={{ title: 'مصروف جماعي', presentation: 'modal' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

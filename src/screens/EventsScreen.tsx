@@ -112,11 +112,7 @@ export function EventsScreen() {
             }
             totalPaid={paidByEvent.get(item.id) ?? 0}
             onPress={() =>
-              item.host_contact_id
-                ? navigation.navigate('ContactProfile', {
-                    contactId: item.host_contact_id,
-                  })
-                : navigation.navigate('AddTransaction', { eventId: item.id })
+              navigation.navigate('EventLedger', { eventId: item.id })
             }
           />
         )}

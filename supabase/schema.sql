@@ -50,6 +50,53 @@ create table if not exists public.transactions (
   created_at timestamptz not null default now()
 );
 
+-- ===================== الدفتر الجماعي للمناسبات =====================
+-- contact_id / payer_contact_id بقيمة null تعني المستخدم نفسه: هو طرف في
+-- القسمة وليس جهة اتصال في دفتره.
+
+create table if not exists public.event_participants (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  event_id uuid not null references public.events (id) on delete cascade,
+  contact_id uuid references public.contacts (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+-- null لا يتكرر في قيود unique العادية، لذا نفصل الحالتين بفهرسين جزئيين.
+create unique index if not exists event_participants_contact_uniq
+  on public.event_participants (event_id, contact_id)
+  where contact_id is not null;
+create unique index if not exists event_participants_self_uniq
+  on public.event_participants (event_id)
+  where contact_id is null;
+
+create table if not exists public.shared_expenses (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  event_id uuid not null references public.events (id) on delete cascade,
+  payer_contact_id uuid references public.contacts (id) on delete set null,
+  description text not null,
+  amount numeric(12, 2) not null check (amount > 0),
+  currency text not null default 'EGP',
+  occurred_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.expense_shares (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  expense_id uuid not null references public.shared_expenses (id) on delete cascade,
+  contact_id uuid references public.contacts (id) on delete cascade,
+  share_amount numeric(12, 2) not null check (share_amount >= 0)
+);
+
+create index if not exists event_participants_event_idx
+  on public.event_participants (event_id);
+create index if not exists shared_expenses_event_idx
+  on public.shared_expenses (event_id, occurred_at desc);
+create index if not exists expense_shares_expense_idx
+  on public.expense_shares (expense_id);
+
 create index if not exists contacts_user_name_idx on public.contacts (user_id, full_name);
 create index if not exists contacts_active_idx
   on public.contacts (user_id, is_archived);
@@ -109,3 +156,19 @@ create policy "transactions_owner" on public.transactions
       )
     )
   );
+
+alter table public.event_participants enable row level security;
+alter table public.shared_expenses enable row level security;
+alter table public.expense_shares enable row level security;
+
+drop policy if exists "event_participants_owner" on public.event_participants;
+create policy "event_participants_owner" on public.event_participants
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "shared_expenses_owner" on public.shared_expenses;
+create policy "shared_expenses_owner" on public.shared_expenses
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "expense_shares_owner" on public.expense_shares;
+create policy "expense_shares_owner" on public.expense_shares
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

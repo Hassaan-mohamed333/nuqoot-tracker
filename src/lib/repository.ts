@@ -4,6 +4,12 @@ import { isSupabaseConfigured, requireSupabase, TABLES } from '@/lib/supabase';
 import type {
   Contact,
   ContactInsert,
+  EventParticipant,
+  ExpenseShare,
+  NewSharedExpenseInput,
+  SharedExpense,
+  SharedExpenseInsert,
+  SharedExpenseWithShares,
   Event,
   EventInsert,
   NewContactInput,
@@ -111,6 +117,241 @@ export async function fetchLedgerData(): Promise<LedgerData> {
     // تعذّر الوصول للخادم: نعرض آخر نسخة محفوظة لهذا الحساب بلا زرع بيانات.
     return loadLocal(false);
   }
+}
+
+/** كل ما تحتاجه صفحة الدفتر الجماعي لمناسبة واحدة. */
+export interface EventLedger {
+  event: Event | null;
+  participants: EventParticipant[];
+  expenses: SharedExpenseWithShares[];
+  offline: boolean;
+}
+
+/** يدمج المصاريف مع حصصها في بنية واحدة. */
+function attachShares(
+  expenses: SharedExpense[],
+  shares: ExpenseShare[],
+): SharedExpenseWithShares[] {
+  const byExpense = new Map<string, ExpenseShare[]>();
+  for (const share of shares) {
+    const list = byExpense.get(share.expense_id) ?? [];
+    list.push(share);
+    byExpense.set(share.expense_id, list);
+  }
+  return expenses.map((expense) => ({
+    ...expense,
+    shares: byExpense.get(expense.id) ?? [],
+  }));
+}
+
+/** النسخة المحلية من دفتر المناسبة. */
+async function loadLocalEventLedger(eventId: string): Promise<EventLedger> {
+  const [events, participants, expenses, shares] = await Promise.all([
+    readJson<Event[]>(STORAGE_KEYS.events, []),
+    readJson<EventParticipant[]>(STORAGE_KEYS.participants, []),
+    readJson<SharedExpense[]>(STORAGE_KEYS.sharedExpenses, []),
+    readJson<ExpenseShare[]>(STORAGE_KEYS.expenseShares, []),
+  ]);
+
+  const eventExpenses = expenses
+    .filter((expense) => expense.event_id === eventId)
+    .sort((a, b) => b.occurred_at.localeCompare(a.occurred_at));
+  const expenseIds = new Set(eventExpenses.map((expense) => expense.id));
+
+  return {
+    event: events.find((event) => event.id === eventId) ?? null,
+    participants: participants.filter((row) => row.event_id === eventId),
+    expenses: attachShares(
+      eventExpenses,
+      shares.filter((share) => expenseIds.has(share.expense_id)),
+    ),
+    offline: true,
+  };
+}
+
+/** يجلب دفتر المناسبة من Supabase، مع رجوع إلى النسخة المحلية عند التعذّر. */
+export async function fetchEventLedger(eventId: string): Promise<EventLedger> {
+  if (!isSupabaseConfigured) return loadLocalEventLedger(eventId);
+
+  try {
+    const client = requireSupabase();
+
+    const [eventResult, participantsResult, expensesResult] = await Promise.all([
+      client.from(TABLES.events).select('*').eq('id', eventId).maybeSingle(),
+      client
+        .from(TABLES.eventParticipants)
+        .select('*')
+        .eq('event_id', eventId),
+      client
+        .from(TABLES.sharedExpenses)
+        .select('*')
+        .eq('event_id', eventId)
+        .order('occurred_at', { ascending: false }),
+    ]);
+
+    if (eventResult.error) throw eventResult.error;
+    if (participantsResult.error) throw participantsResult.error;
+    if (expensesResult.error) throw expensesResult.error;
+
+    const expenses = (expensesResult.data ?? []) as SharedExpense[];
+    const expenseIds = expenses.map((expense) => expense.id);
+
+    const sharesResult =
+      expenseIds.length > 0
+        ? await client
+            .from(TABLES.expenseShares)
+            .select('*')
+            .in('expense_id', expenseIds)
+        : { data: [] as ExpenseShare[], error: null };
+
+    if (sharesResult.error) throw sharesResult.error;
+
+    return {
+      event: (eventResult.data as Event | null) ?? null,
+      participants: (participantsResult.data ?? []) as EventParticipant[],
+      expenses: attachShares(expenses, (sharesResult.data ?? []) as ExpenseShare[]),
+      offline: false,
+    };
+  } catch {
+    return loadLocalEventLedger(eventId);
+  }
+}
+
+/**
+ * يضبط قائمة المشاركين في المناسبة (استبدال كامل).
+ * contactIds لا تتضمن المستخدم؛ includeMe يضيف صف contact_id = null.
+ */
+export async function setEventParticipants(
+  eventId: string,
+  contactIds: string[],
+  includeMe: boolean,
+): Promise<EventParticipant[]> {
+  const nowIso = new Date().toISOString();
+  const desired: (string | null)[] = includeMe
+    ? [null, ...contactIds]
+    : [...contactIds];
+
+  const rows: EventParticipant[] = desired.map((contactId) => ({
+    id: createId('p'),
+    event_id: eventId,
+    contact_id: contactId,
+    created_at: nowIso,
+  }));
+
+  if (isSupabaseConfigured) {
+    const client = requireSupabase();
+
+    const { error: deleteError } = await client
+      .from(TABLES.eventParticipants)
+      .delete()
+      .eq('event_id', eventId);
+    if (deleteError) throw deleteError;
+
+    if (desired.length > 0) {
+      const { data, error } = await client
+        .from(TABLES.eventParticipants)
+        .insert(
+          desired.map((contactId) => ({
+            event_id: eventId,
+            contact_id: contactId,
+          })),
+        )
+        .select();
+      if (error) throw error;
+      const saved = (data ?? []) as EventParticipant[];
+      await replaceLocalParticipants(eventId, saved);
+      return saved;
+    }
+
+    await replaceLocalParticipants(eventId, []);
+    return [];
+  }
+
+  await replaceLocalParticipants(eventId, rows);
+  return rows;
+}
+
+async function replaceLocalParticipants(
+  eventId: string,
+  rows: EventParticipant[],
+): Promise<void> {
+  const cached = await readJson<EventParticipant[]>(STORAGE_KEYS.participants, []);
+  await writeJson(STORAGE_KEYS.participants, [
+    ...cached.filter((row) => row.event_id !== eventId),
+    ...rows,
+  ]);
+}
+
+/** يضيف مصروفاً جماعياً مع حصصه. */
+export async function createSharedExpense(
+  input: NewSharedExpenseInput,
+): Promise<SharedExpenseWithShares> {
+  const nowIso = new Date().toISOString();
+
+  const payload: SharedExpenseInsert = {
+    event_id: input.event_id,
+    payer_contact_id: input.payer_contact_id,
+    description: input.description.trim(),
+    amount: Math.abs(input.amount),
+    currency: input.currency ?? DEFAULT_CURRENCY,
+    occurred_at: input.occurred_at ?? nowIso,
+  };
+
+  let expense: SharedExpense = {
+    ...payload,
+    id: createId('x'),
+    user_id: null,
+    created_at: nowIso,
+  };
+
+  let shares: ExpenseShare[] = input.shares.map((share) => ({
+    id: createId('s'),
+    expense_id: expense.id,
+    contact_id: share.contact_id,
+    share_amount: share.share_amount,
+  }));
+
+  if (isSupabaseConfigured) {
+    const client = requireSupabase();
+
+    const { data, error } = await client
+      .from(TABLES.sharedExpenses)
+      .insert(payload)
+      .select()
+      .single();
+    if (error) throw error;
+    expense = data as SharedExpense;
+
+    const { data: shareData, error: shareError } = await client
+      .from(TABLES.expenseShares)
+      .insert(
+        input.shares.map((share) => ({
+          expense_id: expense.id,
+          contact_id: share.contact_id,
+          share_amount: share.share_amount,
+        })),
+      )
+      .select();
+
+    if (shareError) {
+      // الحصص هي ما يجعل المصروف قابلاً للقسمة؛ مصروف بلا حصص يفسد
+      // الحساب، فنتراجع عن الإدراج بدل ترك صف نصف مكتمل.
+      await client.from(TABLES.sharedExpenses).delete().eq('id', expense.id);
+      throw shareError;
+    }
+    shares = (shareData ?? []) as ExpenseShare[];
+  }
+
+  const [cachedExpenses, cachedShares] = await Promise.all([
+    readJson<SharedExpense[]>(STORAGE_KEYS.sharedExpenses, []),
+    readJson<ExpenseShare[]>(STORAGE_KEYS.expenseShares, []),
+  ]);
+  await Promise.all([
+    writeJson(STORAGE_KEYS.sharedExpenses, [expense, ...cachedExpenses]),
+    writeJson(STORAGE_KEYS.expenseShares, [...shares, ...cachedShares]),
+  ]);
+
+  return { ...expense, shares };
 }
 
 /** بيانات صفحة شخص واحد: الشخص وحركاته ومناسباته. */

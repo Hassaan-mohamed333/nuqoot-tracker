@@ -142,3 +142,86 @@ export type ContactInsert = Omit<
 
 /** حمولة إدراج مناسبة (user_id مستبعد كما في الحركات). */
 export type EventInsert = Omit<Event, 'id' | 'created_at' | 'user_id'>;
+
+/**
+ * مشارك في مناسبة جماعية.
+ *
+ * contact_id = null يعني المستخدم نفسه: هو طرف في القسمة وليس جهة اتصال.
+ */
+export interface EventParticipant {
+  id: string;
+  event_id: string;
+  contact_id: string | null;
+  created_at: string;
+}
+
+/** مصروف جماعي دفعه شخص واحد ويُقسم على المشاركين. */
+export interface SharedExpense {
+  id: string;
+  user_id: string | null;
+  event_id: string;
+  /** من دفع؛ null = المستخدم نفسه. */
+  payer_contact_id: string | null;
+  description: string;
+  amount: number;
+  currency: string;
+  occurred_at: string;
+  created_at: string;
+}
+
+/** حصة مشارك واحد من مصروف جماعي. */
+export interface ExpenseShare {
+  id: string;
+  expense_id: string;
+  /** null = المستخدم نفسه. */
+  contact_id: string | null;
+  share_amount: number;
+}
+
+/** مصروف مع حصصه، كما يُعرض في دفتر المناسبة. */
+export interface SharedExpenseWithShares extends SharedExpense {
+  shares: ExpenseShare[];
+}
+
+/** رصيد مشارك داخل مناسبة واحدة. */
+export interface ParticipantBalance {
+  /** null = المستخدم نفسه. */
+  contactId: string | null;
+  name: string;
+  /** مجموع ما دفعه هذا المشارك. */
+  paid: number;
+  /** مجموع ما يخصّه من الحصص. */
+  owed: number;
+  /** paid - owed: موجب يعني له، سالب يعني عليه. */
+  net: number;
+}
+
+/** تحويل مقترح لتسوية المناسبة: من يدفع لمن وكم. */
+export interface Settlement {
+  fromContactId: string | null;
+  fromName: string;
+  toContactId: string | null;
+  toName: string;
+  amount: number;
+}
+
+/** طريقة توزيع المصروف على المشاركين. */
+export type SplitMode = 'equal' | 'custom';
+
+/** بيانات إنشاء مصروف جماعي. */
+export interface NewSharedExpenseInput {
+  event_id: string;
+  payer_contact_id: string | null;
+  description: string;
+  amount: number;
+  currency?: string;
+  occurred_at?: string;
+  /** الحصص النهائية؛ مجموعها يجب أن يساوي amount. */
+  shares: { contact_id: string | null; share_amount: number }[];
+}
+
+/** حمولات الإدراج (user_id مستبعد كما في بقية الجداول). */
+export type SharedExpenseInsert = Omit<
+  SharedExpense,
+  'id' | 'created_at' | 'user_id'
+>;
