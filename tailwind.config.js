@@ -2,6 +2,12 @@
 module.exports = {
   content: ['./App.tsx', './src/**/*.{js,jsx,ts,tsx}'],
   presets: [require('nativewind/preset')],
+  // الوضع الليلي في NativeWind v4 يُضبط هنا، لا باستدعاء وقت التشغيل.
+  // StyleSheet.setFlag('darkMode', 'class') غير موجود في React Native 0.86
+  // ويُسقط التطبيق عند الإقلاع؛ للتبديل برمجياً استخدم:
+  //   import { colorScheme } from 'nativewind';
+  //   colorScheme.set('dark' | 'light' | 'system');
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {

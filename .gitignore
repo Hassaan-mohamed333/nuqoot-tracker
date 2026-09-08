@@ -43,3 +43,6 @@ yarn-error.*
 # local supabase credentials
 .env
 !.env.example
+
+# Supabase CLI local state
+supabase/.temp/
