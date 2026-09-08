@@ -1,3 +1,6 @@
+import { decode as decodeBase64 } from 'base64-arraybuffer';
+import * as FileSystem from 'expo-file-system';
+
 import { SEED_CONTACTS, SEED_EVENTS, SEED_TRANSACTIONS } from '@/data/seed';
 import { readJson, STORAGE_KEYS, writeJson } from '@/lib/storage';
 import { isSupabaseConfigured, requireSupabase, TABLES } from '@/lib/supabase';
@@ -117,6 +120,54 @@ export async function fetchLedgerData(): Promise<LedgerData> {
     // تعذّر الوصول للخادم: نعرض آخر نسخة محفوظة لهذا الحساب بلا زرع بيانات.
     return loadLocal(false);
   }
+}
+
+/** اسم دلو التخزين الذي تُرفع إليه صور الإيصالات. */
+export const RECEIPTS_BUCKET = 'receipts';
+
+/**
+ * يرفع صورة إيصال ويعيد مسارها داخل الدلو.
+ *
+ * الدلو خاص، فنخزّن المسار لا رابطاً عاماً، ونولّد رابطاً موقّعاً عند
+ * العرض. رابط عام يعني أن أي شخص يخمّن المسار يقرأ إيصالات غيره.
+ */
+export async function uploadReceipt(localUri: string): Promise<string> {
+  const client = requireSupabase();
+
+  const {
+    data: { user },
+  } = await client.auth.getUser();
+  if (!user) throw new Error('يلزم تسجيل الدخول لرفع الإيصالات.');
+
+  const base64 = await FileSystem.readAsStringAsync(localUri, {
+    encoding: 'base64',
+  });
+
+  const extension = localUri.split('.').pop()?.toLowerCase() ?? 'jpg';
+  const contentType = extension === 'png' ? 'image/png' : 'image/jpeg';
+  // المسار يبدأ بمعرّف المستخدم لتستطيع سياسات التخزين عزل الملفات.
+  const path = `${user.id}/${Date.now()}.${extension}`;
+
+  const { error } = await client.storage
+    .from(RECEIPTS_BUCKET)
+    .upload(path, decodeBase64(base64), { contentType, upsert: false });
+
+  if (error) throw error;
+  return path;
+}
+
+/** يولّد رابطاً موقّعاً مؤقتاً لعرض إيصال مخزَّن. */
+export async function getReceiptUrl(
+  path: string,
+  expiresInSeconds = 3600,
+): Promise<string | null> {
+  if (!isSupabaseConfigured) return null;
+  const client = requireSupabase();
+  const { data, error } = await client.storage
+    .from(RECEIPTS_BUCKET)
+    .createSignedUrl(path, expiresInSeconds);
+  if (error) return null;
+  return data?.signedUrl ?? null;
 }
 
 /** كل ما تحتاجه صفحة الدفتر الجماعي لمناسبة واحدة. */
@@ -612,6 +663,7 @@ export async function createTransaction(
     currency: input.currency ?? DEFAULT_CURRENCY,
     occurred_at: input.occurred_at ?? nowIso,
     note: input.note ?? null,
+    receipt_url: input.receipt_url ?? null,
   };
 
   const draft: Transaction = {

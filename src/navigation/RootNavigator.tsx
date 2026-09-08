@@ -15,6 +15,8 @@ import { EventLedgerScreen } from '@/screens/EventLedgerScreen';
 import { EventParticipantsScreen } from '@/screens/EventParticipantsScreen';
 import { EventsScreen } from '@/screens/EventsScreen';
 import { HomeScreen } from '@/screens/HomeScreen';
+import { ScanReceiptScreen } from '@/screens/ScanReceiptScreen';
+import { SmartInputScreen } from '@/screens/SmartInputScreen';
 
 const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -91,6 +93,16 @@ export function RootNavigator() {
           name="AddEvent"
           component={AddEventScreen}
           options={{ title: 'مناسبة جديدة', presentation: 'modal' }}
+        />
+        <Stack.Screen
+          name="SmartInput"
+          component={SmartInputScreen}
+          options={{ title: 'إدخال ذكي', presentation: 'modal' }}
+        />
+        <Stack.Screen
+          name="ScanReceipt"
+          component={ScanReceiptScreen}
+          options={{ title: 'قراءة إيصال', presentation: 'modal' }}
         />
         <Stack.Screen
           name="EventLedger"

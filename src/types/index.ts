@@ -65,6 +65,8 @@ export interface Transaction {
   /** تاريخ الحركة بصيغة ISO. */
   occurred_at: string;
   note: string | null;
+  /** رابط صورة الإيصال في Supabase Storage، إن رُفعت. */
+  receipt_url: string | null;
   created_at: string;
 }
 
@@ -121,6 +123,7 @@ export interface NewTransactionInput {
   currency?: string;
   occurred_at?: string;
   note?: string | null;
+  receipt_url?: string | null;
 }
 
 /**

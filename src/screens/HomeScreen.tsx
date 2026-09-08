@@ -1,6 +1,14 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { CalendarPlus, CloudOff, LogOut, Plus, UserPlus } from 'lucide-react-native';
+import {
+  CalendarPlus,
+  CloudOff,
+  LogOut,
+  Plus,
+  ScanLine,
+  Sparkles,
+  UserPlus,
+} from 'lucide-react-native';
 import React, { useMemo } from 'react';
 import {
   ActivityIndicator,
@@ -167,6 +175,25 @@ export function HomeScreen() {
         ) : null}
 
         <View className="mt-4 flex-row-reverse">
+          <Pressable
+            onPress={() => navigation.navigate('SmartInput')}
+            accessibilityRole="button"
+            className="flex-1 flex-row-reverse items-center justify-center rounded-2xl bg-green-600 py-3">
+            <Sparkles size={18} color="#ffffff" />
+            <Text className="mr-2 text-sm font-bold text-white">إدخال ذكي</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => navigation.navigate('ScanReceipt')}
+            accessibilityRole="button"
+            className="mr-2 flex-1 flex-row-reverse items-center justify-center rounded-2xl border border-gray-200 bg-white py-3">
+            <ScanLine size={18} color="#16a34a" />
+            <Text className="mr-2 text-sm font-bold text-green-700">
+              قراءة إيصال
+            </Text>
+          </Pressable>
+        </View>
+
+        <View className="mt-3 flex-row-reverse">
           <View className="flex-1 rounded-2xl border border-gray-100 bg-white p-4">
             <Text className="text-right text-xs text-gray-500">إجمالي ما دفعت</Text>
             <Text className="text-right text-lg font-bold text-green-700">

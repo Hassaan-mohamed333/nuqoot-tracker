@@ -5,6 +5,7 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Check,
+  Paperclip,
   Plus,
   UserPlus,
 } from 'lucide-react-native';
@@ -22,6 +23,8 @@ import {
 } from 'react-native';
 
 import type { RootStackParamList } from '@/navigation/types';
+import { uploadReceipt } from '@/lib/repository';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { useLedger } from '@/store/LedgerProvider';
 import type { TransactionDirection } from '@/types';
 import { DEFAULT_CURRENCY, formatDate, getNetTheme } from '@/utils/ledger';
@@ -43,6 +46,9 @@ export function AddTransactionScreen() {
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [receiptUri, setReceiptUri] = useState<string | null>(
+    params?.prefill?.receiptUri ?? null,
+  );
 
   // العودة من شاشة الإنشاء تمرّ عبر تحديث المعاملات، لا عبر إعادة التركيب،
   // لذا نزامن الاختيار يدوياً. نتجاهل القيم الفارغة حتى لا يُمسح اختيار قائم.
@@ -56,6 +62,16 @@ export function AddTransactionScreen() {
   useEffect(() => {
     if (paramEventId) setEventId(paramEventId);
   }, [paramEventId]);
+
+  // قيم مقترحة من الإدخال الذكي أو قارئ الإيصالات: تُملأ للمراجعة فقط.
+  const prefill = params?.prefill;
+  useEffect(() => {
+    if (!prefill) return;
+    if (prefill.amount !== undefined) setAmount(String(prefill.amount));
+    if (prefill.direction) setDirection(prefill.direction);
+    if (prefill.note) setNote(prefill.note);
+    if (prefill.receiptUri) setReceiptUri(prefill.receiptUri);
+  }, [prefill]);
 
   const sortedContacts = useMemo(
     () =>
@@ -76,6 +92,13 @@ export function AddTransactionScreen() {
     if (!isValid || !contactId) return;
     setSaving(true);
     try {
+      // الرفع قبل الإدراج: حركة تشير إلى إيصال غير موجود أسوأ من حركة
+      // بلا إيصال، لذا يفشل الحفظ كله إن فشل الرفع.
+      let receiptPath: string | null = null;
+      if (receiptUri && isSupabaseConfigured) {
+        receiptPath = await uploadReceipt(receiptUri);
+      }
+
       await addTransaction({
         contact_id: contactId,
         event_id: eventId,
@@ -83,6 +106,7 @@ export function AddTransactionScreen() {
         amount: parsedAmount,
         currency: DEFAULT_CURRENCY,
         note: note.trim() || null,
+        receipt_url: receiptPath,
       });
       navigation.goBack();
     } catch (error) {
@@ -264,6 +288,23 @@ export function AddTransactionScreen() {
           placeholderTextColor="#9ca3af"
           className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-right text-sm text-gray-900"
         />
+
+        {receiptUri ? (
+          <View className="mt-6 flex-row-reverse items-center rounded-xl bg-green-50 p-3">
+            <Paperclip size={16} color="#16a34a" />
+            <Text className="mr-2 flex-1 text-right text-xs text-green-800">
+              {isSupabaseConfigured
+                ? 'إيصال مرفق — يُرفع عند الحفظ.'
+                : 'إيصال مرفق — يحتاج Supabase ليُرفع.'}
+            </Text>
+            <Pressable
+              onPress={() => setReceiptUri(null)}
+              accessibilityRole="button"
+              className="rounded-full bg-white px-3 py-1">
+              <Text className="text-xs font-bold text-gray-600">إزالة</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         <Pressable
           onPress={() => void handleSave()}

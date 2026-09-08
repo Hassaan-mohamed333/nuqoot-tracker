@@ -172,3 +172,32 @@ create policy "shared_expenses_owner" on public.shared_expenses
 drop policy if exists "expense_shares_owner" on public.expense_shares;
 create policy "expense_shares_owner" on public.expense_shares
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ===================== تخزين صور الإيصالات =====================
+-- دلو خاص: الملفات لا تُقرأ برابط عام، بل برابط موقّع مؤقت يولّده التطبيق.
+
+insert into storage.buckets (id, name, public)
+values ('receipts', 'receipts', false)
+on conflict (id) do nothing;
+
+-- المسار يبدأ بمعرّف المستخدم، وهذه السياسات تمنع تجاوزه إلى مجلد غيره.
+drop policy if exists "receipts_read_own" on storage.objects;
+create policy "receipts_read_own" on storage.objects
+  for select using (
+    bucket_id = 'receipts'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "receipts_insert_own" on storage.objects;
+create policy "receipts_insert_own" on storage.objects
+  for insert with check (
+    bucket_id = 'receipts'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "receipts_delete_own" on storage.objects;
+create policy "receipts_delete_own" on storage.objects
+  for delete using (
+    bucket_id = 'receipts'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );

@@ -21,6 +21,21 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "scheme": "nuqoot"
+    "scheme": "nuqoot",
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "نستخدم صورك لإرفاق إيصالات بالحركات.",
+          "cameraPermission": "نستخدم الكاميرا لتصوير الإيصالات."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "نستخدم الميكروفون لإدخال الحركات بالصوت."
+        }
+      ]
+    ]
   }
 }
