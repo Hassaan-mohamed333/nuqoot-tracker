@@ -31,6 +31,9 @@ export interface Contact {
   /** صلة القرابة أو العلاقة: قريب، صديق، جار… */
   relation: string | null;
   notes: string | null;
+  /** مؤرشف: يختفي من القائمة النشطة بعد تسوية الحساب. */
+  is_archived: boolean;
+  archived_at: string | null;
   created_at: string;
 }
 
@@ -132,7 +135,10 @@ export type TransactionInsert = Omit<
 >;
 
 /** حمولة إدراج جهة اتصال (user_id مستبعد كما في الحركات). */
-export type ContactInsert = Omit<Contact, 'id' | 'created_at' | 'user_id'>;
+export type ContactInsert = Omit<
+  Contact,
+  'id' | 'created_at' | 'user_id' | 'is_archived' | 'archived_at'
+>;
 
 /** حمولة إدراج مناسبة (user_id مستبعد كما في الحركات). */
 export type EventInsert = Omit<Event, 'id' | 'created_at' | 'user_id'>;

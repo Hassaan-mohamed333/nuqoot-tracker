@@ -274,6 +274,8 @@ export async function createContact(
     ...payload,
     id: createId('c'),
     user_id: null,
+    is_archived: false,
+    archived_at: null,
     created_at: nowIso,
   };
 
@@ -283,6 +285,47 @@ export async function createContact(
     draft,
     payload,
   );
+}
+
+/**
+ * يؤرشف جهة اتصال أو يعيدها إلى القائمة النشطة.
+ *
+ * الأرشفة إخفاء لا حذف: الحركات تبقى كما هي، ويمكن الاستعادة في أي وقت.
+ */
+export async function setContactArchived(
+  contactId: string,
+  archived: boolean,
+): Promise<Contact> {
+  const patch = {
+    is_archived: archived,
+    archived_at: archived ? new Date().toISOString() : null,
+  };
+
+  let updated: Contact | null = null;
+
+  if (isSupabaseConfigured) {
+    const client = requireSupabase();
+    const { data, error } = await client
+      .from(TABLES.contacts)
+      .update(patch)
+      .eq('id', contactId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    updated = data as Contact;
+  }
+
+  const cached = await readJson<Contact[]>(STORAGE_KEYS.contacts, []);
+  const next = cached.map((contact) =>
+    contact.id === contactId ? { ...contact, ...patch } : contact,
+  );
+  await writeJson(STORAGE_KEYS.contacts, next);
+
+  const local = next.find((contact) => contact.id === contactId);
+  const result = updated ?? local;
+  if (!result) throw new Error('جهة الاتصال غير موجودة.');
+  return result;
 }
 
 /** يضيف مناسبة جديدة. */

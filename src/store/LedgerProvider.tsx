@@ -12,6 +12,7 @@ import {
   createEvent,
   createTransaction,
   fetchLedgerData,
+  setContactArchived,
 } from '@/lib/repository';
 import { useAuth } from '@/store/AuthProvider';
 import type {
@@ -35,9 +36,11 @@ interface LedgerContextValue {
   contacts: Contact[];
   events: Event[];
   transactions: Transaction[];
-  /** جهات الاتصال مع ملخص كل واحدة. */
+  /** جهات الاتصال النشطة مع ملخص كل واحدة (بدون المؤرشفة). */
   contactsWithSummary: ContactWithSummary[];
-  /** أقسام مرتبة أبجدياً لعرضها في SectionList. */
+  /** جهات الاتصال المؤرشفة مع ملخصاتها. */
+  archivedContacts: ContactWithSummary[];
+  /** أقسام مرتبة أبجدياً لعرضها في SectionList (النشطة فقط). */
   sections: ContactSection[];
   /** الملخص الإجمالي لكل الحركات. */
   totals: LedgerSummary;
@@ -48,6 +51,8 @@ interface LedgerContextValue {
   addContact: (input: NewContactInput) => Promise<Contact>;
   addEvent: (input: NewEventInput) => Promise<Event>;
   addTransaction: (input: NewTransactionInput) => Promise<Transaction>;
+  /** يؤرشف جهة اتصال أو يستعيدها. */
+  setArchived: (contactId: string, archived: boolean) => Promise<void>;
   getContactById: (contactId: string) => ContactWithSummary | undefined;
   getContactTransactions: (contactId: string) => Transaction[];
   getContactEvents: (contactId: string) => Event[];
@@ -100,9 +105,31 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
     return saved;
   }, []);
 
-  const contactsWithSummary = useMemo(
+  const setArchived = useCallback(
+    async (contactId: string, archived: boolean) => {
+      const updated = await setContactArchived(contactId, archived);
+      setContacts((current) =>
+        current.map((contact) =>
+          contact.id === contactId ? updated : contact,
+        ),
+      );
+    },
+    [],
+  );
+
+  const allWithSummary = useMemo(
     () => attachSummaries(contacts, transactions),
     [contacts, transactions],
+  );
+
+  const contactsWithSummary = useMemo(
+    () => allWithSummary.filter((contact) => !contact.is_archived),
+    [allWithSummary],
+  );
+
+  const archivedContacts = useMemo(
+    () => allWithSummary.filter((contact) => contact.is_archived),
+    [allWithSummary],
   );
 
   const sections = useMemo(
@@ -110,7 +137,21 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
     [contactsWithSummary],
   );
 
-  const totals = useMemo(() => summarize(transactions), [transactions]);
+  // الإجماليات تتجاهل المؤرشفين: حساباتهم مسوّاة ولا تؤثر على الوضع الحالي.
+  const activeContactIds = useMemo(
+    () => new Set(contactsWithSummary.map((contact) => contact.id)),
+    [contactsWithSummary],
+  );
+
+  const totals = useMemo(
+    () =>
+      summarize(
+        transactions.filter((transaction) =>
+          activeContactIds.has(transaction.contact_id),
+        ),
+      ),
+    [transactions, activeContactIds],
+  );
 
   const value = useMemo<LedgerContextValue>(
     () => ({
@@ -118,6 +159,7 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       events,
       transactions,
       contactsWithSummary,
+      archivedContacts,
       sections,
       totals,
       loading,
@@ -126,8 +168,9 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       addContact,
       addEvent,
       addTransaction,
+      setArchived,
       getContactById: (contactId) =>
-        contactsWithSummary.find((contact) => contact.id === contactId),
+        allWithSummary.find((contact) => contact.id === contactId),
       getContactTransactions: (contactId) =>
         transactions
           .filter((transaction) => transaction.contact_id === contactId)
@@ -149,7 +192,9 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       contacts,
       events,
       transactions,
+      allWithSummary,
       contactsWithSummary,
+      archivedContacts,
       sections,
       totals,
       loading,
@@ -158,6 +203,7 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       addContact,
       addEvent,
       addTransaction,
+      setArchived,
     ],
   );
 

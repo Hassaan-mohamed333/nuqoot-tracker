@@ -1,10 +1,18 @@
 import type { RouteProp } from '@react-navigation/native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { CloudOff, Phone, Plus, TriangleAlert } from 'lucide-react-native';
+import {
+  Archive,
+  ArchiveRestore,
+  CloudOff,
+  Phone,
+  Plus,
+  TriangleAlert,
+} from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -45,7 +53,7 @@ export function ContactProfileScreen() {
 
   // النسخة المحمّلة مسبقاً في المزوّد تُستخدم كعنوان مؤقت ريثما يصل الطلب،
   // فلا تظهر الشاشة فارغة عند الدخول إليها.
-  const { getContactById } = useLedger();
+  const { getContactById, setArchived } = useLedger();
   const cachedContact = getContactById(params.contactId);
 
   const contact = data?.contact ?? cachedContact ?? null;
@@ -66,6 +74,45 @@ export function ContactProfileScreen() {
         : transactions.filter((transaction) => transaction.direction === filter),
     [filter, transactions],
   );
+
+  const isArchived = contact?.is_archived ?? false;
+  // التسوية متاحة فقط عند صافي صفر: لا حقوق معلّقة في الاتجاهين.
+  const canSettle =
+    !isArchived && summary.net === 0 && summary.transactionCount > 0;
+
+  function confirmArchive() {
+    if (!contact) return;
+    Alert.alert(
+      'تسوية وأرشفة',
+      `سيتم إخفاء ${contact.full_name} من القائمة النشطة. الحركات تبقى محفوظة ويمكن الاستعادة في أي وقت.`,
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'تسوية وأرشفة',
+          onPress: () => {
+            setArchived(contact.id, true)
+              .then(() => navigation.goBack())
+              .catch((caught: unknown) =>
+                Alert.alert(
+                  'تعذّر الأرشفة',
+                  caught instanceof Error ? caught.message : 'حدث خطأ.',
+                ),
+              );
+          },
+        },
+      ],
+    );
+  }
+
+  function restore() {
+    if (!contact) return;
+    setArchived(contact.id, false).catch((caught: unknown) =>
+      Alert.alert(
+        'تعذّرت الاستعادة',
+        caught instanceof Error ? caught.message : 'حدث خطأ.',
+      ),
+    );
+  }
 
   if (!contact) {
     return (
@@ -135,17 +182,51 @@ export function ContactProfileScreen() {
             <NetBalanceBadge summary={summary} size="lg" />
           </View>
 
-          <Pressable
-            onPress={() =>
-              navigation.navigate('AddTransaction', { contactId: contact.id })
-            }
-            accessibilityRole="button"
-            className="mt-4 flex-row-reverse items-center rounded-xl bg-green-600 px-4 py-2">
-            <Plus size={16} color="#ffffff" />
-            <Text className="mr-1 text-sm font-semibold text-white">
-              إضافة حركة
-            </Text>
-          </Pressable>
+          <View className="mt-4 flex-row-reverse items-center">
+            <Pressable
+              onPress={() =>
+                navigation.navigate('AddTransaction', { contactId: contact.id })
+              }
+              accessibilityRole="button"
+              className="flex-row-reverse items-center rounded-xl bg-green-600 px-4 py-2">
+              <Plus size={16} color="#ffffff" />
+              <Text className="mr-1 text-sm font-semibold text-white">
+                إضافة حركة
+              </Text>
+            </Pressable>
+
+            {canSettle ? (
+              <Pressable
+                onPress={confirmArchive}
+                accessibilityRole="button"
+                className="mr-2 flex-row-reverse items-center rounded-xl border border-gray-300 bg-white px-4 py-2">
+                <Archive size={16} color="#374151" />
+                <Text className="mr-1 text-sm font-semibold text-gray-700">
+                  تسوية وأرشفة
+                </Text>
+              </Pressable>
+            ) : null}
+
+            {isArchived ? (
+              <Pressable
+                onPress={restore}
+                accessibilityRole="button"
+                className="mr-2 flex-row-reverse items-center rounded-xl border border-gray-300 bg-white px-4 py-2">
+                <ArchiveRestore size={16} color="#374151" />
+                <Text className="mr-1 text-sm font-semibold text-gray-700">
+                  استعادة
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          {isArchived ? (
+            <View className="mt-3 rounded-full bg-gray-200 px-3 py-1">
+              <Text className="text-[11px] font-semibold text-gray-600">
+                مؤرشف — الحساب مسوّى
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         <View className="mt-4 flex-row-reverse">

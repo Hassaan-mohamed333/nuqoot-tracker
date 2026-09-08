@@ -11,8 +11,16 @@ create table if not exists public.contacts (
   phone text,
   relation text,
   notes text,
+  is_archived boolean not null default false,
+  archived_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+-- لقواعد بيانات أُنشئت قبل إضافة الأرشفة
+alter table public.contacts
+  add column if not exists is_archived boolean not null default false;
+alter table public.contacts
+  add column if not exists archived_at timestamptz;
 
 -- المناسبات
 create table if not exists public.events (
@@ -43,6 +51,8 @@ create table if not exists public.transactions (
 );
 
 create index if not exists contacts_user_name_idx on public.contacts (user_id, full_name);
+create index if not exists contacts_active_idx
+  on public.contacts (user_id, is_archived);
 create index if not exists events_user_date_idx on public.events (user_id, event_date desc);
 create index if not exists transactions_contact_idx on public.transactions (contact_id, occurred_at desc);
 

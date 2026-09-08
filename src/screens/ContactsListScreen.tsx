@@ -1,6 +1,6 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Plus, Search, UserPlus } from 'lucide-react-native';
+import { Archive, Plus, Search, UserPlus } from 'lucide-react-native';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, SectionList, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,21 +18,25 @@ type Navigation = NativeStackNavigationProp<RootStackParamList>;
 /** قائمة جهات الاتصال مرتبة أبجدياً مع فهرس جانبي وشريط ملخص ثابت. */
 export function ContactsListScreen() {
   const navigation = useNavigation<Navigation>();
-  const { contactsWithSummary, transactions, loading, refresh } = useLedger();
+  const { contactsWithSummary, archivedContacts, transactions, loading, refresh } =
+    useLedger();
+  const [showArchived, setShowArchived] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
   const listRef = useRef<SectionList<ContactWithSummary>>(null);
 
+  const source = showArchived ? archivedContacts : contactsWithSummary;
+
   const filtered = useMemo(() => {
     const term = query.trim();
-    if (!term) return contactsWithSummary;
-    return contactsWithSummary.filter(
+    if (!term) return source;
+    return source.filter(
       (contact) =>
         contact.full_name.includes(term) ||
         (contact.phone ?? '').includes(term) ||
         (contact.relation ?? '').includes(term),
     );
-  }, [contactsWithSummary, query]);
+  }, [source, query]);
 
   const sections = useMemo(() => buildContactSections(filtered), [filtered]);
 
@@ -90,6 +94,33 @@ export function ContactsListScreen() {
         />
       </View>
 
+      <View className="mx-4 mt-3 flex-row-reverse">
+        {(
+          [
+            { key: false, label: `النشطة (${contactsWithSummary.length})` },
+            { key: true, label: `المؤرشفة (${archivedContacts.length})` },
+          ] as const
+        ).map((tab) => {
+          const isActive = showArchived === tab.key;
+          return (
+            <Pressable
+              key={String(tab.key)}
+              onPress={() => setShowArchived(tab.key)}
+              accessibilityRole="button"
+              className={`ml-2 rounded-full px-4 py-1.5 ${
+                isActive ? 'bg-green-600' : 'border border-gray-200 bg-white'
+              }`}>
+              <Text
+                className={`text-xs font-semibold ${
+                  isActive ? 'text-white' : 'text-gray-600'
+                }`}>
+                {tab.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       <View className="mt-3 flex-1 flex-row">
         <AlphabetIndex
           letters={INDEX_ALPHABET}
@@ -128,6 +159,18 @@ export function ContactsListScreen() {
               <Text className="mt-8 text-center text-sm text-gray-500">
                 لا توجد نتائج مطابقة.
               </Text>
+            ) : showArchived ? (
+              <View className="mt-10 items-center">
+                <View className="h-14 w-14 items-center justify-center rounded-full bg-gray-200">
+                  <Archive size={26} color="#6b7280" />
+                </View>
+                <Text className="mt-3 text-center text-sm font-semibold text-gray-800">
+                  لا توجد جهات مؤرشفة
+                </Text>
+                <Text className="mt-1 text-center text-xs text-gray-500">
+                  تظهر هنا الحسابات التي سوّيتها وأرشفتها.
+                </Text>
+              </View>
             ) : (
               <View className="mt-10 items-center">
                 <View className="h-14 w-14 items-center justify-center rounded-full bg-green-100">

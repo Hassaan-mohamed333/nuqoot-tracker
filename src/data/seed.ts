@@ -25,6 +25,8 @@ export const SEED_CONTACTS: Contact[] = [
     phone: '01001234567',
     relation: 'ابن العم',
     notes: null,
+    is_archived: false,
+    archived_at: null,
     created_at: daysAgo(400),
   },
   {
@@ -34,6 +36,8 @@ export const SEED_CONTACTS: Contact[] = [
     phone: '01112223344',
     relation: 'صديق',
     notes: 'زميل العمل السابق',
+    is_archived: false,
+    archived_at: null,
     created_at: daysAgo(320),
   },
   {
@@ -43,6 +47,8 @@ export const SEED_CONTACTS: Contact[] = [
     phone: null,
     relation: 'قريبة',
     notes: null,
+    is_archived: false,
+    archived_at: null,
     created_at: daysAgo(280),
   },
   {
@@ -52,6 +58,8 @@ export const SEED_CONTACTS: Contact[] = [
     phone: '01223334455',
     relation: 'جار',
     notes: null,
+    is_archived: false,
+    archived_at: null,
     created_at: daysAgo(250),
   },
   {
@@ -61,6 +69,8 @@ export const SEED_CONTACTS: Contact[] = [
     phone: '01555667788',
     relation: 'صديقة العائلة',
     notes: null,
+    is_archived: false,
+    archived_at: null,
     created_at: daysAgo(200),
   },
   {
@@ -70,6 +80,8 @@ export const SEED_CONTACTS: Contact[] = [
     phone: '01099887766',
     relation: 'خال',
     notes: null,
+    is_archived: false,
+    archived_at: null,
     created_at: daysAgo(150),
   },
   {
@@ -79,6 +91,8 @@ export const SEED_CONTACTS: Contact[] = [
     phone: null,
     relation: 'زميلة',
     notes: null,
+    is_archived: false,
+    archived_at: null,
     created_at: daysAgo(90),
   },
   {
@@ -88,6 +102,8 @@ export const SEED_CONTACTS: Contact[] = [
     phone: '01777889900',
     relation: 'صديق الدراسة',
     notes: 'مقيم بالخارج',
+    is_archived: false,
+    archived_at: null,
     created_at: daysAgo(60),
   },
 ];
