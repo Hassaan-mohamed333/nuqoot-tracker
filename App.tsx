@@ -6,7 +6,9 @@ import './global.css';
 
 import { AppGate } from '@/navigation/AppGate';
 import { AuthProvider } from '@/store/AuthProvider';
+import { StyleSheet } from 'react-native';
 
+StyleSheet.setFlag('darkMode', 'class');
 export default function App() {
   return (
     <SafeAreaProvider>
