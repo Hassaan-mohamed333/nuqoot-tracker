@@ -1,6 +1,3 @@
-import { decode as decodeBase64 } from 'base64-arraybuffer';
-import * as FileSystem from 'expo-file-system';
-
 import { SEED_CONTACTS, SEED_EVENTS, SEED_TRANSACTIONS } from '@/data/seed';
 import { readJson, STORAGE_KEYS, writeJson } from '@/lib/storage';
 import { isSupabaseConfigured, requireSupabase, TABLES } from '@/lib/supabase';
@@ -139,9 +136,12 @@ export async function uploadReceipt(localUri: string): Promise<string> {
   } = await client.auth.getUser();
   if (!user) throw new Error('يلزم تسجيل الدخول لرفع الإيصالات.');
 
-  const base64 = await FileSystem.readAsStringAsync(localUri, {
-    encoding: 'base64',
-  });
+  // استيراد كسول: يُبقي expo-file-system خارج مسار الإقلاع، فلا يستطيع
+  // فشلٌ في وحدة أصلية أن يمنع التطبيق من البدء.
+  // SDK 57 أزال readAsStringAsync من الواجهة الرئيسية (يرمي خطأً عند
+  // الاستدعاء)، والبديل هو صنف File الجديد.
+  const { File } = await import('expo-file-system');
+  const bytes = await new File(localUri).arrayBuffer();
 
   const extension = localUri.split('.').pop()?.toLowerCase() ?? 'jpg';
   const contentType = extension === 'png' ? 'image/png' : 'image/jpeg';
@@ -150,7 +150,7 @@ export async function uploadReceipt(localUri: string): Promise<string> {
 
   const { error } = await client.storage
     .from(RECEIPTS_BUCKET)
-    .upload(path, decodeBase64(base64), { contentType, upsert: false });
+    .upload(path, bytes, { contentType, upsert: false });
 
   if (error) throw error;
   return path;

@@ -4,9 +4,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { CalendarDays, Home, Users } from 'lucide-react-native';
 import React from 'react';
 
+import { lazyScreen } from '@/navigation/LazyScreen';
 import type { RootStackParamList, TabParamList } from '@/navigation/types';
 import { AddContactScreen } from '@/screens/AddContactScreen';
-import { AddEventScreen } from '@/screens/AddEventScreen';
 import { AddSharedExpenseScreen } from '@/screens/AddSharedExpenseScreen';
 import { AddTransactionScreen } from '@/screens/AddTransactionScreen';
 import { ContactProfileScreen } from '@/screens/ContactProfileScreen';
@@ -15,8 +15,24 @@ import { EventLedgerScreen } from '@/screens/EventLedgerScreen';
 import { EventParticipantsScreen } from '@/screens/EventParticipantsScreen';
 import { EventsScreen } from '@/screens/EventsScreen';
 import { HomeScreen } from '@/screens/HomeScreen';
-import { ScanReceiptScreen } from '@/screens/ScanReceiptScreen';
-import { SmartInputScreen } from '@/screens/SmartInputScreen';
+
+/**
+ * هذه الشاشات وحدها تلمس وحدات أصلية (منتقي التاريخ، الكاميرا،
+ * الميكروفون، نظام الملفات)، فتُحمَّل عند فتحها لا عند إقلاع التطبيق.
+ */
+const AddEventScreen = lazyScreen(() =>
+  import('@/screens/AddEventScreen').then((m) => ({ default: m.AddEventScreen })),
+);
+const SmartInputScreen = lazyScreen(() =>
+  import('@/screens/SmartInputScreen').then((m) => ({
+    default: m.SmartInputScreen,
+  })),
+);
+const ScanReceiptScreen = lazyScreen(() =>
+  import('@/screens/ScanReceiptScreen').then((m) => ({
+    default: m.ScanReceiptScreen,
+  })),
+);
 
 const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();

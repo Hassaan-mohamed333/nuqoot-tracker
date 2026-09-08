@@ -6,7 +6,7 @@ import {
   setAudioModeAsync,
   useAudioRecorder,
 } from 'expo-audio';
-import * as FileSystem from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { Mic, Send, Sparkles, Square, TriangleAlert } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import {
@@ -129,9 +129,9 @@ export function SmartInputScreen() {
       if (!uri) throw new Error('لم يُحفظ التسجيل.');
 
       // Gemini يقبل الصوت مباشرةً، فنرسله base64 بدل تفريغه على الجهاز.
-      const audioBase64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: 'base64',
-      });
+      // readAsStringAsync أُزيل في SDK 57، فنقرأ عبر صنف File ثم نرمّز.
+      const { encode } = await import('base64-arraybuffer');
+      const audioBase64 = encode(await new File(uri).arrayBuffer());
 
       await runParse({
         audioBase64,
