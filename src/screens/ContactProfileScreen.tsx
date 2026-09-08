@@ -1,19 +1,27 @@
 import type { RouteProp } from '@react-navigation/native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Phone, Plus } from 'lucide-react-native';
+import { CloudOff, Phone, Plus, TriangleAlert } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EventCard } from '@/components/EventCard';
 import { LedgerSummaryBar } from '@/components/LedgerSummaryBar';
 import { NetBalanceBadge } from '@/components/NetBalanceBadge';
 import { TransactionCard } from '@/components/TransactionCard';
+import { useContactLedger } from '@/hooks/useContactLedger';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
 import type { TransactionDirection } from '@/types';
-import { formatAmount } from '@/utils/ledger';
+import { formatAmount, summarize } from '@/utils/ledger';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 type ProfileRoute = RouteProp<RootStackParamList, 'ContactProfile'>;
@@ -30,22 +38,25 @@ const FILTERS: { key: Filter; label: string }[] = [
 export function ContactProfileScreen() {
   const navigation = useNavigation<Navigation>();
   const { params } = useRoute<ProfileRoute>();
-  const {
-    getContactById,
-    getContactTransactions,
-    getContactEvents,
-    getEventById,
-  } = useLedger();
   const [filter, setFilter] = useState<Filter>('ALL');
 
-  const contact = getContactById(params.contactId);
-  const transactions = useMemo(
-    () => getContactTransactions(params.contactId),
-    [getContactTransactions, params.contactId],
-  );
-  const events = useMemo(
-    () => getContactEvents(params.contactId),
-    [getContactEvents, params.contactId],
+  // استعلام مباشر مُرشَّح على الخادم بـ contact_id.
+  const { data, loading, error, refresh } = useContactLedger(params.contactId);
+
+  // النسخة المحمّلة مسبقاً في المزوّد تُستخدم كعنوان مؤقت ريثما يصل الطلب،
+  // فلا تظهر الشاشة فارغة عند الدخول إليها.
+  const { getContactById } = useLedger();
+  const cachedContact = getContactById(params.contactId);
+
+  const contact = data?.contact ?? cachedContact ?? null;
+  const transactions = useMemo(() => data?.transactions ?? [], [data]);
+  const events = useMemo(() => data?.events ?? [], [data]);
+
+  const summary = useMemo(() => summarize(transactions), [transactions]);
+
+  const eventTitles = useMemo(
+    () => new Map(events.map((event) => [event.id, event.title])),
+    [events],
   );
 
   const visibleTransactions = useMemo(
@@ -58,15 +69,48 @@ export function ContactProfileScreen() {
 
   if (!contact) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-gray-50">
-        <Text className="text-sm text-gray-500">جهة الاتصال غير موجودة.</Text>
+      <SafeAreaView className="flex-1 items-center justify-center bg-gray-50 px-8">
+        {loading ? (
+          <ActivityIndicator color="#16a34a" />
+        ) : (
+          <Text className="text-center text-sm text-gray-500">
+            {error ?? 'جهة الاتصال غير موجودة.'}
+          </Text>
+        )}
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50" edges={['bottom']}>
-      <ScrollView className="flex-1" contentContainerClassName="p-4 pb-56">
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="p-4 pb-56"
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={() => void refresh()} />
+        }>
+        {error ? (
+          <View className="mb-3 flex-row-reverse items-center rounded-xl bg-red-50 p-3">
+            <TriangleAlert size={16} color="#b91c1c" />
+            <Text className="mr-2 flex-1 text-right text-xs text-red-800">
+              {error}
+            </Text>
+            <Pressable
+              onPress={() => void refresh()}
+              accessibilityRole="button"
+              className="rounded-full bg-white px-3 py-1">
+              <Text className="text-xs font-bold text-red-700">إعادة</Text>
+            </Pressable>
+          </View>
+        ) : data?.offline ? (
+          <View className="mb-3 flex-row-reverse items-center rounded-xl bg-amber-50 p-3">
+            <CloudOff size={16} color="#b45309" />
+            <Text className="mr-2 flex-1 text-right text-xs text-amber-800">
+              تُعرض نسخة محفوظة على الجهاز.
+            </Text>
+          </View>
+        ) : null}
+
         <View className="items-center rounded-2xl border border-gray-100 bg-white p-5">
           <View className="h-16 w-16 items-center justify-center rounded-full bg-green-100">
             <Text className="text-2xl font-bold text-green-700">
@@ -88,7 +132,7 @@ export function ContactProfileScreen() {
           ) : null}
 
           <View className="mt-3">
-            <NetBalanceBadge summary={contact.summary} size="lg" />
+            <NetBalanceBadge summary={summary} size="lg" />
           </View>
 
           <Pressable
@@ -106,16 +150,20 @@ export function ContactProfileScreen() {
 
         <View className="mt-4 flex-row-reverse">
           <View className="flex-1 rounded-2xl border border-gray-100 bg-white p-3">
-            <Text className="text-right text-[11px] text-gray-500">دفعت له</Text>
+            <Text className="text-right text-[11px] text-gray-500">
+              إجمالي دائن
+            </Text>
             <Text className="text-right text-base font-bold text-green-700">
-              {formatAmount(contact.summary.totalOut, contact.summary.currency)}
+              {formatAmount(summary.totalOut, summary.currency)}
             </Text>
           </View>
           <View className="w-3" />
           <View className="flex-1 rounded-2xl border border-gray-100 bg-white p-3">
-            <Text className="text-right text-[11px] text-gray-500">استلمت منه</Text>
+            <Text className="text-right text-[11px] text-gray-500">
+              إجمالي مدين
+            </Text>
             <Text className="text-right text-base font-bold text-red-700">
-              {formatAmount(contact.summary.totalIn, contact.summary.currency)}
+              {formatAmount(summary.totalIn, summary.currency)}
             </Text>
           </View>
         </View>
@@ -152,10 +200,30 @@ export function ContactProfileScreen() {
           })}
         </View>
 
-        {visibleTransactions.length === 0 ? (
-          <Text className="text-right text-sm text-gray-500">
-            لا توجد حركات في هذا التصنيف.
-          </Text>
+        {loading && transactions.length === 0 ? (
+          <ActivityIndicator color="#16a34a" />
+        ) : visibleTransactions.length === 0 ? (
+          <View className="items-center rounded-2xl border border-gray-100 bg-white p-6">
+            <Text className="text-center text-sm text-gray-600">
+              {transactions.length === 0
+                ? 'لا توجد حركات مسجّلة مع هذا الشخص بعد.'
+                : 'لا توجد حركات في هذا التصنيف.'}
+            </Text>
+            {transactions.length === 0 ? (
+              <Pressable
+                onPress={() =>
+                  navigation.navigate('AddTransaction', {
+                    contactId: contact.id,
+                  })
+                }
+                accessibilityRole="button"
+                className="mt-3 rounded-2xl bg-green-600 px-5 py-2">
+                <Text className="text-sm font-bold text-white">
+                  تسجيل أول حركة
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
         ) : (
           visibleTransactions.map((transaction) => (
             <TransactionCard
@@ -163,7 +231,7 @@ export function ContactProfileScreen() {
               transaction={transaction}
               eventTitle={
                 transaction.event_id
-                  ? (getEventById(transaction.event_id)?.title ?? null)
+                  ? (eventTitles.get(transaction.event_id) ?? null)
                   : null
               }
             />
@@ -184,7 +252,7 @@ export function ContactProfileScreen() {
         )}
       </ScrollView>
 
-      <LedgerSummaryBar summary={contact.summary} />
+      <LedgerSummaryBar summary={summary} />
     </SafeAreaView>
   );
 }

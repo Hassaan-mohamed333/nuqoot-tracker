@@ -57,14 +57,14 @@ export function LedgerSummaryBar({
 
       <View className="mt-3 flex-row-reverse justify-between">
         <View className="flex-1 items-center rounded-xl bg-green-50 py-2">
-          <Text className="text-[11px] text-gray-500">دفعت (واجبات لي)</Text>
+          <Text className="text-[11px] text-gray-500">إجمالي دائن (دفعت)</Text>
           <Text className="text-sm font-bold text-green-700">
             {formatAmount(summary.totalOut, summary.currency)}
           </Text>
         </View>
         <View className="mx-2 w-2" />
         <View className="flex-1 items-center rounded-xl bg-red-50 py-2">
-          <Text className="text-[11px] text-gray-500">استلمت (واجبات عليّ)</Text>
+          <Text className="text-[11px] text-gray-500">إجمالي مدين (استلمت)</Text>
           <Text className="text-sm font-bold text-red-700">
             {formatAmount(summary.totalIn, summary.currency)}
           </Text>

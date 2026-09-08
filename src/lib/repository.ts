@@ -113,6 +113,117 @@ export async function fetchLedgerData(): Promise<LedgerData> {
   }
 }
 
+/** بيانات صفحة شخص واحد: الشخص وحركاته ومناسباته. */
+export interface ContactLedger {
+  contact: Contact | null;
+  transactions: Transaction[];
+  events: Event[];
+  /** true عندما تكون البيانات من النسخة المحلية لا من الخادم. */
+  offline: boolean;
+}
+
+/** يبني سجل الشخص من النسخة المحلية (وضع بلا Supabase أو عند فشل الطلب). */
+async function loadLocalContactLedger(
+  contactId: string,
+): Promise<ContactLedger> {
+  const [contacts, events, transactions] = await Promise.all([
+    readJson<Contact[]>(STORAGE_KEYS.contacts, []),
+    readJson<Event[]>(STORAGE_KEYS.events, []),
+    readJson<Transaction[]>(STORAGE_KEYS.transactions, []),
+  ]);
+
+  const contactTransactions = transactions
+    .filter((transaction) => transaction.contact_id === contactId)
+    .sort((a, b) => b.occurred_at.localeCompare(a.occurred_at));
+
+  const linkedEventIds = new Set(
+    contactTransactions
+      .map((transaction) => transaction.event_id)
+      .filter((eventId): eventId is string => eventId !== null),
+  );
+
+  return {
+    contact: contacts.find((contact) => contact.id === contactId) ?? null,
+    transactions: contactTransactions,
+    events: events.filter(
+      (event) =>
+        event.host_contact_id === contactId || linkedEventIds.has(event.id),
+    ),
+    offline: true,
+  };
+}
+
+/**
+ * يجلب سجل شخص واحد من Supabase مباشرةً، مُرشَّحاً على مستوى الخادم
+ * (contact_id = ...) بدل ترشيح نسخة عامة في الذاكرة. سياسات RLS تضمن
+ * أن الصفوف العائدة تخص المستخدم الحالي وحده.
+ *
+ * عند غياب الإعداد أو فشل الطلب نرجع إلى النسخة المحلية حتى تظل الصفحة
+ * قابلة للعرض بلا شبكة.
+ */
+export async function fetchContactLedger(
+  contactId: string,
+): Promise<ContactLedger> {
+  if (!isSupabaseConfigured) {
+    return loadLocalContactLedger(contactId);
+  }
+
+  try {
+    const client = requireSupabase();
+
+    const [contactResult, transactionsResult] = await Promise.all([
+      client.from(TABLES.contacts).select('*').eq('id', contactId).maybeSingle(),
+      client
+        .from(TABLES.transactions)
+        .select('*')
+        .eq('contact_id', contactId)
+        .order('occurred_at', { ascending: false }),
+    ]);
+
+    if (contactResult.error) throw contactResult.error;
+    if (transactionsResult.error) throw transactionsResult.error;
+
+    const transactions = (transactionsResult.data ?? []) as Transaction[];
+    const linkedEventIds = [
+      ...new Set(
+        transactions
+          .map((transaction) => transaction.event_id)
+          .filter((eventId): eventId is string => eventId !== null),
+      ),
+    ];
+
+    // المناسبات المرتبطة: ما يستضيفه الشخص، وما أشارت إليه حركاته.
+    const [hostedResult, linkedResult] = await Promise.all([
+      client.from(TABLES.events).select('*').eq('host_contact_id', contactId),
+      linkedEventIds.length > 0
+        ? client.from(TABLES.events).select('*').in('id', linkedEventIds)
+        : Promise.resolve({ data: [] as Event[], error: null }),
+    ]);
+
+    if (hostedResult.error) throw hostedResult.error;
+    if (linkedResult.error) throw linkedResult.error;
+
+    const eventsById = new Map<string, Event>();
+    for (const event of [
+      ...((hostedResult.data ?? []) as Event[]),
+      ...((linkedResult.data ?? []) as Event[]),
+    ]) {
+      eventsById.set(event.id, event);
+    }
+
+    return {
+      contact: (contactResult.data as Contact | null) ?? null,
+      transactions,
+      events: [...eventsById.values()].sort((a, b) =>
+        b.event_date.localeCompare(a.event_date),
+      ),
+      offline: false,
+    };
+  } catch {
+    return loadLocalContactLedger(contactId);
+  }
+}
+
 /**
  * يحفظ صفاً جديداً: في Supabase عند توفره، ثم يضيفه إلى النسخة المحلية.
  *
