@@ -84,3 +84,42 @@ curl -H "Authorization: Bearer <anon-key>" \
 curl "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY" \
   | grep -o '"name": "models/[^"]*"'
 ```
+
+# دخول Google (OAuth)
+
+## 1. Google Cloud Console
+
+أنشئ OAuth Client ID من نوع **Web application**، وأضف إلى
+Authorized redirect URIs:
+
+```
+https://<project-ref>.supabase.co/auth/v1/callback
+```
+
+هذا العنوان هو الوحيد الذي يراه Google؛ إعادة التوجيه إلى التطبيق تتم من
+Supabase بعده.
+
+## 2. Supabase Dashboard
+
+- Authentication → Providers → **Google**: فعّله وألصق Client ID و Secret.
+- Authentication → URL Configuration → **Redirect URLs**: أضف
+
+```
+nuqoot://auth/callback        # بناء تطويري أو إنتاجي
+exp://127.0.0.1:8081/--/auth/callback   # Expo Go محلياً (عدّل المنفذ/العنوان)
+http://localhost:8081         # معاينة الويب
+https://<production-domain>   # الويب في الإنتاج
+```
+
+عنوان غير مُدرَج هنا يُرفض بصمت ويعود المستخدم بلا جلسة.
+
+## 3. الاختبار
+
+```bash
+npx expo start -c        # ثم w للويب
+npx expo run:android     # بناء تطويري (المخطط nuqoot:// يعمل هنا)
+```
+
+الويب: يعود المتصفّح إلى الصفحة ومعه `?code=` ويلتقطه `detectSessionInUrl`.
+الأصلي: يُفتح متصفّح المصادقة، وعند العودة يُبدَّل الرمز بجلسة يدوياً عبر
+`exchangeCodeForSession`.

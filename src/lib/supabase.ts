@@ -1,6 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
+
+import { installWebCryptoShim } from '@/lib/webCryptoShim';
+
+// قبل إنشاء العميل: تدفّق PKCE يحتاج SHA-256 عند أول تسجيل دخول.
+installWebCryptoShim();
 
 /**
  * إعداد عميل Supabase.
@@ -53,8 +59,18 @@ export const supabase: SupabaseClient | null = isSupabaseConfigured
         storage: AsyncStorage,
         autoRefreshToken: true,
         persistSession: true,
-        // لا يوجد شريط عنوان في التطبيقات الأصلية.
-        detectSessionInUrl: false,
+        /**
+         * على الويب يعود مزوّد OAuth إلى صفحة التطبيق ومعه الرمز في
+         * العنوان، ولا بد أن يقرأه supabase-js ويُبدّله بجلسة. على المنصات
+         * الأصلية لا يوجد شريط عنوان، والتبديل يتم يدوياً بعد إغلاق
+         * متصفّح المصادقة.
+         */
+        detectSessionInUrl: Platform.OS === 'web',
+        /**
+         * PKCE بدل implicit: لا تمرّ الرموز عبر جزء العنوان (fragment)،
+         * وهو الأسلوب المطلوب لإعادة التوجيه إلى مخطط روابط التطبيق.
+         */
+        flowType: 'pkce',
       },
       global: { fetch: fetchWithTimeout },
     })

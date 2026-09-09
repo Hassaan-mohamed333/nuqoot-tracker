@@ -1,4 +1,7 @@
 import type { Session, User } from '@supabase/supabase-js';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
+import { Platform } from 'react-native';
 import React, {
   createContext,
   useCallback,
@@ -10,6 +13,23 @@ import React, {
 
 import { clearLocalData } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+
+// يُغلق نافذة المصادقة المنبثقة على الويب عند العودة.
+WebBrowser.maybeCompleteAuthSession();
+
+/**
+ * وجهة العودة بعد موافقة Google.
+ *
+ * على الويب: أصل الصفحة نفسه، ليقرأ supabase-js الرمز من العنوان.
+ * على المنصات الأصلية: رابط عميق بمخطط التطبيق (nuqoot://) — أو exp://
+ * داخل Expo Go، وهو ما تتكفّل به createURL تلقائياً.
+ */
+function oauthRedirectTo(): string {
+  if (Platform.OS === 'web') {
+    return typeof window !== 'undefined' ? window.location.origin : '';
+  }
+  return Linking.createURL('auth/callback');
+}
 
 /**
  * أقصى انتظار لاستعادة الجلسة عند الإقلاع.
@@ -56,6 +76,8 @@ interface AuthContextValue {
   /** يعيد true إذا لزم تأكيد البريد قبل إنشاء الجلسة. */
   signUpWithEmail: (email: string, password: string) => Promise<boolean>;
   signInAnonymously: () => Promise<void>;
+  /** دخول عبر Google. يرمي خطأً واضحاً عند الإلغاء أو الفشل. */
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -151,6 +173,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const signInWithGoogle = useCallback(async () => {
+    if (!supabase) return;
+
+    const redirectTo = oauthRedirectTo();
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo,
+        // على المنصات الأصلية نفتح الرابط بأنفسنا في متصفّح المصادقة.
+        skipBrowserRedirect: Platform.OS !== 'web',
+      },
+    });
+    if (error) throw error;
+
+    // على الويب يتولّى المتصفّح إعادة التوجيه، وتُلتقط الجلسة عند العودة
+    // عبر detectSessionInUrl؛ فلا شيء آخر نفعله هنا.
+    if (Platform.OS === 'web') return;
+
+    if (!data?.url) {
+      throw new Error('لم يُرجع Supabase رابط مصادقة.');
+    }
+
+    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+
+    if (result.type === 'cancel' || result.type === 'dismiss') {
+      throw new Error('أُلغي تسجيل الدخول.');
+    }
+    if (result.type !== 'success' || !result.url) {
+      throw new Error('لم تكتمل المصادقة.');
+    }
+
+    // PKCE: العنوان العائد يحمل code نُبدّله بجلسة.
+    const returnedUrl = new URL(result.url);
+    const code = returnedUrl.searchParams.get('code');
+    const oauthError =
+      returnedUrl.searchParams.get('error_description') ??
+      returnedUrl.searchParams.get('error');
+
+    if (oauthError) throw new Error(oauthError);
+    if (!code) {
+      throw new Error('لم يصل رمز المصادقة من Google.');
+    }
+
+    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(
+      code,
+    );
+    if (exchangeError) throw exchangeError;
+    // onAuthStateChange يلتقط الجلسة الجديدة ويحدّث الحالة.
+  }, []);
+
   const signInAnonymously = useCallback(async () => {
     if (!supabase) return;
     const { error } = await supabase.auth.signInAnonymously();
@@ -185,6 +258,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signInWithEmail,
       signUpWithEmail,
       signInAnonymously,
+      signInWithGoogle,
       signOut,
     }),
     [
@@ -195,6 +269,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signInWithEmail,
       signUpWithEmail,
       signInAnonymously,
+      signInWithGoogle,
       signOut,
     ],
   );

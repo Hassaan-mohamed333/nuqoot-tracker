@@ -1,4 +1,9 @@
-import { LogIn, Mail, TriangleAlert, UserRound } from 'lucide-react-native';
+import {
+  LogIn,
+  Mail,
+  TriangleAlert,
+  UserRound,
+} from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,18 +17,48 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
 
 import { useAuth } from '@/store/AuthProvider';
 
 type Mode = 'signIn' | 'signUp';
+
+/** شعار Google بألوانه الرسمية، مرسوم بـ SVG بدل صورة خارجية. */
+function GoogleMark() {
+  return (
+    <Svg width={18} height={18} viewBox="0 0 48 48">
+      <Path
+        fill="#EA4335"
+        d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+      />
+      <Path
+        fill="#4285F4"
+        d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+      />
+      <Path
+        fill="#FBBC05"
+        d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+      />
+      <Path
+        fill="#34A853"
+        d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+      />
+    </Svg>
+  );
+}
 
 /**
  * شاشة الدخول. الحساب ضروري لأن سياسات RLS تربط كل صف بـ auth.uid()،
  * فلا تُقرأ أو تُكتب أي بيانات قبل وجود جلسة.
  */
 export function AuthScreen() {
-  const { signInWithEmail, signUpWithEmail, signInAnonymously, initError } =
-    useAuth();
+  const {
+    signInWithEmail,
+    signUpWithEmail,
+    signInAnonymously,
+    signInWithGoogle,
+    initError,
+  } = useAuth();
   const [mode, setMode] = useState<Mode>('signIn');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -56,6 +91,20 @@ export function AuthScreen() {
       }
     } catch (error) {
       reportError(error);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleGoogle() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await signInWithGoogle();
+    } catch (error) {
+      // الإلغاء تصرّف طبيعي من المستخدم ولا يستحق تنبيهاً.
+      const message = error instanceof Error ? error.message : '';
+      if (!message.includes('أُلغي')) reportError(error);
     } finally {
       setBusy(false);
     }
@@ -183,10 +232,22 @@ export function AuthScreen() {
           </View>
 
           <Pressable
+            onPress={() => void handleGoogle()}
+            disabled={busy}
+            accessibilityRole="button"
+            accessibilityLabel="تسجيل الدخول بحساب Google"
+            className="flex-row-reverse items-center justify-center rounded-2xl border border-gray-300 bg-white py-3">
+            <GoogleMark />
+            <Text className="mr-2 text-base font-bold text-gray-700">
+              المتابعة بحساب Google
+            </Text>
+          </Pressable>
+
+          <Pressable
             onPress={() => void handleAnonymous()}
             disabled={busy}
             accessibilityRole="button"
-            className="flex-row-reverse items-center justify-center rounded-2xl border border-gray-200 bg-white py-3">
+            className="mt-2 flex-row-reverse items-center justify-center rounded-2xl border border-gray-200 bg-white py-3">
             <UserRound size={18} color="#16a34a" />
             <Text className="mr-2 text-base font-bold text-green-700">
               متابعة كضيف
