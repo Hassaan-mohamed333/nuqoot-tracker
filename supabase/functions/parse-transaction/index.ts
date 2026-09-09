@@ -1,8 +1,13 @@
 import {
-  corsHeaders,
+  ApiError,
+  errorResponse,
   generateJson,
-  isConfigured,
+  handleOptions,
   jsonResponse,
+  MAX_IMAGE_BYTES,
+  readJsonBody,
+  toErrorResponse,
+  type GeminiPart,
 } from '../_shared/gemini.ts';
 
 /**
@@ -13,26 +18,31 @@ import {
  */
 
 interface RequestBody {
-  /** نص المستخدم؛ مطلوب ما لم يُرسل صوت. */
-  text?: string;
-  /** تسجيل صوتي بصيغة base64 مع نوعه، لتفريغه وتحليله في خطوة واحدة. */
-  audioBase64?: string;
-  audioMimeType?: string;
-  /** أسماء جهات الاتصال المعروفة، ليطابق النموذج اسماً قائماً بدل اختراعه. */
-  knownContacts?: string[];
+  text?: unknown;
+  audioBase64?: unknown;
+  audioMimeType?: unknown;
+  knownContacts?: unknown;
+}
+
+interface ParseResponse {
+  contact_name: string | null;
+  amount: number | null;
+  type: 'CREDIT' | 'DEBIT' | null;
+  note: string | null;
+  currency: string | null;
 }
 
 const RESPONSE_SCHEMA = {
-  type: 'object',
+  type: 'OBJECT',
   properties: {
-    contact_name: { type: 'string', nullable: true },
-    amount: { type: 'number', nullable: true },
-    type: { type: 'string', enum: ['CREDIT', 'DEBIT'], nullable: true },
-    note: { type: 'string', nullable: true },
-    currency: { type: 'string', nullable: true },
+    contact_name: { type: 'STRING', nullable: true },
+    amount: { type: 'NUMBER', nullable: true },
+    type: { type: 'STRING', enum: ['CREDIT', 'DEBIT'], nullable: true },
+    note: { type: 'STRING', nullable: true },
+    currency: { type: 'STRING', nullable: true },
   },
   required: ['contact_name', 'amount', 'type', 'note', 'currency'],
-};
+} as const;
 
 const SYSTEM_INSTRUCTION = `أنت مساعد لتطبيق "النقوط والواجبات" المصري.
 حوّل كلام المستخدم إلى حقول حركة مالية.
@@ -47,37 +57,73 @@ const SYSTEM_INSTRUCTION = `أنت مساعد لتطبيق "النقوط وال�
 - note وصف مختصر جداً للسبب، أو null.
 - لا تخمّن حقلاً غير مذكور: ضع null بدل التخمين.`;
 
-Deno.serve(async (request) => {
-  if (request.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+/** ينظّف حمولة الصوت: يزيل بادئة data URL والفراغات، ويتحقق من الحجم. */
+function normalizeAudio(input: string, mimeType: string) {
+  let value = input.trim();
+  let resolvedMime = mimeType;
+
+  const dataUrl = value.match(/^data:([^;,]+);base64,(.*)$/s);
+  if (dataUrl) {
+    resolvedMime = dataUrl[1];
+    value = dataUrl[2];
+  }
+  value = value.replace(/\s+/g, '');
+
+  if (!value) {
+    throw new ApiError('EMPTY_AUDIO', 'حمولة الصوت فارغة.', 400);
   }
 
-  if (!isConfigured()) {
-    // 503 وليس 500: الخدمة غير مُهيّأة، والتطبيق يتحوّل إلى التحليل المحلي.
-    return jsonResponse(
-      { error: 'AI_NOT_CONFIGURED', message: 'مفتاح Gemini غير مضبوط.' },
-      503,
+  const bytes = Math.floor((value.length * 3) / 4);
+  if (bytes > MAX_IMAGE_BYTES) {
+    throw new ApiError(
+      'AUDIO_TOO_LARGE',
+      `حجم التسجيل ${(bytes / (1024 * 1024)).toFixed(1)} ميجابايت ويتجاوز الحد. سجّل مقطعاً أقصر.`,
+      413,
+    );
+  }
+
+  return { data: value, mimeType: resolvedMime };
+}
+
+Deno.serve(async (request: Request): Promise<Response> => {
+  if (request.method === 'OPTIONS') {
+    return handleOptions();
+  }
+
+  if (request.method !== 'POST') {
+    return errorResponse(
+      'METHOD_NOT_ALLOWED',
+      `الطريقة ${request.method} غير مدعومة؛ استخدم POST.`,
+      405,
     );
   }
 
   try {
-    const body = (await request.json()) as RequestBody;
-    const knownContacts = body.knownContacts ?? [];
+    const body = await readJsonBody<RequestBody>(request);
 
-    const parts = [];
-    if (body.audioBase64 && body.audioMimeType) {
+    const knownContacts = Array.isArray(body.knownContacts)
+      ? body.knownContacts.filter((name): name is string => typeof name === 'string')
+      : [];
+
+    const parts: GeminiPart[] = [];
+
+    if (typeof body.audioBase64 === 'string' && body.audioBase64.trim()) {
+      const audio = normalizeAudio(
+        body.audioBase64,
+        typeof body.audioMimeType === 'string' && body.audioMimeType.trim()
+          ? body.audioMimeType.trim()
+          : 'audio/m4a',
+      );
       parts.push({
-        inline_data: {
-          mime_type: body.audioMimeType,
-          data: body.audioBase64,
-        },
+        inline_data: { mime_type: audio.mimeType, data: audio.data },
       });
       parts.push({ text: 'فرّغ هذا التسجيل ثم استخرج حقول الحركة منه.' });
-    } else if (body.text?.trim()) {
+    } else if (typeof body.text === 'string' && body.text.trim()) {
       parts.push({ text: body.text.trim() });
     } else {
-      return jsonResponse(
-        { error: 'EMPTY_INPUT', message: 'أرسل نصاً أو تسجيلاً صوتياً.' },
+      return errorResponse(
+        'EMPTY_INPUT',
+        'أرسل نصاً في الحقل text أو تسجيلاً في الحقل audioBase64.',
         400,
       );
     }
@@ -88,20 +134,24 @@ Deno.serve(async (request) => {
       });
     }
 
-    const parsed = await generateJson<Record<string, unknown>>(
+    const parsed = await generateJson<ParseResponse>(
       parts,
-      RESPONSE_SCHEMA,
+      RESPONSE_SCHEMA as unknown as Record<string, unknown>,
       SYSTEM_INSTRUCTION,
     );
 
-    return jsonResponse({ ...parsed, confidence: 'high' });
+    return jsonResponse({
+      contact_name: parsed.contact_name ?? null,
+      amount: typeof parsed.amount === 'number' ? parsed.amount : null,
+      type: parsed.type ?? null,
+      note: parsed.note ?? null,
+      currency: parsed.currency ?? null,
+      confidence: 'high',
+    });
   } catch (error) {
-    return jsonResponse(
-      {
-        error: 'AI_FAILED',
-        message: error instanceof Error ? error.message : 'خطأ غير متوقع.',
-      },
-      502,
-    );
+    if (!(error instanceof ApiError)) {
+      console.error('parse-transaction unexpected failure:', error);
+    }
+    return toErrorResponse(error);
   }
 });

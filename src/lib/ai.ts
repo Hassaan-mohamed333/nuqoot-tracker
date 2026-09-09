@@ -31,6 +31,46 @@ export interface ReceiptScan {
   summary: string | null;
 }
 
+/**
+ * يستخرج رسالة الخطأ الحقيقية من فشل دالة الحافة.
+ *
+ * supabase-js يضع في error.message نصاً عاماً دائماً ("Edge Function
+ * returned a non-2xx status code")، بينما الجسم الحقيقي — وفيه سبب الفشل —
+ * موجود في error.context كاستجابة. بلا قراءتها لا يرى المستخدم إلا الرسالة
+ * العامة مهما كان السبب.
+ */
+async function describeFunctionError(error: unknown): Promise<string> {
+  const context = (error as { context?: unknown } | null)?.context as
+    | { status?: number; json?: () => Promise<unknown>; text?: () => Promise<string> }
+    | undefined;
+
+  if (context && typeof context.json === 'function') {
+    try {
+      const body = (await context.json()) as { error?: string; code?: string };
+      if (body?.error) {
+        return body.code ? `${body.error} [${body.code}]` : body.error;
+      }
+    } catch {
+      // الجسم ليس JSON — نجرّب النص الخام أدناه.
+    }
+  }
+
+  if (context && typeof context.text === 'function') {
+    try {
+      const raw = (await context.text()).trim();
+      if (raw) return raw.slice(0, 300);
+    } catch {
+      // نتجاهل ونكتفي بالحالة.
+    }
+  }
+
+  if (context?.status) {
+    return `فشل الطلب بالحالة ${context.status}.`;
+  }
+
+  return error instanceof Error ? error.message : 'خطأ غير متوقع.';
+}
+
 /** CREDIT في واجهة النموذج = المستخدم دفع = OUT في نموذج البيانات. */
 function toDirection(type: ParseResponse['type']): TransactionDirection | null {
   if (type === 'CREDIT') return 'OUT';
@@ -73,7 +113,7 @@ export async function smartParse(
       { body: { ...input, knownContacts } },
     );
 
-    if (error) throw error;
+    if (error) throw new Error(await describeFunctionError(error));
     if (!data) throw new Error('استجابة فارغة.');
 
     return {
@@ -97,7 +137,8 @@ export async function smartParse(
           : 'تعذّر تحليل التسجيل الصوتي.',
       );
     }
-    return localFallback('تعذّر الوصول إلى الخدمة — استُخدم التحليل المحلي.');
+    const reason = await describeFunctionError(caught);
+    return localFallback(`تعذّر الوصول إلى الخدمة (${reason}) — استُخدم التحليل المحلي.`);
   }
 }
 
@@ -115,7 +156,7 @@ export async function scanReceipt(
     { body: { imageBase64, imageMimeType } },
   );
 
-  if (error) throw error;
+  if (error) throw new Error(await describeFunctionError(error));
   if (!data) throw new Error('تعذّرت قراءة الإيصال.');
   return data;
 }

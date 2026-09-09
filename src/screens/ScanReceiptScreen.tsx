@@ -35,14 +35,19 @@ export function ScanReceiptScreen() {
     setScan(null);
     setError(null);
 
-    if (!base64) {
+    // على الويب لا يملأ المنتقي base64 أحياناً، لكن الـ uri نفسه يكون
+    // data URL. الدالة على الخادم تزيل البادئة، فيصلح الاثنان.
+    const payload =
+      base64 ?? (uri.startsWith('data:') ? uri : null);
+
+    if (!payload) {
       setError('تعذّرت قراءة الصورة.');
       return;
     }
 
     setBusy(true);
     try {
-      setScan(await scanReceipt(base64));
+      setScan(await scanReceipt(payload));
     } catch (caught) {
       setError(
         caught instanceof Error

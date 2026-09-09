@@ -1,30 +1,50 @@
 import {
-  corsHeaders,
+  ApiError,
+  errorResponse,
   generateJson,
-  isConfigured,
+  handleOptions,
   jsonResponse,
+  normalizeImagePayload,
+  readJsonBody,
+  toErrorResponse,
 } from '../_shared/gemini.ts';
 
-/** يقرأ صورة إيصال ويستخرج المبلغ والتاريخ واسم المتجر. */
+/**
+ * يقرأ صورة إيصال ويستخرج المبلغ والتاريخ واسم المتجر.
+ *
+ * كل مسار خروج يعيد JSON مع ترويسات CORS، بما في ذلك الأخطاء، حتى لا
+ * يواجه العميل جسماً فارغاً ("Unexpected end of JSON input") أو خطأ CORS
+ * بدل الرسالة الحقيقية.
+ */
 
 interface RequestBody {
-  /** الصورة بصيغة base64 بلا بادئة data:. */
-  imageBase64: string;
-  imageMimeType?: string;
+  /** base64 خام أو data URL كامل؛ الاثنان مقبولان. */
+  imageBase64?: unknown;
+  imageMimeType?: unknown;
 }
 
+interface ReceiptScan {
+  merchant: string | null;
+  total: number | null;
+  currency: string | null;
+  date: string | null;
+  summary: string | null;
+}
+
+/**
+ * أسماء الأنواع بحروف كبيرة هي الصيغة المعتمدة في Schema الخاص بـ Gemini.
+ */
 const RESPONSE_SCHEMA = {
-  type: 'object',
+  type: 'OBJECT',
   properties: {
-    merchant: { type: 'string', nullable: true },
-    total: { type: 'number', nullable: true },
-    currency: { type: 'string', nullable: true },
-    /** ISO 8601 (YYYY-MM-DD) أو null. */
-    date: { type: 'string', nullable: true },
-    summary: { type: 'string', nullable: true },
+    merchant: { type: 'STRING', nullable: true },
+    total: { type: 'NUMBER', nullable: true },
+    currency: { type: 'STRING', nullable: true },
+    date: { type: 'STRING', nullable: true },
+    summary: { type: 'STRING', nullable: true },
   },
   required: ['merchant', 'total', 'currency', 'date', 'summary'],
-};
+} as const;
 
 const SYSTEM_INSTRUCTION = `استخرج بيانات هذا الإيصال.
 
@@ -36,49 +56,54 @@ const SYSTEM_INSTRUCTION = `استخرج بيانات هذا الإيصال.
 - summary سطر واحد يصف المشتريات.
 - ضع null لأي حقل غير مقروء؛ لا تخمّن ولا تخترع رقماً.`;
 
-Deno.serve(async (request) => {
+Deno.serve(async (request: Request): Promise<Response> => {
+  // الـ preflight أولاً: قبل أي تحقق، وإلا حجبه المتصفح.
   if (request.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return handleOptions();
   }
 
-  if (!isConfigured()) {
-    return jsonResponse(
-      { error: 'AI_NOT_CONFIGURED', message: 'مفتاح Gemini غير مضبوط.' },
-      503,
+  if (request.method !== 'POST') {
+    return errorResponse(
+      'METHOD_NOT_ALLOWED',
+      `الطريقة ${request.method} غير مدعومة؛ استخدم POST.`,
+      405,
     );
   }
 
   try {
-    const body = (await request.json()) as RequestBody;
-    if (!body.imageBase64) {
-      return jsonResponse(
-        { error: 'EMPTY_INPUT', message: 'أرسل صورة الإيصال.' },
-        400,
-      );
-    }
+    const body = await readJsonBody<RequestBody>(request);
 
-    const parsed = await generateJson<Record<string, unknown>>(
+    // يتحقق من الوجود والحجم وصحة الترميز، ويزيل بادئة data URL إن وُجدت.
+    const image = normalizeImagePayload(
+      body.imageBase64,
+      typeof body.imageMimeType === 'string' && body.imageMimeType.trim()
+        ? body.imageMimeType.trim()
+        : 'image/jpeg',
+    );
+
+    const scan = await generateJson<ReceiptScan>(
       [
         {
-          inline_data: {
-            mime_type: body.imageMimeType ?? 'image/jpeg',
-            data: body.imageBase64,
-          },
+          inline_data: { mime_type: image.mimeType, data: image.data },
         },
         { text: 'استخرج بيانات الإيصال.' },
       ],
-      RESPONSE_SCHEMA,
+      RESPONSE_SCHEMA as unknown as Record<string, unknown>,
       SYSTEM_INSTRUCTION,
     );
 
-    return jsonResponse(parsed);
+    return jsonResponse({
+      merchant: scan.merchant ?? null,
+      total: typeof scan.total === 'number' ? scan.total : null,
+      currency: scan.currency ?? null,
+      date: scan.date ?? null,
+      summary: scan.summary ?? null,
+    });
   } catch (error) {
-    return jsonResponse(
-      {
-        error: 'AI_FAILED',
-        message: error instanceof Error ? error.message : 'خطأ غير متوقع.',
-      },
-      502,
-    );
+    // ApiError يحمل حالته الصحيحة؛ أي شيء آخر يصبح 500 بجسم JSON.
+    if (!(error instanceof ApiError)) {
+      console.error('scan-receipt unexpected failure:', error);
+    }
+    return toErrorResponse(error);
   }
 });
