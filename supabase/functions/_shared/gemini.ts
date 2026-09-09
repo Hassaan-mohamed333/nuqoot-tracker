@@ -22,7 +22,12 @@ function readModel(name: string, fallback: string): string {
   return (Deno.env.get(name) ?? fallback).trim().replace(/^models\//, '');
 }
 
-const GEMINI_MODEL = readModel('GEMINI_MODEL', 'gemini-2.0-flash');
+/**
+ * أسماء الأسماء المستعارة ("-latest") أثبتت أنها تُحلّ فعلاً مع هذا المفتاح،
+ * بينما ردّت أسماء الإصدارات المرقّمة بـ 404. الأسماء المستعارة تتبع أحدث
+ * إصدار متاح تلقائياً، فلا تتعطّل عند تقاعد إصدار.
+ */
+const GEMINI_MODEL = readModel('GEMINI_MODEL', 'gemini-flash-latest');
 
 /**
  * طراز احتياطي يُجرَّب عندما يعجز الأساسي (ضغط، حصة، أو طراز غير متاح).
@@ -30,17 +35,14 @@ const GEMINI_MODEL = readModel('GEMINI_MODEL', 'gemini-2.0-flash');
  */
 const GEMINI_FALLBACK_MODEL = readModel(
   'GEMINI_FALLBACK_MODEL',
-  'gemini-3.6-flash',
+  'gemini-flash-lite-latest',
 );
 
 /**
  * طبقة خفيفة تُجرَّب أخيراً: عادةً حصتها أوسع وزمن ردها أقصر، فهي أفضل
  * فرصة للنجاح حين تكون الطبقات الأثقل مزدحمة.
  */
-const GEMINI_LITE_MODEL = readModel(
-  'GEMINI_LITE_MODEL',
-  'gemini-3.1-flash-lite',
-);
+const GEMINI_LITE_MODEL = readModel('GEMINI_LITE_MODEL', '');
 
 /** سلسلة المحاولة بالترتيب، بلا تكرار وبلا قيم فارغة. */
 const MODEL_CHAIN = [
@@ -67,14 +69,18 @@ const TOTAL_BUDGET_MS = 32000;
 /**
  * محاولة واحدة لكل طراز.
  *
- * طرازٌ مشبع لا يتعافى خلال نصف ثانية، فإعادة المحاولة عليه تُنفق من
- * ميزانية الوقت بلا مقابل. الانتقال الفوري إلى الطبقة التالية أعلى
- * احتمالاً للنجاح. ارفعها من الأسرار إن أردت إعادة المحاولة:
- *   supabase secrets set GEMINI_MAX_ATTEMPTS=2
+ * جولة واحدة = محاولة واحدة لكل طراز في السلسلة، بانتقال فوري بلا انتظار.
+ * الجولة الثانية تُعيد المحاولة على الطُرُز المزدحمة وحدها؛ أما التي ردّت
+ * 404 فتُسقط نهائياً لأن اسمها لن يصبح صحيحاً بالتكرار.
+ *
+ * هذا يستثمر ما تبقّى من الميزانية: طرازٌ غير موجود يفشل في أجزاء من
+ * الثانية، فيبقى وقت كافٍ لإعادة محاولة الطراز الحقيقي المزدحم — وهو غالباً
+ * ما ينجح لأن 503 حالة عابرة. لجولة واحدة فقط:
+ *   supabase secrets set GEMINI_MAX_ROUNDS=1
  */
-const MAX_ATTEMPTS_PER_MODEL = Math.max(
+const MAX_ROUNDS = Math.max(
   1,
-  Number(Deno.env.get('GEMINI_MAX_ATTEMPTS') ?? '1') || 1,
+  Number(Deno.env.get('GEMINI_MAX_ROUNDS') ?? '2') || 2,
 );
 const BACKOFF_BASE_MS = 500;
 
@@ -152,6 +158,14 @@ export function handleOptions(): Response {
 
 export function isConfigured(): boolean {
   return GEMINI_API_KEY.length > 0;
+}
+
+/**
+ * يتيح لدالة list-models استخدام المفتاح دون تصديره كمتغيّر عام.
+ * المفتاح لا يغادر الخادم في كل الأحوال.
+ */
+export function GEMINI_API_KEY_FOR_DISCOVERY(): string {
+  return GEMINI_API_KEY;
 }
 
 /** يتحقق من ضبط المفتاح ويرمي خطأً واضحاً إن غاب. */
@@ -448,8 +462,13 @@ export async function generateJson<T>(
   // حصيلة كل طبقة، لتمييز "مزدحم فعلاً" عن "اسم طراز غير موجود".
   const outcomes: string[] = [];
 
-  for (const model of MODEL_CHAIN) {
-    for (let attempt = 0; attempt < MAX_ATTEMPTS_PER_MODEL; attempt++) {
+  // الجولة الأولى تجرّب كل الطُرُز؛ الجولات التالية تجرّب المزدحمة فقط.
+  let candidates = [...MODEL_CHAIN];
+
+  for (let round = 0; round < MAX_ROUNDS && candidates.length > 0; round++) {
+    const stillBusy: string[] = [];
+
+    for (const model of candidates) {
       const remaining = deadline - Date.now();
       // لا نبدأ محاولة لا يتسع لها الوقت المتبقي.
       if (remaining < 2000) {
@@ -466,29 +485,27 @@ export async function generateJson<T>(
       } catch (caught) {
         if (!(caught instanceof ApiError)) throw caught;
         lastError = caught;
-        outcomes.push(`${model}=${caught.code}`);
+        outcomes.push(`${model}=${caught.code}${round > 0 ? `#${round + 1}` : ''}`);
+        console.warn(`[gemini] round ${round + 1} ${model}: ${caught.code}`);
 
-        // فشل نهائي: لا إعادة ولا انتقال إلى الاحتياطي.
+        // فشل نهائي (مفتاح خاطئ، طلب غير صالح، محتوى محجوب): أوقف كل شيء.
         if (!caught.retryable && caught.code !== 'GEMINI_MODEL_NOT_FOUND') {
           throw caught;
         }
 
-        console.warn(
-          `[gemini] ${model} attempt ${attempt + 1} failed: ${caught.code}`,
-        );
-
-        // طراز غير متاح: انتقل مباشرةً إلى التالي بلا انتظار.
-        if (caught.code === 'GEMINI_MODEL_NOT_FOUND') break;
-
-        const isLastAttempt = attempt + 1 >= MAX_ATTEMPTS_PER_MODEL;
-        if (isLastAttempt) break;
-
-        // تراجع أسّي مع اهتزاز، ولا نتجاوز الوقت المتبقي.
-        const backoff =
-          caught.retryAfterMs ??
-          BACKOFF_BASE_MS * 2 ** attempt + Math.floor(Math.random() * 250);
-        await sleep(Math.max(0, Math.min(backoff, deadline - Date.now() - 1500)));
+        // 404 يُسقط الطراز من الجولات القادمة؛ الازدحام يبقيه مرشّحاً.
+        if (caught.retryable) stillBusy.push(model);
       }
+    }
+
+    candidates = stillBusy;
+
+    // مهلة قصيرة قبل إعادة محاولة الطُرُز المزدحمة، ضمن الوقت المتبقي.
+    if (candidates.length > 0 && round + 1 < MAX_ROUNDS) {
+      const backoff =
+        lastError?.retryAfterMs ??
+        BACKOFF_BASE_MS * 2 ** round + Math.floor(Math.random() * 250);
+      await sleep(Math.max(0, Math.min(backoff, deadline - Date.now() - 1500)));
     }
   }
 

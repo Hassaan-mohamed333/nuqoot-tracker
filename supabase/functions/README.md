@@ -20,11 +20,11 @@ supabase secrets set GEMINI_API_KEY=<your-key>
 # اختياري: لتغيير الطراز بلا تعديل الكود
 supabase secrets set GEMINI_MODEL=gemini-2.0-flash
 # الطراز الاحتياطي عند ازدحام الأساسي أو عدم توفّره
-supabase secrets set GEMINI_FALLBACK_MODEL=gemini-2.0-flash-lite
-# طبقة خفيفة تُجرَّب أخيراً
-supabase secrets set GEMINI_LITE_MODEL=gemini-3.1-flash-lite
-# محاولة واحدة لكل طراز افتراضياً؛ ارفعها إن أردت إعادة المحاولة
-supabase secrets set GEMINI_MAX_ATTEMPTS=1
+supabase secrets set GEMINI_FALLBACK_MODEL=gemini-flash-lite-latest
+# طبقة ثالثة اختيارية (فارغة افتراضياً)
+supabase secrets set GEMINI_LITE_MODEL=
+# جولتان افتراضياً؛ اجعلها 1 لجولة واحدة بلا إعادة محاولة
+supabase secrets set GEMINI_MAX_ROUNDS=2
 
 # انشر
 supabase functions deploy parse-transaction
@@ -39,12 +39,33 @@ supabase functions deploy scan-receipt
 بلا `GEMINI_API_KEY` تُعيد الدالة `503` ورمز `AI_NOT_CONFIGURED`، ويتحوّل
 التطبيق تلقائياً إلى التحليل المحلي في `src/utils/parseTransactionText.ts`.
 
+## أي الطُرُز متاحة لمفتاحك؟
+
+اسم طراز خاطئ يفشل بـ 404 ويبدو من التطبيق شبيهاً بالازدحام. الأسماء
+المرقّمة (`gemini-2.5-flash`) قد لا تكون متاحة لكل مفتاح، بينما الأسماء
+المستعارة (`gemini-flash-latest`) تتبع أحدث إصدار متاح.
+
+المفتاح سرّ على الخادم، لذا تسرد دالة `list-models` ما يقبله فعلاً:
+
+```bash
+supabase functions deploy list-models
+curl -H "Authorization: Bearer <anon-key>" \
+  https://<project-ref>.supabase.co/functions/v1/list-models
+```
+
+اضبط الأسرار بأسماء من القائمة العائدة فقط.
+
 ## عند الازدحام
 
-تُجرَّب ثلاث طبقات بالترتيب — `GEMINI_MODEL` ثم `GEMINI_FALLBACK_MODEL` ثم
-`GEMINI_LITE_MODEL` — بمحاولة واحدة لكل طبقة وانتقال فوري بلا انتظار عند
-`503` أو `429`. إن فشل الجميع تعود برمز `AI_BUSY` ورسالة تطلب المحاولة
-لاحقاً أو الإدخال اليدوي، دون أن ينكسر مسار قراءة الإيصال.
+الجولة الأولى تجرّب كل طبقات السلسلة مرة واحدة بانتقال فوري بلا انتظار.
+ثم تُعاد المحاولة على الطُرُز المزدحمة وحدها في جولة ثانية؛ أما ما ردّ 404
+فيُسقط نهائياً لأن اسمه لن يصبح صحيحاً بالتكرار.
+
+الفائدة عملية: الطراز غير الموجود يفشل في أجزاء من الثانية، فيبقى وقت كافٍ
+لإعادة محاولة الطراز الحقيقي المزدحم — و503 حالة عابرة غالباً ما تزول.
+
+إن فشل الجميع تعود برمز `AI_BUSY` ورسالة تطلب المحاولة لاحقاً أو الإدخال
+اليدوي، دون أن ينكسر مسار قراءة الإيصال.
 
 يحمل حقل `detail` في استجابة الخطأ حصيلة كل طبقة، مثل:
 
