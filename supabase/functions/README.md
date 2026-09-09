@@ -19,6 +19,8 @@ supabase link --project-ref <project-ref>
 supabase secrets set GEMINI_API_KEY=<your-key>
 # اختياري: لتغيير الطراز بلا تعديل الكود
 supabase secrets set GEMINI_MODEL=gemini-2.0-flash
+# الطراز الاحتياطي عند ازدحام الأساسي أو عدم توفّره
+supabase secrets set GEMINI_FALLBACK_MODEL=gemini-2.0-flash-lite
 
 # انشر
 supabase functions deploy parse-transaction
@@ -32,3 +34,18 @@ supabase functions deploy scan-receipt
 
 بلا `GEMINI_API_KEY` تُعيد الدالة `503` ورمز `AI_NOT_CONFIGURED`، ويتحوّل
 التطبيق تلقائياً إلى التحليل المحلي في `src/utils/parseTransactionText.ts`.
+
+## عند الازدحام
+
+تُعيد الدالة المحاولة مرتين على الطراز الأساسي بتراجع أسّي، ثم تنتقل إلى
+`GEMINI_FALLBACK_MODEL` بالسياسة نفسها. إن فشل الجميع تعود برمز `AI_BUSY`
+ورسالة تطلب المحاولة لاحقاً أو الإدخال اليدوي — دون أن ينكسر مسار قراءة
+الإيصال.
+
+تأكّد أن الطراز الاحتياطي متاح لمفتاحك فعلاً؛ طراز غير موجود يعني أن
+الاحتياطي سيفشل بـ 404 في اللحظة التي تحتاجه فيها. للتحقق:
+
+```bash
+curl "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY" \
+  | grep -o '"name": "models/[^"]*"'
+```

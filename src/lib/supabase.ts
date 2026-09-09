@@ -24,8 +24,14 @@ export const isSupabaseConfigured =
  * fetch في React Native بلا مهلة افتراضية: شبكة بطيئة أو محجوبة تُبقي
  * الوعد معلّقاً إلى الأبد. هذا ما كان يجمّد شاشة الإقلاع، لأن
  * getSession() يجدّد الرمز المنتهي عبر الشبكة قبل أن يعود.
+ *
+ * القيمة أوسع من زمن أي استعلام عادي عمداً: دوال الحافة تعيد المحاولة على
+ * طراز احتياطي عند ازدحام Gemini، وقطعُها من طرف العميل قبل أن تنتهي كان
+ * سيُظهر انقطاعاً غامضاً بدل رسالة "الخدمة مزدحمة". هذه مهلة أمان ضد
+ * التعليق لا هدف زمني، وشاشة الإقلاع محميّة على حدة بمهلة أقصر في
+ * AuthProvider.
  */
-export const REQUEST_TIMEOUT_MS = 15000;
+export const REQUEST_TIMEOUT_MS = 45000;
 
 const fetchWithTimeout: typeof fetch = async (input, init) => {
   const controller = new AbortController();

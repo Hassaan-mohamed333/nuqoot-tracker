@@ -18,19 +18,47 @@ const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') ?? '';
  * نُزيل بادئة "models/" إن كتبها أحد في المتغير، لأن ENDPOINT يحتوي عليها
  * أصلاً وتكرارها ينتج مساراً خاطئاً ينتهي بـ 404.
  */
-const GEMINI_MODEL = (Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.0-flash')
-  .trim()
-  .replace(/^models\//, '');
+function readModel(name: string, fallback: string): string {
+  return (Deno.env.get(name) ?? fallback).trim().replace(/^models\//, '');
+}
+
+const GEMINI_MODEL = readModel('GEMINI_MODEL', 'gemini-2.0-flash');
+
+/**
+ * طراز احتياطي يُجرَّب عندما يعجز الأساسي (ضغط، حصة، أو طراز غير متاح).
+ * قابل للضبط: supabase secrets set GEMINI_FALLBACK_MODEL=...
+ */
+const GEMINI_FALLBACK_MODEL = readModel(
+  'GEMINI_FALLBACK_MODEL',
+  'gemini-3.6-flash',
+);
+
+/** سلسلة المحاولة: الأساسي ثم الاحتياطي، بلا تكرار وبلا قيم فارغة. */
+const MODEL_CHAIN = [...new Set([GEMINI_MODEL, GEMINI_FALLBACK_MODEL])].filter(
+  (model) => model.length > 0,
+);
 
 const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 /** الرابط الكامل كما تتوقعه واجهة REST. */
-function generateContentUrl(): string {
-  return `${ENDPOINT}/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+function generateContentUrl(model: string): string {
+  return `${ENDPOINT}/${model}:generateContent?key=${GEMINI_API_KEY}`;
 }
 
-/** مهلة الطلب: بلا مهلة قد يبقى الاستدعاء معلّقاً ويستهلك زمن التنفيذ. */
-const TIMEOUT_MS = 25000;
+/**
+ * ميزانية الوقت.
+ *
+ * العميل يقطع أي طلب بعد REQUEST_TIMEOUT_MS، فلو تجاوزت المحاولات وفترات
+ * الانتظار تلك المهلة لرأى المستخدم انقطاعاً من طرفه بدل رسالتنا المهذّبة.
+ * لذلك: مهلة قصيرة لكل محاولة، وسقف إجمالي أقل من مهلة العميل.
+ */
+const ATTEMPT_TIMEOUT_MS = 12000;
+const TOTAL_BUDGET_MS = 38000;
+const MAX_ATTEMPTS_PER_MODEL = 2;
+const BACKOFF_BASE_MS = 500;
+
+/** حالات يُرجى أن تزول بإعادة المحاولة. */
+const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 
 /** أقصى حجم صورة بعد فك الترميز. أكبر من ذلك يُرفض برسالة واضحة. */
 export const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
@@ -57,6 +85,10 @@ export class ApiError extends Error {
     readonly code: string,
     message: string,
     readonly status: number,
+    /** هل تستحق الحالة إعادة محاولة على الطراز نفسه؟ */
+    readonly retryable = false,
+    /** ثوانٍ اقترحها الخادم عبر ترويسة Retry-After. */
+    readonly retryAfterMs?: number,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -215,57 +247,65 @@ export interface GeminiPart {
   inline_data?: { mime_type: string; data: string };
 }
 
-/**
- * ينادي Gemini ويطلب مخرجاً بصيغة JSON مطابقاً للمخطط المعطى.
- *
- * كل حالات الفشل تتحوّل إلى ApiError: انتهاء المهلة، خطأ HTTP من Gemini،
- * حجب بفلاتر الأمان، رد بلا نص، أو نص ليس JSON. الحالة الأخيرة تحديداً
- * هي مصدر رسالة "Unexpected end of JSON input" حين كنا نمرّر النص إلى
- * JSON.parse بلا فحص.
- */
-export async function generateJson<T>(
-  parts: GeminiPart[],
-  responseSchema: Record<string, unknown>,
-  systemInstruction: string,
-): Promise<T> {
-  assertConfigured();
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** يقرأ ترويسة Retry-After (بالثواني) إن وُجدت. */
+function parseRetryAfter(response: Response): number | undefined {
+  const raw = response.headers.get('retry-after');
+  if (!raw) return undefined;
+  const seconds = Number(raw);
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : undefined;
+}
+
+interface RequestPayload {
+  parts: GeminiPart[];
+  responseSchema: Record<string, unknown>;
+  systemInstruction: string;
+}
+
+/**
+ * محاولة واحدة على طراز واحد.
+ *
+ * ترمي ApiError موسومة بـ retryable حين يكون الفشل عابراً (ضغط، حصة، عطل
+ * مؤقت، انقطاع شبكة)، وغير موسومة حين يكون الفشل نهائياً (مفتاح خاطئ،
+ * طلب غير صالح، محتوى محجوب).
+ */
+async function requestOnce<T>(
+  model: string,
+  { parts, responseSchema, systemInstruction }: RequestPayload,
+  timeoutMs: number,
+): Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   let response: Response;
   try {
-    response = await fetch(
-      generateContentUrl(),
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts }],
-          systemInstruction: { parts: [{ text: systemInstruction }] },
-          generationConfig: {
-            responseMimeType: 'application/json',
-            responseSchema,
-            temperature: 0,
-          },
-        }),
-      },
-    );
+    response = await fetch(generateContentUrl(model), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts }],
+        systemInstruction: { parts: [{ text: systemInstruction }] },
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema,
+          temperature: 0,
+        },
+      }),
+    });
   } catch (caught) {
-    if (caught instanceof DOMException && caught.name === 'AbortError') {
-      throw new ApiError(
-        'GEMINI_TIMEOUT',
-        `لم يستجب Gemini خلال ${TIMEOUT_MS / 1000} ثانية.`,
-        504,
-      );
-    }
+    const aborted = caught instanceof DOMException && caught.name === 'AbortError';
+    // انقطاع الشبكة وانتهاء المهلة كلاهما يستحق محاولة أخرى.
     throw new ApiError(
-      'GEMINI_UNREACHABLE',
-      `تعذّر الوصول إلى Gemini: ${
-        caught instanceof Error ? caught.message : 'سبب غير معروف'
-      }`,
-      502,
+      aborted ? 'GEMINI_TIMEOUT' : 'GEMINI_UNREACHABLE',
+      aborted
+        ? `لم يستجب الطراز "${model}" خلال ${timeoutMs / 1000} ثانية.`
+        : `تعذّر الوصول إلى Gemini: ${
+            caught instanceof Error ? caught.message : 'سبب غير معروف'
+          }`,
+      aborted ? 504 : 502,
+      true,
     );
   } finally {
     clearTimeout(timer);
@@ -274,17 +314,28 @@ export async function generateJson<T>(
   if (!response.ok) {
     const detail = await response.text().catch(() => '');
 
-    // 404 يعني أن اسم الطراز غير معروف لهذا المفتاح — خطأ إعداد لا عطل
-    // مؤقت، فنسمّي الطراز في الرسالة ونشير إلى طريقة تغييره.
+    if (RETRYABLE_STATUSES.has(response.status)) {
+      throw new ApiError(
+        response.status === 429 ? 'GEMINI_RATE_LIMITED' : 'GEMINI_OVERLOADED',
+        `الطراز "${model}" ردّ بالحالة ${response.status}: ${
+          detail.slice(0, 200) || 'ضغط مؤقت'
+        }`,
+        503,
+        true,
+        parseRetryAfter(response),
+      );
+    }
+
+    // 404 لا يُصلحه التكرار على الطراز نفسه، لكنه يستحق تجربة الاحتياطي.
     if (response.status === 404) {
       throw new ApiError(
         'GEMINI_MODEL_NOT_FOUND',
-        `الطراز "${GEMINI_MODEL}" غير متاح لهذا المفتاح. غيّره بـ: supabase secrets set GEMINI_MODEL=<model>`,
+        `الطراز "${model}" غير متاح لهذا المفتاح. غيّره بـ: supabase secrets set GEMINI_MODEL=<model>`,
         503,
       );
     }
 
-    // 401/403 من Gemini تعني مفتاحاً خاطئاً، وهو خطأ إعداد لا خطأ مستخدم.
+    // 401/403 مفتاح خاطئ، و400 طلب غير صالح: الإعادة بلا فائدة.
     const status = response.status === 401 || response.status === 403 ? 503 : 502;
     throw new ApiError(
       'GEMINI_HTTP_ERROR',
@@ -346,4 +397,84 @@ export async function generateJson<T>(
       502,
     );
   }
+}
+
+/**
+ * ينادي Gemini ويطلب مخرجاً بصيغة JSON مطابقاً للمخطط المعطى.
+ *
+ * سياسة المحاولة:
+ * 1. الطراز الأساسي، ثم إعادة واحدة بتراجع أسّي عند فشل عابر (429/503/...).
+ * 2. إن بقي فاشلاً — أو كان الطراز نفسه غير متاح (404) — نجرّب الاحتياطي
+ *    بالسياسة نفسها.
+ * 3. إن سقط الجميع بسبب الضغط، نعيد رسالة واحدة مفهومة للمستخدم بدل
+ *    تفاصيل تقنية، فلا ينكسر مسار قراءة الإيصال.
+ *
+ * كل ذلك داخل ميزانية زمنية أقل من مهلة العميل، حتى تصل الرسالة فعلاً.
+ */
+export async function generateJson<T>(
+  parts: GeminiPart[],
+  responseSchema: Record<string, unknown>,
+  systemInstruction: string,
+): Promise<T> {
+  assertConfigured();
+
+  const payload: RequestPayload = { parts, responseSchema, systemInstruction };
+  const deadline = Date.now() + TOTAL_BUDGET_MS;
+  let lastError: ApiError | null = null;
+
+  for (const model of MODEL_CHAIN) {
+    for (let attempt = 0; attempt < MAX_ATTEMPTS_PER_MODEL; attempt++) {
+      const remaining = deadline - Date.now();
+      // لا نبدأ محاولة لا يتسع لها الوقت المتبقي.
+      if (remaining < 2000) {
+        return failBusy(lastError);
+      }
+
+      try {
+        return await requestOnce<T>(
+          model,
+          payload,
+          Math.min(ATTEMPT_TIMEOUT_MS, remaining),
+        );
+      } catch (caught) {
+        if (!(caught instanceof ApiError)) throw caught;
+        lastError = caught;
+
+        // فشل نهائي: لا إعادة ولا انتقال إلى الاحتياطي.
+        if (!caught.retryable && caught.code !== 'GEMINI_MODEL_NOT_FOUND') {
+          throw caught;
+        }
+
+        console.warn(
+          `[gemini] ${model} attempt ${attempt + 1} failed: ${caught.code}`,
+        );
+
+        // طراز غير متاح: انتقل مباشرةً إلى التالي بلا انتظار.
+        if (caught.code === 'GEMINI_MODEL_NOT_FOUND') break;
+
+        const isLastAttempt = attempt + 1 >= MAX_ATTEMPTS_PER_MODEL;
+        if (isLastAttempt) break;
+
+        // تراجع أسّي مع اهتزاز، ولا نتجاوز الوقت المتبقي.
+        const backoff =
+          caught.retryAfterMs ??
+          BACKOFF_BASE_MS * 2 ** attempt + Math.floor(Math.random() * 250);
+        await sleep(Math.max(0, Math.min(backoff, deadline - Date.now() - 1500)));
+      }
+    }
+  }
+
+  return failBusy(lastError);
+}
+
+/** الرسالة الأخيرة الموجّهة للمستخدم بعد استنفاد كل الطُرُز والمحاولات. */
+function failBusy(lastError: ApiError | null): never {
+  if (lastError?.code === 'GEMINI_MODEL_NOT_FOUND') {
+    throw lastError;
+  }
+  throw new ApiError(
+    'AI_BUSY',
+    'خدمة الذكاء الاصطناعي مزدحمة حالياً. حاول بعد قليل، أو أدخل البيانات يدوياً.',
+    503,
+  );
 }
