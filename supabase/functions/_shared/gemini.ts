@@ -33,10 +33,19 @@ const GEMINI_FALLBACK_MODEL = readModel(
   'gemini-3.6-flash',
 );
 
-/** سلسلة المحاولة: الأساسي ثم الاحتياطي، بلا تكرار وبلا قيم فارغة. */
-const MODEL_CHAIN = [...new Set([GEMINI_MODEL, GEMINI_FALLBACK_MODEL])].filter(
-  (model) => model.length > 0,
+/**
+ * طبقة خفيفة تُجرَّب أخيراً: عادةً حصتها أوسع وزمن ردها أقصر، فهي أفضل
+ * فرصة للنجاح حين تكون الطبقات الأثقل مزدحمة.
+ */
+const GEMINI_LITE_MODEL = readModel(
+  'GEMINI_LITE_MODEL',
+  'gemini-3.1-flash-lite',
 );
+
+/** سلسلة المحاولة بالترتيب، بلا تكرار وبلا قيم فارغة. */
+const MODEL_CHAIN = [
+  ...new Set([GEMINI_MODEL, GEMINI_FALLBACK_MODEL, GEMINI_LITE_MODEL]),
+].filter((model) => model.length > 0);
 
 const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -52,9 +61,21 @@ function generateContentUrl(model: string): string {
  * الانتظار تلك المهلة لرأى المستخدم انقطاعاً من طرفه بدل رسالتنا المهذّبة.
  * لذلك: مهلة قصيرة لكل محاولة، وسقف إجمالي أقل من مهلة العميل.
  */
-const ATTEMPT_TIMEOUT_MS = 12000;
-const TOTAL_BUDGET_MS = 38000;
-const MAX_ATTEMPTS_PER_MODEL = 2;
+const ATTEMPT_TIMEOUT_MS = 10000;
+const TOTAL_BUDGET_MS = 32000;
+
+/**
+ * محاولة واحدة لكل طراز.
+ *
+ * طرازٌ مشبع لا يتعافى خلال نصف ثانية، فإعادة المحاولة عليه تُنفق من
+ * ميزانية الوقت بلا مقابل. الانتقال الفوري إلى الطبقة التالية أعلى
+ * احتمالاً للنجاح. ارفعها من الأسرار إن أردت إعادة المحاولة:
+ *   supabase secrets set GEMINI_MAX_ATTEMPTS=2
+ */
+const MAX_ATTEMPTS_PER_MODEL = Math.max(
+  1,
+  Number(Deno.env.get('GEMINI_MAX_ATTEMPTS') ?? '1') || 1,
+);
 const BACKOFF_BASE_MS = 500;
 
 /** حالات يُرجى أن تزول بإعادة المحاولة. */
@@ -89,6 +110,8 @@ export class ApiError extends Error {
     readonly retryable = false,
     /** ثوانٍ اقترحها الخادم عبر ترويسة Retry-After. */
     readonly retryAfterMs?: number,
+    /** تفصيل تقني للمطوّر، منفصل عن الرسالة الموجّهة للمستخدم. */
+    readonly detail?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -107,14 +130,15 @@ export function errorResponse(
   code: string,
   message: string,
   status: number,
+  detail?: string,
 ): Response {
-  return jsonResponse({ error: message, code }, status);
+  return jsonResponse(detail ? { error: message, code, detail } : { error: message, code }, status);
 }
 
 /** يحوّل أي استثناء إلى استجابة JSON، فلا يخرج جسم فارغ أبداً. */
 export function toErrorResponse(error: unknown): Response {
   if (error instanceof ApiError) {
-    return errorResponse(error.code, error.message, error.status);
+    return errorResponse(error.code, error.message, error.status, error.detail);
   }
   const message =
     error instanceof Error ? error.message : 'خطأ غير متوقع في الخادم.';
@@ -330,7 +354,7 @@ async function requestOnce<T>(
     if (response.status === 404) {
       throw new ApiError(
         'GEMINI_MODEL_NOT_FOUND',
-        `الطراز "${model}" غير متاح لهذا المفتاح. غيّره بـ: supabase secrets set GEMINI_MODEL=<model>`,
+        `الطراز "${model}" غير متاح لهذا المفتاح.`,
         503,
       );
     }
@@ -421,13 +445,16 @@ export async function generateJson<T>(
   const payload: RequestPayload = { parts, responseSchema, systemInstruction };
   const deadline = Date.now() + TOTAL_BUDGET_MS;
   let lastError: ApiError | null = null;
+  // حصيلة كل طبقة، لتمييز "مزدحم فعلاً" عن "اسم طراز غير موجود".
+  const outcomes: string[] = [];
 
   for (const model of MODEL_CHAIN) {
     for (let attempt = 0; attempt < MAX_ATTEMPTS_PER_MODEL; attempt++) {
       const remaining = deadline - Date.now();
       // لا نبدأ محاولة لا يتسع لها الوقت المتبقي.
       if (remaining < 2000) {
-        return failBusy(lastError);
+        outcomes.push(`${model}=BUDGET_EXHAUSTED`);
+        return failBusy(lastError, outcomes);
       }
 
       try {
@@ -439,6 +466,7 @@ export async function generateJson<T>(
       } catch (caught) {
         if (!(caught instanceof ApiError)) throw caught;
         lastError = caught;
+        outcomes.push(`${model}=${caught.code}`);
 
         // فشل نهائي: لا إعادة ولا انتقال إلى الاحتياطي.
         if (!caught.retryable && caught.code !== 'GEMINI_MODEL_NOT_FOUND') {
@@ -464,17 +492,41 @@ export async function generateJson<T>(
     }
   }
 
-  return failBusy(lastError);
+  return failBusy(lastError, outcomes);
 }
 
-/** الرسالة الأخيرة الموجّهة للمستخدم بعد استنفاد كل الطُرُز والمحاولات. */
-function failBusy(lastError: ApiError | null): never {
-  if (lastError?.code === 'GEMINI_MODEL_NOT_FOUND') {
-    throw lastError;
+/**
+ * الرسالة الأخيرة بعد استنفاد السلسلة.
+ *
+ * الرسالة للمستخدم تبقى بسيطة، لكن detail يحمل حصيلة كل طبقة حتى يتبيّن
+ * من السجل ما إذا كان الازدحام حقيقياً أم أن أحد الأسماء غير موجود أصلاً
+ * (404) — وهما حالتان تُعالَجان بطريقتين مختلفتين تماماً.
+ */
+function failBusy(lastError: ApiError | null, outcomes: string[]): never {
+  const detail = outcomes.join(', ');
+  console.warn(`[gemini] chain exhausted: ${detail}`);
+
+  // كل الطُرُز غير موجودة: المشكلة إعداد لا ضغط.
+  const allMissing =
+    outcomes.length > 0 &&
+    outcomes.every((entry) => entry.endsWith('GEMINI_MODEL_NOT_FOUND'));
+  if (allMissing) {
+    throw new ApiError(
+      'GEMINI_MODEL_NOT_FOUND',
+      `لا يوجد طراز صالح في السلسلة. تحقّق من أسماء الطُرُز المتاحة لمفتاحك.`,
+      503,
+      false,
+      undefined,
+      detail,
+    );
   }
+
   throw new ApiError(
     'AI_BUSY',
     'خدمة الذكاء الاصطناعي مزدحمة حالياً. حاول بعد قليل، أو أدخل البيانات يدوياً.',
     503,
+    false,
+    undefined,
+    detail,
   );
 }

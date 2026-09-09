@@ -46,9 +46,18 @@ async function describeFunctionError(error: unknown): Promise<string> {
 
   if (context && typeof context.json === 'function') {
     try {
-      const body = (await context.json()) as { error?: string; code?: string };
+      const body = (await context.json()) as {
+        error?: string;
+        code?: string;
+        detail?: string;
+      };
       if (body?.error) {
-        return body.code ? `${body.error} [${body.code}]` : body.error;
+        // detail يحمل حصيلة كل طراز في السلسلة؛ مفيد جداً عند تشخيص
+        // الازدحام مقابل اسم طراز خاطئ.
+        const parts = [body.error];
+        if (body.code) parts.push(`[${body.code}]`);
+        if (body.detail) parts.push(`— ${body.detail}`);
+        return parts.join(' ');
       }
     } catch {
       // الجسم ليس JSON — نجرّب النص الخام أدناه.
