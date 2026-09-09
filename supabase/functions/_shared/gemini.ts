@@ -11,10 +11,23 @@
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') ?? '';
 
-/** يُضبط من أسرار المشروع؛ غيّره دون تعديل الكود عند تغيّر أسماء الطُرُز. */
-const GEMINI_MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.5-flash';
+/**
+ * يُضبط من أسرار المشروع؛ غيّره دون تعديل الكود عند تغيّر أسماء الطُرُز:
+ *   supabase secrets set GEMINI_MODEL=...
+ *
+ * نُزيل بادئة "models/" إن كتبها أحد في المتغير، لأن ENDPOINT يحتوي عليها
+ * أصلاً وتكرارها ينتج مساراً خاطئاً ينتهي بـ 404.
+ */
+const GEMINI_MODEL = (Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.0-flash')
+  .trim()
+  .replace(/^models\//, '');
 
 const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
+
+/** الرابط الكامل كما تتوقعه واجهة REST. */
+function generateContentUrl(): string {
+  return `${ENDPOINT}/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+}
 
 /** مهلة الطلب: بلا مهلة قد يبقى الاستدعاء معلّقاً ويستهلك زمن التنفيذ. */
 const TIMEOUT_MS = 25000;
@@ -223,7 +236,7 @@ export async function generateJson<T>(
   let response: Response;
   try {
     response = await fetch(
-      `${ENDPOINT}/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+      generateContentUrl(),
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -260,6 +273,17 @@ export async function generateJson<T>(
 
   if (!response.ok) {
     const detail = await response.text().catch(() => '');
+
+    // 404 يعني أن اسم الطراز غير معروف لهذا المفتاح — خطأ إعداد لا عطل
+    // مؤقت، فنسمّي الطراز في الرسالة ونشير إلى طريقة تغييره.
+    if (response.status === 404) {
+      throw new ApiError(
+        'GEMINI_MODEL_NOT_FOUND',
+        `الطراز "${GEMINI_MODEL}" غير متاح لهذا المفتاح. غيّره بـ: supabase secrets set GEMINI_MODEL=<model>`,
+        503,
+      );
+    }
+
     // 401/403 من Gemini تعني مفتاحاً خاطئاً، وهو خطأ إعداد لا خطأ مستخدم.
     const status = response.status === 401 || response.status === 403 ? 503 : 502;
     throw new ApiError(

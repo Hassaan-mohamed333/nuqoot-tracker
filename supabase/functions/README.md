@@ -18,7 +18,7 @@ supabase link --project-ref <project-ref>
 # اضبط الأسرار
 supabase secrets set GEMINI_API_KEY=<your-key>
 # اختياري: لتغيير الطراز بلا تعديل الكود
-supabase secrets set GEMINI_MODEL=gemini-2.5-flash
+supabase secrets set GEMINI_MODEL=gemini-2.0-flash
 
 # انشر
 supabase functions deploy parse-transaction
