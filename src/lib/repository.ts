@@ -116,8 +116,10 @@ export async function fetchLedgerData(): Promise<LedgerData> {
     ]);
 
     return data;
-  } catch {
+  } catch (error) {
     // تعذّر الوصول للخادم: نعرض آخر نسخة محفوظة لهذا الحساب بلا زرع بيانات.
+    // نسجّل السبب أولاً، وإلا صار الرجوع الصامت يخفي أخطاء حقيقية.
+    logStepFailure('تحميل الدفتر', error);
     return loadLocal(false);
   }
 }
@@ -280,7 +282,8 @@ export async function fetchEventLedger(eventId: string): Promise<EventLedger> {
       expenses: attachShares(expenses, (sharesResult.data ?? []) as ExpenseShare[]),
       offline: false,
     };
-  } catch {
+  } catch (error) {
+    logStepFailure('تحميل دفتر المناسبة', error);
     return loadLocalEventLedger(eventId);
   }
 }
@@ -542,7 +545,8 @@ export async function fetchContactLedger(
       ),
       offline: false,
     };
-  } catch {
+  } catch (error) {
+    logStepFailure('تحميل دفتر جهة الاتصال', error);
     return loadLocalContactLedger(contactId);
   }
 }

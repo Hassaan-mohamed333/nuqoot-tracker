@@ -14,6 +14,7 @@ import {
 
 import { reportError } from '@/lib/alerts';
 import { fetchEventLedger, setEventParticipants } from '@/lib/repository';
+import { describeSupabaseError, logStepFailure } from '@/lib/supabaseError';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
 import type { NewEventMember } from '@/types';
@@ -34,6 +35,7 @@ export function EventParticipantsScreen() {
   const [guests, setGuests] = useState<string[]>([]);
   const [guestDraft, setGuestDraft] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const sortedContacts = useMemo(
@@ -68,6 +70,11 @@ export function EventParticipantsScreen() {
             .map((row) => row.display_name)
             .filter((name): name is string => Boolean(name)),
         );
+      })
+      .catch((error: unknown) => {
+        // بلا هذا المعالج يبقى الرفض صامتاً وتظهر الشاشة فارغة بلا سبب.
+        logStepFailure('تحميل مشاركي المناسبة', error);
+        if (active) setLoadError(describeSupabaseError(error));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -135,6 +142,14 @@ export function EventParticipantsScreen() {
         <Text className="mb-2 text-right text-sm font-bold text-gray-900">
           من يشارك في هذه المناسبة؟
         </Text>
+
+        {loadError ? (
+          <View className="mb-3 rounded-2xl border border-red-200 bg-red-50 p-3">
+            <Text className="text-right text-xs text-red-700">
+              تعذّر تحميل المشاركين الحاليين: {loadError}
+            </Text>
+          </View>
+        ) : null}
 
         <View className="rounded-2xl border border-gray-100 bg-white p-2">
           <Pressable
