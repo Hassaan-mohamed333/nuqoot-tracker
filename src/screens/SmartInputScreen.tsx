@@ -11,7 +11,6 @@ import { Mic, Send, Sparkles, Square, TriangleAlert } from 'lucide-react-native'
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -21,6 +20,7 @@ import {
   View,
 } from 'react-native';
 
+import { notify, reportError } from '@/lib/alerts';
 import { smartParse } from '@/lib/ai';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
@@ -93,10 +93,7 @@ export function SmartInputScreen() {
         setNotice(outcome.fallbackReason);
       }
     } catch (error) {
-      Alert.alert(
-        'تعذّر التحليل',
-        error instanceof Error ? error.message : 'حدث خطأ غير متوقع.',
-      );
+      reportError('تعذّر التحليل', error);
     } finally {
       setBusy(false);
     }
@@ -106,7 +103,7 @@ export function SmartInputScreen() {
     try {
       const permission = await AudioModule.requestRecordingPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('إذن مطلوب', 'فعّل إذن الميكروفون لاستخدام الإدخال الصوتي.');
+        notify('إذن مطلوب', 'فعّل إذن الميكروفون لاستخدام الإدخال الصوتي.');
         return;
       }
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
@@ -114,10 +111,7 @@ export function SmartInputScreen() {
       recorder.record();
       setRecording(true);
     } catch (error) {
-      Alert.alert(
-        'تعذّر التسجيل',
-        error instanceof Error ? error.message : 'حدث خطأ غير متوقع.',
-      );
+      reportError('تعذّر التسجيل', error);
     }
   }
 
@@ -138,10 +132,7 @@ export function SmartInputScreen() {
         audioMimeType: Platform.OS === 'ios' ? 'audio/mp4' : 'audio/m4a',
       });
     } catch (error) {
-      Alert.alert(
-        'تعذّر التسجيل',
-        error instanceof Error ? error.message : 'حدث خطأ غير متوقع.',
-      );
+      reportError('تعذّر التسجيل', error);
     }
   }
 

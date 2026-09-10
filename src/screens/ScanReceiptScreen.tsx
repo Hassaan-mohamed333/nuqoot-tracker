@@ -5,7 +5,6 @@ import { Camera, Image as ImageIcon, TriangleAlert } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -13,6 +12,7 @@ import {
   View,
 } from 'react-native';
 
+import { notify } from '@/lib/alerts';
 import { scanReceipt, type ReceiptScan } from '@/lib/ai';
 import type { RootStackParamList } from '@/navigation/types';
 import { formatAmount, formatDate } from '@/utils/ledger';
@@ -62,7 +62,7 @@ export function ScanReceiptScreen() {
   async function capture() {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('إذن مطلوب', 'فعّل إذن الكاميرا لتصوير الإيصالات.');
+      notify('إذن مطلوب', 'فعّل إذن الكاميرا لتصوير الإيصالات.');
       return;
     }
     const result = await ImagePicker.launchCameraAsync({

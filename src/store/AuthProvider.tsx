@@ -174,9 +174,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const signInWithGoogle = useCallback(async () => {
-    if (!supabase) return;
+    if (!supabase) {
+      // بلا إعداد Supabase لا يوجد مزوّد أصلاً؛ نُبلغ بدل الصمت.
+      throw new Error('Supabase غير مُعدّ، فلا يمكن تسجيل الدخول بحساب Google.');
+    }
 
     const redirectTo = oauthRedirectTo();
+    // يظهر في سجل المتصفّح: أول ما يجب مطابقته مع قائمة Redirect URLs.
+    console.log('[auth] google sign-in, redirectTo =', redirectTo);
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -186,11 +191,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         skipBrowserRedirect: Platform.OS !== 'web',
       },
     });
-    if (error) throw error;
 
-    // على الويب يتولّى المتصفّح إعادة التوجيه، وتُلتقط الجلسة عند العودة
-    // عبر detectSessionInUrl؛ فلا شيء آخر نفعله هنا.
-    if (Platform.OS === 'web') return;
+    if (error) {
+      console.error('[auth] signInWithOAuth رفض الطلب:', error);
+      throw error;
+    }
+
+    console.log('[auth] provider url =', data?.url ?? '(none)');
+
+    if (Platform.OS === 'web') {
+      /**
+       * المفترض أن ينتقل المتصفّح الآن من تلقائه. إن بقينا هنا فالانتقال
+       * لم يحدث — عادةً بسبب حاجب نوافذ أو بيئة بلا window — فننتقل يدوياً
+       * بدل الوقوف بلا أثر ظاهر.
+       */
+      if (data?.url && typeof window !== 'undefined') {
+        window.location.assign(data.url);
+      } else if (!data?.url) {
+        throw new Error('لم يُرجع Supabase رابط مصادقة Google.');
+      }
+      return;
+    }
 
     if (!data?.url) {
       throw new Error('لم يُرجع Supabase رابط مصادقة.');

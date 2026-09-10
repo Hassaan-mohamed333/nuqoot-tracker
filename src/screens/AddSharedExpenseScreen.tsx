@@ -5,7 +5,6 @@ import { Check } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -15,6 +14,7 @@ import {
   View,
 } from 'react-native';
 
+import { reportError } from '@/lib/alerts';
 import { createSharedExpense, fetchEventLedger } from '@/lib/repository';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
@@ -148,10 +148,7 @@ export function AddSharedExpenseScreen() {
       });
       navigation.goBack();
     } catch (error) {
-      Alert.alert(
-        'تعذّر الحفظ',
-        error instanceof Error ? error.message : 'حدث خطأ غير متوقع.',
-      );
+      reportError('تعذّر الحفظ', error);
     } finally {
       setSaving(false);
     }

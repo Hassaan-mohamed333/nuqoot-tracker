@@ -12,7 +12,6 @@ import {
 import React, { useMemo } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -21,6 +20,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { confirmAction, reportError } from '@/lib/alerts';
 import { EventCard } from '@/components/EventCard';
 import { LedgerSummaryBar } from '@/components/LedgerSummaryBar';
 import { TransactionCard } from '@/components/TransactionCard';
@@ -59,26 +59,21 @@ export function HomeScreen() {
     [transactions],
   );
 
-  function confirmSignOut() {
-    Alert.alert(
-      'تسجيل الخروج',
-      'ستُحذف النسخة المحفوظة على هذا الجهاز، وتبقى بياناتك على الخادم.',
-      [
-        { text: 'إلغاء', style: 'cancel' },
-        {
-          text: 'خروج',
-          style: 'destructive',
-          onPress: () => {
-            signOut().catch((error: unknown) =>
-              Alert.alert(
-                'تعذّر تسجيل الخروج',
-                error instanceof Error ? error.message : 'حدث خطأ غير متوقع.',
-              ),
-            );
-          },
-        },
-      ],
-    );
+  async function confirmSignOut() {
+    const approved = await confirmAction({
+      title: 'تسجيل الخروج',
+      message:
+        'ستُحذف النسخة المحفوظة على هذا الجهاز، وتبقى بياناتك على الخادم.',
+      confirmLabel: 'خروج',
+      destructive: true,
+    });
+    if (!approved) return;
+
+    try {
+      await signOut();
+    } catch (error) {
+      reportError('تعذّر تسجيل الخروج', error);
+    }
   }
 
   const upcomingEvents = useMemo(
@@ -122,7 +117,7 @@ export function HomeScreen() {
             </Pressable>
             {authDisabled ? null : (
               <Pressable
-                onPress={confirmSignOut}
+                onPress={() => void confirmSignOut()}
                 accessibilityRole="button"
                 accessibilityLabel="تسجيل الخروج"
                 className="mr-2 h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white">

@@ -7,7 +7,6 @@ import {
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -19,6 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
+import { notify, reportError } from '@/lib/alerts';
 import { useAuth } from '@/store/AuthProvider';
 
 type Mode = 'signIn' | 'signUp';
@@ -63,26 +63,22 @@ export function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  // يُعرض داخل الصفحة: أوثق من حوار المتصفّح الذي قد يُحجب.
+  const [formError, setFormError] = useState<string | null>(null);
 
   const isValid = email.trim().includes('@') && password.length >= 6;
-
-  function reportError(error: unknown) {
-    Alert.alert(
-      'تعذّر تسجيل الدخول',
-      error instanceof Error ? error.message : 'حدث خطأ غير متوقع.',
-    );
-  }
 
   async function handleEmailSubmit() {
     if (!isValid || busy) return;
     setBusy(true);
     try {
+      setFormError(null);
       if (mode === 'signIn') {
         await signInWithEmail(email, password);
       } else {
         const needsConfirmation = await signUpWithEmail(email, password);
         if (needsConfirmation) {
-          Alert.alert(
+          notify(
             'تأكيد البريد مطلوب',
             'أرسلنا رسالة تأكيد إلى بريدك. افتح الرابط ثم سجّل الدخول.',
           );
@@ -90,7 +86,10 @@ export function AuthScreen() {
         }
       }
     } catch (error) {
-      reportError(error);
+      setFormError(
+        error instanceof Error ? error.message : 'حدث خطأ غير متوقع.',
+      );
+      reportError('تعذّر تسجيل الدخول', error);
     } finally {
       setBusy(false);
     }
@@ -100,11 +99,15 @@ export function AuthScreen() {
     if (busy) return;
     setBusy(true);
     try {
+      setFormError(null);
       await signInWithGoogle();
     } catch (error) {
       // الإلغاء تصرّف طبيعي من المستخدم ولا يستحق تنبيهاً.
       const message = error instanceof Error ? error.message : '';
-      if (!message.includes('أُلغي')) reportError(error);
+      if (!message.includes('أُلغي')) {
+        setFormError(message || 'تعذّر بدء تسجيل الدخول بحساب Google.');
+        reportError('تعذّر تسجيل الدخول بحساب Google', error);
+      }
     } finally {
       setBusy(false);
     }
@@ -116,7 +119,7 @@ export function AuthScreen() {
     try {
       await signInAnonymously();
     } catch (error) {
-      reportError(error);
+      reportError('تعذّر تسجيل الدخول', error);
     } finally {
       setBusy(false);
     }
@@ -139,6 +142,15 @@ export function AuthScreen() {
               سجّل الدخول لحفظ نقوطك وواجباتك ومزامنتها بين أجهزتك.
             </Text>
           </View>
+
+          {formError ? (
+            <View className="mt-6 flex-row-reverse items-center rounded-xl bg-red-50 p-3">
+              <TriangleAlert size={16} color="#b91c1c" />
+              <Text className="mr-2 flex-1 text-right text-xs text-red-800">
+                {formError}
+              </Text>
+            </View>
+          ) : null}
 
           {initError ? (
             <View className="mt-6 flex-row-reverse items-center rounded-xl bg-amber-50 p-3">

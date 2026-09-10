@@ -5,13 +5,13 @@ import { Check } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   Text,
   View,
 } from 'react-native';
 
+import { reportError } from '@/lib/alerts';
 import { fetchEventLedger, setEventParticipants } from '@/lib/repository';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
@@ -81,10 +81,7 @@ export function EventParticipantsScreen() {
       await setEventParticipants(params.eventId, [...selected], includeMe);
       navigation.goBack();
     } catch (error) {
-      Alert.alert(
-        'تعذّر الحفظ',
-        error instanceof Error ? error.message : 'حدث خطأ غير متوقع.',
-      );
+      reportError('تعذّر الحفظ', error);
     } finally {
       setSaving(false);
     }

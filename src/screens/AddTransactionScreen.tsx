@@ -12,7 +12,6 @@ import {
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -22,6 +21,7 @@ import {
   View,
 } from 'react-native';
 
+import { reportError } from '@/lib/alerts';
 import type { RootStackParamList } from '@/navigation/types';
 import { uploadReceipt } from '@/lib/repository';
 import { isSupabaseConfigured } from '@/lib/supabase';
@@ -110,10 +110,7 @@ export function AddTransactionScreen() {
       });
       navigation.goBack();
     } catch (error) {
-      Alert.alert(
-        'تعذّر الحفظ',
-        error instanceof Error ? error.message : 'حدث خطأ غير متوقع.',
-      );
+      reportError('تعذّر الحفظ', error);
     } finally {
       setSaving(false);
     }

@@ -12,7 +12,6 @@ import {
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -21,6 +20,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { confirmAction, reportError } from '@/lib/alerts';
 import { EventCard } from '@/components/EventCard';
 import { LedgerSummaryBar } from '@/components/LedgerSummaryBar';
 import { NetBalanceBadge } from '@/components/NetBalanceBadge';
@@ -80,38 +80,30 @@ export function ContactProfileScreen() {
   const canSettle =
     !isArchived && summary.net === 0 && summary.transactionCount > 0;
 
-  function confirmArchive() {
+  async function confirmArchive() {
     if (!contact) return;
-    Alert.alert(
-      'تسوية وأرشفة',
-      `سيتم إخفاء ${contact.full_name} من القائمة النشطة. الحركات تبقى محفوظة ويمكن الاستعادة في أي وقت.`,
-      [
-        { text: 'إلغاء', style: 'cancel' },
-        {
-          text: 'تسوية وأرشفة',
-          onPress: () => {
-            setArchived(contact.id, true)
-              .then(() => navigation.goBack())
-              .catch((caught: unknown) =>
-                Alert.alert(
-                  'تعذّر الأرشفة',
-                  caught instanceof Error ? caught.message : 'حدث خطأ.',
-                ),
-              );
-          },
-        },
-      ],
-    );
+    const approved = await confirmAction({
+      title: 'تسوية وأرشفة',
+      message: `سيتم إخفاء ${contact.full_name} من القائمة النشطة. الحركات تبقى محفوظة ويمكن الاستعادة في أي وقت.`,
+      confirmLabel: 'تسوية وأرشفة',
+    });
+    if (!approved) return;
+
+    try {
+      await setArchived(contact.id, true);
+      navigation.goBack();
+    } catch (error) {
+      reportError('تعذّر الأرشفة', error);
+    }
   }
 
-  function restore() {
+  async function restore() {
     if (!contact) return;
-    setArchived(contact.id, false).catch((caught: unknown) =>
-      Alert.alert(
-        'تعذّرت الاستعادة',
-        caught instanceof Error ? caught.message : 'حدث خطأ.',
-      ),
-    );
+    try {
+      await setArchived(contact.id, false);
+    } catch (error) {
+      reportError('تعذّرت الاستعادة', error);
+    }
   }
 
   if (!contact) {
@@ -197,7 +189,7 @@ export function ContactProfileScreen() {
 
             {canSettle ? (
               <Pressable
-                onPress={confirmArchive}
+                onPress={() => void confirmArchive()}
                 accessibilityRole="button"
                 className="mr-2 flex-row-reverse items-center rounded-xl border border-gray-300 bg-white px-4 py-2">
                 <Archive size={16} color="#374151" />
@@ -209,7 +201,7 @@ export function ContactProfileScreen() {
 
             {isArchived ? (
               <Pressable
-                onPress={restore}
+                onPress={() => void restore()}
                 accessibilityRole="button"
                 className="mr-2 flex-row-reverse items-center rounded-xl border border-gray-300 bg-white px-4 py-2">
                 <ArchiveRestore size={16} color="#374151" />

@@ -4,7 +4,6 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,6 +13,7 @@ import {
   View,
 } from 'react-native';
 
+import { reportError } from '@/lib/alerts';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
 
@@ -61,10 +61,7 @@ export function AddContactScreen() {
         navigation.goBack();
       }
     } catch (error) {
-      Alert.alert(
-        'تعذّر الحفظ',
-        error instanceof Error ? error.message : 'حدث خطأ غير متوقع.',
-      );
+      reportError('تعذّر الحفظ', error);
     } finally {
       setSaving(false);
     }
