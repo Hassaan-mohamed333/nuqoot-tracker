@@ -1,13 +1,14 @@
 import type { RouteProp } from '@react-navigation/native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Check } from 'lucide-react-native';
+import { Check, UserPlus, X } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
   ScrollView,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 
@@ -15,6 +16,7 @@ import { reportError } from '@/lib/alerts';
 import { fetchEventLedger, setEventParticipants } from '@/lib/repository';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
+import type { NewEventMember } from '@/types';
 import { ME_LABEL } from '@/utils/split';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
@@ -28,6 +30,9 @@ export function EventParticipantsScreen() {
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [includeMe, setIncludeMe] = useState(true);
+  /** أعضاء بأسماء حرة، خارج دفتر جهات الاتصال. */
+  const [guests, setGuests] = useState<string[]>([]);
+  const [guestDraft, setGuestDraft] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -54,7 +59,14 @@ export function EventParticipantsScreen() {
         );
         setIncludeMe(
           ledger.participants.length === 0 ||
-            ledger.participants.some((row) => row.contact_id === null),
+            ledger.participants.some(
+              (row) => !row.contact_id && !row.display_name,
+            ),
+        );
+        setGuests(
+          ledger.participants
+            .map((row) => row.display_name)
+            .filter((name): name is string => Boolean(name)),
         );
       })
       .finally(() => {
@@ -64,6 +76,17 @@ export function EventParticipantsScreen() {
       active = false;
     };
   }, [params.eventId]);
+
+  function addGuest() {
+    const name = guestDraft.trim();
+    // الأسماء الحرة فريدة داخل المناسبة، فنمنع التكرار قبل الحفظ.
+    if (!name || guests.includes(name)) {
+      setGuestDraft('');
+      return;
+    }
+    setGuests((current) => [...current, name]);
+    setGuestDraft('');
+  }
 
   function toggle(contactId: string) {
     setSelected((current) => {
@@ -78,7 +101,18 @@ export function EventParticipantsScreen() {
     if (saving) return;
     setSaving(true);
     try {
-      await setEventParticipants(params.eventId, [...selected], includeMe);
+      const members: NewEventMember[] = [
+        ...(includeMe ? [{ kind: 'self' as const }] : []),
+        ...[...selected].map((contactId) => ({
+          kind: 'contact' as const,
+          contactId,
+        })),
+        ...guests.map((displayName) => ({
+          kind: 'guest' as const,
+          displayName,
+        })),
+      ];
+      await setEventParticipants(params.eventId, members);
       navigation.goBack();
     } catch (error) {
       reportError('تعذّر الحفظ', error);
@@ -139,8 +173,59 @@ export function EventParticipantsScreen() {
           )}
         </View>
 
-        <Text className="mt-3 text-right text-[11px] text-gray-500">
-          المجموع: {selected.size + (includeMe ? 1 : 0)} مشارك.
+        <Text className="mb-2 mt-6 text-right text-sm font-bold text-gray-900">
+          أعضاء من خارج جهات الاتصال
+        </Text>
+        <Text className="mb-2 text-right text-[11px] text-gray-500">
+          لرحلة أو مناسبة عابرة: أضف اسماً دون إنشاء جهة اتصال. أرصدة هؤلاء
+          تبقى داخل هذه المناسبة ولا تدخل دفتر النقوط.
+        </Text>
+
+        <View className="flex-row-reverse">
+          <TextInput
+            value={guestDraft}
+            onChangeText={setGuestDraft}
+            onSubmitEditing={addGuest}
+            returnKeyType="done"
+            placeholder="اسم العضو"
+            placeholderTextColor="#9ca3af"
+            className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 text-right text-sm text-gray-900"
+          />
+          <Pressable
+            onPress={addGuest}
+            disabled={guestDraft.trim().length === 0}
+            accessibilityRole="button"
+            accessibilityLabel="إضافة عضو"
+            className={`mr-2 h-12 w-12 items-center justify-center rounded-xl ${
+              guestDraft.trim().length === 0 ? 'bg-gray-300' : 'bg-green-600'
+            }`}>
+            <UserPlus size={20} color="#ffffff" />
+          </Pressable>
+        </View>
+
+        {guests.length > 0 ? (
+          <View className="mt-2 rounded-2xl border border-gray-100 bg-white p-2">
+            {guests.map((name) => (
+              <View
+                key={name}
+                className="mb-1 flex-row-reverse items-center justify-between rounded-xl px-3 py-2">
+                <Text className="text-right text-sm text-gray-800">{name}</Text>
+                <Pressable
+                  onPress={() =>
+                    setGuests((current) => current.filter((g) => g !== name))
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={`إزالة ${name}`}
+                  hitSlop={8}>
+                  <X size={16} color="#9ca3af" />
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        <Text className="mt-4 text-right text-[11px] text-gray-500">
+          المجموع: {selected.size + guests.length + (includeMe ? 1 : 0)} مشارك.
         </Text>
       </ScrollView>
 

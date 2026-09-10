@@ -90,6 +90,66 @@ create table if not exists public.expense_shares (
   share_amount numeric(12, 2) not null check (share_amount >= 0)
 );
 
+-- ===== أعضاء بلا جهة اتصال + هوية العضو داخل المناسبة =====
+-- العضو قد يكون: جهة اتصال، أو المستخدم نفسه، أو اسماً حراً لرحلة عابرة.
+
+alter table public.event_participants
+  add column if not exists display_name text;
+
+do $$
+begin
+  -- مصدر واحد للاسم: إما جهة اتصال وإما اسم حر، لا الاثنان.
+  if not exists (
+    select 1 from pg_constraint where conname = 'event_participants_name_source'
+  ) then
+    alter table public.event_participants
+      add constraint event_participants_name_source
+      check (contact_id is null or display_name is null);
+  end if;
+end $$;
+
+-- الفهرس القديم كان يسمح بصف واحد بلا contact_id لكل مناسبة، وهو ما يمنع
+-- وجود أكثر من عضو بلا جهة اتصال. نفصل الحالتين: صف "أنا" وحيد، والأسماء
+-- الحرة فريدة بالاسم.
+drop index if exists event_participants_self_uniq;
+create unique index if not exists event_participants_self_uniq
+  on public.event_participants (event_id)
+  where contact_id is null and display_name is null;
+create unique index if not exists event_participants_adhoc_uniq
+  on public.event_participants (event_id, display_name)
+  where contact_id is null and display_name is not null;
+
+-- هوية العضو داخل المناسبة هي صف event_participants نفسه، لا جهة الاتصال:
+-- عضوان بلا جهة اتصال كانا سيتصادمان لو اعتمدنا contact_id وحده.
+alter table public.shared_expenses
+  add column if not exists payer_participant_id uuid
+  references public.event_participants (id) on delete set null;
+alter table public.shared_expenses
+  add column if not exists receipt_url text;
+
+alter table public.expense_shares
+  add column if not exists participant_id uuid
+  references public.event_participants (id) on delete cascade;
+
+-- ترحيل الصفوف القديمة التي كانت تشير إلى جهة الاتصال مباشرةً.
+update public.expense_shares s
+set participant_id = p.id
+from public.shared_expenses e
+join public.event_participants p on p.event_id = e.event_id
+where s.expense_id = e.id
+  and s.participant_id is null
+  and p.contact_id is not distinct from s.contact_id;
+
+update public.shared_expenses e
+set payer_participant_id = p.id
+from public.event_participants p
+where p.event_id = e.event_id
+  and e.payer_participant_id is null
+  and p.contact_id is not distinct from e.payer_contact_id;
+
+create index if not exists expense_shares_participant_idx
+  on public.expense_shares (participant_id);
+
 create index if not exists event_participants_event_idx
   on public.event_participants (event_id);
 create index if not exists shared_expenses_event_idx

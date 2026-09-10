@@ -20,15 +20,14 @@ import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
 import type { EventParticipant, SplitMode } from '@/types';
 import { DEFAULT_CURRENCY, formatAmount } from '@/utils/ledger';
-import { ME_LABEL, sharesMatchAmount, splitEqually } from '@/utils/split';
+import {
+  participantName,
+  sharesMatchAmount,
+  splitEqually,
+} from '@/utils/split';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 type ExpenseRoute = RouteProp<RootStackParamList, 'AddSharedExpense'>;
-
-/** مفتاح نصي للمشارك، لأن null لا يصلح مفتاحاً في كائن الحالة. */
-const ME_KEY = '__me__';
-const keyOf = (contactId: string | null) => contactId ?? ME_KEY;
-const idOf = (key: string) => (key === ME_KEY ? null : key);
 
 /** تسجيل مصروف جماعي وتقسيمه بالتساوي أو بحصص مخصّصة. */
 export function AddSharedExpenseScreen() {
@@ -38,21 +37,26 @@ export function AddSharedExpenseScreen() {
 
   const [participants, setParticipants] = useState<EventParticipant[]>([]);
   const [loading, setLoading] = useState(true);
-  const [description, setDescription] = useState('');
-  const [amount, setAmount] = useState('');
-  const [payerKey, setPayerKey] = useState<string>(ME_KEY);
+  // قيم منقولة من نموذج الحركة عند التحويل إلى مصروف مشترك.
+  const [description, setDescription] = useState(
+    params.prefill?.description ?? '',
+  );
+  const [amount, setAmount] = useState(
+    params.prefill?.amount !== undefined ? String(params.prefill.amount) : '',
+  );
+  const [payerId, setPayerId] = useState<string>('');
   const [mode, setMode] = useState<SplitMode>('equal');
   const [includedKeys, setIncludedKeys] = useState<Set<string>>(new Set());
   const [customShares, setCustomShares] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
-  const names = useMemo(
+  const contactNames = useMemo(
     () => new Map(contacts.map((contact) => [contact.id, contact.full_name])),
     [contacts],
   );
 
-  const nameOf = (contactId: string | null) =>
-    contactId === null ? ME_LABEL : (names.get(contactId) ?? 'غير معروف');
+  const nameOf = (participant: EventParticipant) =>
+    participantName(participant, contactNames);
 
   useEffect(() => {
     let active = true;
@@ -60,9 +64,13 @@ export function AddSharedExpenseScreen() {
       .then((ledger) => {
         if (!active) return;
         setParticipants(ledger.participants);
-        setIncludedKeys(
-          new Set(ledger.participants.map((row) => keyOf(row.contact_id))),
+        // الافتراضي: الجميع مشاركون في هذا المصروف.
+        setIncludedKeys(new Set(ledger.participants.map((row) => row.id)));
+        // الدافع الافتراضي: المستخدم نفسه إن كان ضمن الأعضاء.
+        const self = ledger.participants.find(
+          (row) => !row.contact_id && !row.display_name,
         );
+        setPayerId(self?.id ?? ledger.participants[0]?.id ?? '');
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -76,10 +84,7 @@ export function AddSharedExpenseScreen() {
   const amountValid = Number.isFinite(parsedAmount) && parsedAmount > 0;
 
   const includedList = useMemo(
-    () =>
-      participants
-        .map((row) => row.contact_id)
-        .filter((contactId) => includedKeys.has(keyOf(contactId))),
+    () => participants.filter((row) => includedKeys.has(row.id)),
     [participants, includedKeys],
   );
 
@@ -89,17 +94,15 @@ export function AddSharedExpenseScreen() {
 
     if (mode === 'equal') {
       const amounts = splitEqually(parsedAmount, includedList.length);
-      return includedList.map((contactId, index) => ({
-        contact_id: contactId,
+      return includedList.map((member, index) => ({
+        participant_id: member.id,
         share_amount: amounts[index],
       }));
     }
 
-    return includedList.map((contactId) => ({
-      contact_id: contactId,
-      share_amount: Number(
-        (customShares[keyOf(contactId)] ?? '').replace(',', '.'),
-      ),
+    return includedList.map((member) => ({
+      participant_id: member.id,
+      share_amount: Number((customShares[member.id] ?? '').replace(',', '.')),
     }));
   }, [amountValid, includedList, mode, parsedAmount, customShares]);
 
@@ -112,7 +115,8 @@ export function AddSharedExpenseScreen() {
     shares.every((share) => Number.isFinite(share.share_amount) && share.share_amount >= 0) &&
     sharesMatchAmount(shares, parsedAmount);
 
-  const isValid = description.trim().length > 0 && amountValid && sharesValid;
+  const isValid =
+    description.trim().length > 0 && amountValid && sharesValid && payerId !== '';
 
   function toggleIncluded(key: string) {
     setIncludedKeys((current) => {
@@ -128,8 +132,8 @@ export function AddSharedExpenseScreen() {
     if (!amountValid || includedList.length === 0) return;
     const amounts = splitEqually(parsedAmount, includedList.length);
     const seeded: Record<string, string> = {};
-    includedList.forEach((contactId, index) => {
-      seeded[keyOf(contactId)] = String(amounts[index]);
+    includedList.forEach((member, index) => {
+      seeded[member.id] = String(amounts[index]);
     });
     setCustomShares(seeded);
   }
@@ -140,7 +144,7 @@ export function AddSharedExpenseScreen() {
     try {
       await createSharedExpense({
         event_id: params.eventId,
-        payer_contact_id: idOf(payerKey),
+        payer_participant_id: payerId,
         description,
         amount: parsedAmount,
         currency: DEFAULT_CURRENCY,
@@ -194,23 +198,20 @@ export function AddSharedExpenseScreen() {
           من دفع؟
         </Text>
         <View className="rounded-2xl border border-gray-100 bg-white p-2">
-          {participants.map((row) => {
-            const key = keyOf(row.contact_id);
-            return (
-              <Pressable
-                key={key}
-                onPress={() => setPayerKey(key)}
-                accessibilityRole="button"
-                className={`mb-1 flex-row-reverse items-center justify-between rounded-xl px-3 py-2 ${
-                  payerKey === key ? 'bg-green-50' : ''
-                }`}>
-                <Text className="text-right text-sm text-gray-800">
-                  {nameOf(row.contact_id)}
-                </Text>
-                {payerKey === key ? <Check size={16} color="#16a34a" /> : null}
-              </Pressable>
-            );
-          })}
+          {participants.map((row) => (
+            <Pressable
+              key={row.id}
+              onPress={() => setPayerId(row.id)}
+              accessibilityRole="button"
+              className={`mb-1 flex-row-reverse items-center justify-between rounded-xl px-3 py-2 ${
+                payerId === row.id ? 'bg-green-50' : ''
+              }`}>
+              <Text className="text-right text-sm text-gray-800">
+                {nameOf(row)}
+              </Text>
+              {payerId === row.id ? <Check size={16} color="#16a34a" /> : null}
+            </Pressable>
+          ))}
         </View>
 
         <Text className="mb-2 mt-6 text-right text-sm font-bold text-gray-900">
@@ -250,14 +251,12 @@ export function AddSharedExpenseScreen() {
         </Text>
         <View className="rounded-2xl border border-gray-100 bg-white p-2">
           {participants.map((row) => {
-            const key = keyOf(row.contact_id);
+            const key = row.id;
             const included = includedKeys.has(key);
             const equalShare =
               mode === 'equal' && amountValid && includedList.length > 0
                 ? splitEqually(parsedAmount, includedList.length)[
-                    includedList.findIndex(
-                      (contactId) => keyOf(contactId) === key,
-                    )
+                    includedList.findIndex((member) => member.id === key)
                   ]
                 : null;
 
@@ -273,7 +272,7 @@ export function AddSharedExpenseScreen() {
                   className="flex-1 flex-row-reverse items-center">
                   {included ? <Check size={16} color="#16a34a" /> : null}
                   <Text className="mr-2 text-right text-sm text-gray-800">
-                    {nameOf(row.contact_id)}
+                    {nameOf(row)}
                   </Text>
                 </Pressable>
 

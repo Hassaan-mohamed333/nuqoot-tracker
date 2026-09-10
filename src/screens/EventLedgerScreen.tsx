@@ -25,7 +25,7 @@ import { useLedger } from '@/store/LedgerProvider';
 import { formatAmount, formatDate } from '@/utils/ledger';
 import {
   computeEventBalances,
-  ME_LABEL,
+  participantName,
   settleBalances,
   totalEventSpend,
 } from '@/utils/split';
@@ -53,15 +53,20 @@ export function EventLedgerScreen() {
   const total = useMemo(() => totalEventSpend(expenses), [expenses]);
   const currency = expenses[0]?.currency ?? 'EGP';
 
-  const names = useMemo(
+  const contactNames = useMemo(
     () => new Map(contacts.map((contact) => [contact.id, contact.full_name])),
     [contacts],
   );
 
-  function payerName(payerContactId: string | null): string {
-    return payerContactId === null
-      ? ME_LABEL
-      : (names.get(payerContactId) ?? 'غير معروف');
+  const participantsById = useMemo(
+    () => new Map(participants.map((row) => [row.id, row])),
+    [participants],
+  );
+
+  function payerName(payerParticipantId: string | null): string {
+    if (!payerParticipantId) return 'غير معروف';
+    const member = participantsById.get(payerParticipantId);
+    return member ? participantName(member, contactNames) : 'عضو محذوف';
   }
 
   if (!event) {
@@ -209,7 +214,7 @@ export function EventLedgerScreen() {
         </Text>
         {balances.map((balance) => (
           <View
-            key={balance.contactId ?? '__me__'}
+            key={balance.participantId}
             className="mb-2 flex-row-reverse items-center rounded-2xl border border-gray-100 bg-white p-3">
             <View className="flex-1">
               <Text className="text-right text-sm font-semibold text-gray-900">
@@ -257,7 +262,7 @@ export function EventLedgerScreen() {
                 </Text>
               </View>
               <Text className="mt-1 text-right text-[11px] text-gray-500">
-                دفعها {payerName(expense.payer_contact_id)} ·{' '}
+                دفعها {payerName(expense.payer_participant_id)} ·{' '}
                 {formatDate(expense.occurred_at)} · مقسومة على{' '}
                 {expense.shares.length}
               </Text>

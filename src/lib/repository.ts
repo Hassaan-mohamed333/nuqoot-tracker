@@ -8,6 +8,7 @@ import type {
   ContactInsert,
   EventParticipant,
   ExpenseShare,
+  NewEventMember,
   NewSharedExpenseInput,
   SharedExpense,
   SharedExpenseInsert,
@@ -290,52 +291,58 @@ export async function fetchEventLedger(eventId: string): Promise<EventLedger> {
  */
 export async function setEventParticipants(
   eventId: string,
-  contactIds: string[],
-  includeMe: boolean,
+  members: NewEventMember[],
 ): Promise<EventParticipant[]> {
   const nowIso = new Date().toISOString();
-  const desired: (string | null)[] = includeMe
-    ? [null, ...contactIds]
-    : [...contactIds];
 
-  const rows: EventParticipant[] = desired.map((contactId) => ({
-    id: createId('p'),
+  /** يحوّل الاختيار إلى شكل الصف في قاعدة البيانات. */
+  const toRow = (member: NewEventMember) => ({
     event_id: eventId,
-    contact_id: contactId,
-    created_at: nowIso,
-  }));
+    contact_id: member.kind === 'contact' ? member.contactId : null,
+    display_name: member.kind === 'guest' ? member.displayName.trim() : null,
+  });
+
+  const rows = members.map(toRow);
 
   if (isSupabaseConfigured) {
     const client = requireSupabase();
 
+    // استبدال كامل: أبسط من مقارنة الفروق، والمناسبات صغيرة.
     const { error: deleteError } = await client
       .from(TABLES.eventParticipants)
       .delete()
       .eq('event_id', eventId);
-    if (deleteError) throw deleteError;
-
-    if (desired.length > 0) {
-      const { data, error } = await client
-        .from(TABLES.eventParticipants)
-        .insert(
-          desired.map((contactId) => ({
-            event_id: eventId,
-            contact_id: contactId,
-          })),
-        )
-        .select();
-      if (error) throw error;
-      const saved = (data ?? []) as EventParticipant[];
-      await replaceLocalParticipants(eventId, saved);
-      return saved;
+    if (deleteError) {
+      logStepFailure('حذف مشاركي المناسبة', deleteError);
+      throw deleteError;
     }
 
-    await replaceLocalParticipants(eventId, []);
-    return [];
+    if (rows.length === 0) {
+      await replaceLocalParticipants(eventId, []);
+      return [];
+    }
+
+    const { data, error } = await client
+      .from(TABLES.eventParticipants)
+      .insert(rows)
+      .select();
+    if (error) {
+      logStepFailure('إضافة مشاركي المناسبة', error);
+      throw error;
+    }
+
+    const saved = (data ?? []) as EventParticipant[];
+    await replaceLocalParticipants(eventId, saved);
+    return saved;
   }
 
-  await replaceLocalParticipants(eventId, rows);
-  return rows;
+  const local: EventParticipant[] = rows.map((row) => ({
+    ...row,
+    id: createId('p'),
+    created_at: nowIso,
+  }));
+  await replaceLocalParticipants(eventId, local);
+  return local;
 }
 
 async function replaceLocalParticipants(
@@ -357,11 +364,14 @@ export async function createSharedExpense(
 
   const payload: SharedExpenseInsert = {
     event_id: input.event_id,
-    payer_contact_id: input.payer_contact_id,
+    payer_participant_id: input.payer_participant_id,
+    // العمود القديم يبقى فارغاً؛ الهوية صارت معرّف العضو.
+    payer_contact_id: null,
     description: input.description.trim(),
     amount: Math.abs(input.amount),
     currency: input.currency ?? DEFAULT_CURRENCY,
     occurred_at: input.occurred_at ?? nowIso,
+    receipt_url: input.receipt_url ?? null,
   };
 
   let expense: SharedExpense = {
@@ -374,7 +384,8 @@ export async function createSharedExpense(
   let shares: ExpenseShare[] = input.shares.map((share) => ({
     id: createId('s'),
     expense_id: expense.id,
-    contact_id: share.contact_id,
+    participant_id: share.participant_id,
+    contact_id: null,
     share_amount: share.share_amount,
   }));
 
@@ -386,7 +397,10 @@ export async function createSharedExpense(
       .insert(payload)
       .select()
       .single();
-    if (error) throw error;
+    if (error) {
+      logStepFailure(`الإدراج في ${TABLES.sharedExpenses}`, error);
+      throw error;
+    }
     expense = data as SharedExpense;
 
     const { data: shareData, error: shareError } = await client
@@ -394,13 +408,14 @@ export async function createSharedExpense(
       .insert(
         input.shares.map((share) => ({
           expense_id: expense.id,
-          contact_id: share.contact_id,
+          participant_id: share.participant_id,
           share_amount: share.share_amount,
         })),
       )
       .select();
 
     if (shareError) {
+      logStepFailure(`الإدراج في ${TABLES.expenseShares}`, shareError);
       // الحصص هي ما يجعل المصروف قابلاً للقسمة؛ مصروف بلا حصص يفسد
       // الحساب، فنتراجع عن الإدراج بدل ترك صف نصف مكتمل.
       await client.from(TABLES.sharedExpenses).delete().eq('id', expense.id);

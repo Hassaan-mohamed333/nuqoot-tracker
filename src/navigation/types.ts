@@ -31,7 +31,11 @@ export type RootStackParamList = {
   AddEvent: { returnTo?: 'AddTransaction'; hostContactId?: string } | undefined;
   /** الدفتر الجماعي لمناسبة: المشاركون، المصاريف، ومن يدين لمن. */
   EventLedger: { eventId: string };
-  AddSharedExpense: { eventId: string };
+  AddSharedExpense: {
+    eventId: string;
+    /** قيم منقولة من نموذج الحركة عند التحويل إلى مصروف مشترك. */
+    prefill?: { description?: string; amount?: number; receiptUri?: string };
+  };
   EventParticipants: { eventId: string };
   SmartInput: undefined;
   ScanReceipt: undefined;

@@ -154,17 +154,29 @@ export type EventInsert = Omit<Event, 'id' | 'created_at' | 'user_id'>;
 export interface EventParticipant {
   id: string;
   event_id: string;
+  /** جهة اتصال مسجّلة، أو null للمستخدم نفسه أو لاسم حر. */
   contact_id: string | null;
+  /** اسم حر لعضو ليس في جهات الاتصال؛ null للمستخدم أو لجهة اتصال. */
+  display_name: string | null;
   created_at: string;
 }
+
+/** كيف يُضاف العضو: أنا، جهة اتصال، أو اسم حر. */
+export type NewEventMember =
+  | { kind: 'self' }
+  | { kind: 'contact'; contactId: string }
+  | { kind: 'guest'; displayName: string };
 
 /** مصروف جماعي دفعه شخص واحد ويُقسم على المشاركين. */
 export interface SharedExpense {
   id: string;
   user_id: string | null;
   event_id: string;
-  /** من دفع؛ null = المستخدم نفسه. */
+  /** من دفع، بمعرّف عضو المناسبة. */
+  payer_participant_id: string | null;
+  /** يبقى للتوافق مع صفوف قديمة؛ الكتابة تتم عبر payer_participant_id. */
   payer_contact_id: string | null;
+  receipt_url: string | null;
   description: string;
   amount: number;
   currency: string;
@@ -176,7 +188,9 @@ export interface SharedExpense {
 export interface ExpenseShare {
   id: string;
   expense_id: string;
-  /** null = المستخدم نفسه. */
+  /** هوية العضو داخل المناسبة (event_participants.id). */
+  participant_id: string | null;
+  /** يبقى للتوافق مع صفوف قديمة. */
   contact_id: string | null;
   share_amount: number;
 }
@@ -188,7 +202,8 @@ export interface SharedExpenseWithShares extends SharedExpense {
 
 /** رصيد مشارك داخل مناسبة واحدة. */
 export interface ParticipantBalance {
-  /** null = المستخدم نفسه. */
+  /** معرّف عضو المناسبة. */
+  participantId: string;
   contactId: string | null;
   name: string;
   /** مجموع ما دفعه هذا المشارك. */
@@ -201,9 +216,9 @@ export interface ParticipantBalance {
 
 /** تحويل مقترح لتسوية المناسبة: من يدفع لمن وكم. */
 export interface Settlement {
-  fromContactId: string | null;
+  fromParticipantId: string;
   fromName: string;
-  toContactId: string | null;
+  toParticipantId: string;
   toName: string;
   amount: number;
 }
@@ -214,13 +229,15 @@ export type SplitMode = 'equal' | 'custom';
 /** بيانات إنشاء مصروف جماعي. */
 export interface NewSharedExpenseInput {
   event_id: string;
-  payer_contact_id: string | null;
+  /** الدافع بمعرّف عضو المناسبة. */
+  payer_participant_id: string;
   description: string;
   amount: number;
   currency?: string;
   occurred_at?: string;
+  receipt_url?: string | null;
   /** الحصص النهائية؛ مجموعها يجب أن يساوي amount. */
-  shares: { contact_id: string | null; share_amount: number }[];
+  shares: { participant_id: string; share_amount: number }[];
 }
 
 /** حمولات الإدراج (user_id مستبعد كما في بقية الجداول). */

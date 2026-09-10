@@ -9,9 +9,20 @@ import type {
 /** الاسم المعروض للمستخدم نفسه داخل القسمة. */
 export const ME_LABEL = 'أنا';
 
-/** مفتاح نصي ثابت للمشارك، لأن null لا يصلح مفتاحاً في Map. */
-function participantKey(contactId: string | null): string {
-  return contactId ?? '__me__';
+/**
+ * الاسم المعروض لعضو المناسبة.
+ *
+ * ثلاث حالات: المستخدم نفسه، جهة اتصال مسجّلة، أو اسم حر لعضو خارج دفتر
+ * جهات الاتصال.
+ */
+export function participantName(
+  participant: EventParticipant,
+  contactNames: Map<string, string>,
+): string {
+  if (participant.contact_id) {
+    return contactNames.get(participant.contact_id) ?? 'غير معروف';
+  }
+  return participant.display_name?.trim() || ME_LABEL;
 }
 
 /**
@@ -51,34 +62,39 @@ export function computeEventBalances(
   expenses: SharedExpenseWithShares[],
   contacts: Contact[],
 ): ParticipantBalance[] {
-  const names = new Map(contacts.map((contact) => [contact.id, contact.full_name]));
+  const contactNames = new Map(
+    contacts.map((contact) => [contact.id, contact.full_name]),
+  );
 
+  /**
+   * المفتاح هو معرّف صف العضو، لا جهة الاتصال: عضوان بلا جهة اتصال
+   * (المستخدم نفسه واسم حر، أو اسمان حران) كانا سيتصادمان لو اعتمدنا
+   * contact_id وحده فتُدمج أرصدتهما.
+   */
   const balances = new Map<string, ParticipantBalance>();
 
-  function ensure(contactId: string | null): ParticipantBalance {
-    const key = participantKey(contactId);
-    let balance = balances.get(key);
-    if (!balance) {
-      balance = {
-        contactId,
-        name: contactId === null ? ME_LABEL : (names.get(contactId) ?? 'غير معروف'),
-        paid: 0,
-        owed: 0,
-        net: 0,
-      };
-      balances.set(key, balance);
-    }
-    return balance;
-  }
-
   for (const participant of participants) {
-    ensure(participant.contact_id);
+    balances.set(participant.id, {
+      participantId: participant.id,
+      contactId: participant.contact_id,
+      name: participantName(participant, contactNames),
+      paid: 0,
+      owed: 0,
+      net: 0,
+    });
   }
 
   for (const expense of expenses) {
-    ensure(expense.payer_contact_id).paid += Math.abs(expense.amount);
+    if (expense.payer_participant_id) {
+      const payer = balances.get(expense.payer_participant_id);
+      // عضو حُذف من المناسبة بعد تسجيل المصروف: نتجاهله بدل اختراع رصيد.
+      if (payer) payer.paid += Math.abs(expense.amount);
+    }
+
     for (const share of expense.shares) {
-      ensure(share.contact_id).owed += Math.abs(share.share_amount);
+      if (!share.participant_id) continue;
+      const member = balances.get(share.participant_id);
+      if (member) member.owed += Math.abs(share.share_amount);
     }
   }
 
@@ -117,9 +133,9 @@ export function settleBalances(balances: ParticipantBalance[]): Settlement[] {
 
     if (amount > 0) {
       settlements.push({
-        fromContactId: debtor.contactId,
+        fromParticipantId: debtor.participantId,
         fromName: debtor.name,
-        toContactId: creditor.contactId,
+        toParticipantId: creditor.participantId,
         toName: creditor.name,
         amount,
       });

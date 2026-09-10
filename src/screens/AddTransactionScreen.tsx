@@ -7,6 +7,7 @@ import {
   Check,
   Paperclip,
   Plus,
+  Users,
   UserPlus,
 } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -80,13 +81,30 @@ export function AddTransactionScreen() {
   );
 
   const parsedAmount = Number(amount.replace(',', '.'));
-  const isValid =
-    contactId !== null && Number.isFinite(parsedAmount) && parsedAmount > 0;
+  const amountValid = Number.isFinite(parsedAmount) && parsedAmount > 0;
+  const isValid = contactId !== null && amountValid;
 
   /** معاينة أثر الحركة على الصافي: OUT يزيده، IN ينقصه. */
   const previewTheme = getNetTheme(
     direction === 'OUT' ? 1 : -1,
   );
+
+  /**
+   * مصروف المناسبة يُقسَّم على أعضائها، وهو مسار مختلف عن حركة شخصية
+   * واحدة: ننقل ما كُتب إلى شاشة المصروف الجماعي بدل تكرار منطق القسمة
+   * هنا. رفع الإيصال يبقى كما هو في كلا المسارين.
+   */
+  function continueAsSharedExpense() {
+    if (!eventId) return;
+    navigation.navigate('AddSharedExpense', {
+      eventId,
+      prefill: {
+        description: note.trim() || undefined,
+        amount: amountValid ? parsedAmount : undefined,
+        receiptUri: receiptUri ?? undefined,
+      },
+    });
+  }
 
   async function handleSave() {
     if (!isValid || !contactId) return;
@@ -285,6 +303,32 @@ export function AddTransactionScreen() {
           placeholderTextColor="#9ca3af"
           className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-right text-sm text-gray-900"
         />
+
+        {eventId ? (
+          <View className="mt-4 rounded-2xl border border-green-200 bg-green-50 p-4">
+            <View className="flex-row-reverse items-center">
+              <Users size={16} color="#16a34a" />
+              <Text className="mr-2 text-right text-sm font-bold text-green-800">
+                مصروف مشترك؟
+              </Text>
+            </View>
+            <Text className="mt-1 text-right text-xs text-green-800">
+              اختر من يشارك في هذا المصروف تحديداً، ويُقسَّم المبلغ على
+              المحدّدين وحدهم. المستبعدون لا يتحمّلون شيئاً منه.
+            </Text>
+            <Pressable
+              onPress={continueAsSharedExpense}
+              accessibilityRole="button"
+              className="mt-3 items-center rounded-2xl bg-green-600 py-2.5">
+              <Text className="text-sm font-bold text-white">
+                متابعة كمصروف مشترك
+              </Text>
+            </Pressable>
+            <Text className="mt-2 text-center text-[11px] text-green-800">
+              أو تابع بالأسفل لتسجيلها حركة شخصية عادية.
+            </Text>
+          </View>
+        ) : null}
 
         {receiptUri ? (
           <View className="mt-6 flex-row-reverse items-center rounded-xl bg-green-50 p-3">
