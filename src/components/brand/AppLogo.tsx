@@ -58,7 +58,9 @@ export function AppLogo({
    * رسمٌ أبيض بسيط فوق لوح مصمت.
    */
   const glyphColor = isBadge
-    ? '#FFFFFF'
+    ? tone === 'mono'
+      ? '#FFFFFF'
+      : PALETTE.dark.primary
     : tone === 'mono'
       ? palette.text
       : tone === 'inverse'
@@ -79,8 +81,8 @@ export function AppLogo({
         <>
           <Defs>
             <LinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-              <Stop offset="0" stopColor="#2A2833" />
-              <Stop offset="1" stopColor={PALETTE.light.primary} />
+              <Stop offset="0" stopColor={PALETTE.dark.surfaceRaised} />
+              <Stop offset="1" stopColor={PALETTE.dark.base} />
             </LinearGradient>
           </Defs>
           <Rect

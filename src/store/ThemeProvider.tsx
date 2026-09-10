@@ -122,36 +122,36 @@ export function useTheme(): ThemeContextValue {
  */
 export const PALETTE = {
   light: {
-    // الرئيسي محايد لا ملوّن: زرّ أسود على أرضية بنفسجية فاتحة، كالمرجع.
-    primary: '#17161C',
-    secondary: '#5433EB',
+    // الكحلي يحمل الإجراء الرئيسي: الذهب غير مقروء على الأبيض.
+    primary: '#001D3D',
+    secondary: '#003566',
     success: '#10B981',
     danger: '#FF453A',
-    warning: '#F5C518',
+    warning: '#FFC300',
     base: '#FFFFFF',
     surface: '#FFFFFF',
-    surfaceRaised: '#F2F3F7',
-    border: '#E5E7EE',
-    text: '#101014',
-    muted: '#5B5B69',
+    surfaceRaised: '#F2F4F8',
+    border: '#E2E6EE',
+    text: '#000814',
+    muted: '#435063',
     onPrimary: '#FFFFFF',
     onSecondary: '#FFFFFF',
   },
   dark: {
-    // ينقلب الرئيسي إلى أبيض بنصّ داكن، كزرّ "Let's Start" في المرجع.
-    primary: '#FFFFFF',
-    secondary: '#A78BFA',
+    // الذهب زرّاً على الكحلي: موضعه الطبيعي في هذه اللوحة.
+    primary: '#FFC300',
+    secondary: '#4A87C7',
     success: '#34D399',
     danger: '#FF6961',
-    warning: '#F5C518',
-    base: '#121218',
-    surface: '#1D1D26',
-    surfaceRaised: '#26262F',
-    border: '#2E2E3A',
-    text: '#F5F5F7',
-    muted: '#A0A0B0',
-    onPrimary: '#14131A',
-    onSecondary: '#14131A',
+    warning: '#FFD60A',
+    base: '#000814',
+    surface: '#001D3D',
+    surfaceRaised: '#003566',
+    border: '#0A3F71',
+    text: '#F0F4F9',
+    muted: '#93A6BE',
+    onPrimary: '#000814',
+    onSecondary: '#000814',
   },
 } as const;
 

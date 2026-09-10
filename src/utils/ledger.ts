@@ -60,7 +60,7 @@ const STATUS_THEME: Record<LedgerStatus, StatusTheme> = {
   },
   settled: {
     label: 'متعادل',
-    color: '#5B5B69',
+    color: '#435063',
     colorKey: 'muted',
     textClass: 'text-ink-muted',
     bgClass: 'bg-line/40',

@@ -13,88 +13,87 @@
  * `dark:` على كل عنصر ولا يمكن أن ينسى أحدهم النسخة الليلية.
  *
  * ---------------------------------------------------------------------
- * المرجع البصري: لقطات Future Pro وShop.
+ * اللوحة: كحلي متدرّج إلى ذهب (Ink Black / Prussian Blue / Regal Navy /
+ * School Bus Yellow / Gold).
  *
- * القراءة من الصور: أرضية بنفسجية فاتحة (بريوينكل)، أسطح بيضاء بزوايا
- * كبيرة، وأزرار رئيسية سوداء بشكل حبّة كاملة الاستدارة، ولمسة بنفسجية
- * للعناصر المميّزة. لا وجود لأي لون نيون في المرجع.
- *
- * والوضع الداكن مأخوذ من شاشات المرجع الداكنة نفسها: هناك ينقلب الزرّ
- * الرئيسي إلى حبّة بيضاء بنصّ أسود (زرّ "Let's Start")، لا إلى لون مميّز.
- * لذلك primary هنا محايد لا ملوّن، وهو ما يجعل الانقلاب طبيعياً.
+ * وهي لوحة داكنة الأصل: ثلاثة كحليّات للأسطح والنصوص، ولونان ذهبيّان
+ * للإبراز. لا تحمل محايدات فاتحة ولا ألوان حالة، فالأبيض والرمادي
+ * والأخضر والأحمر مشتقّة هنا لا مأخوذة منها.
  */
 :root {
-  /* الإجراء الرئيسي: حبّة سوداء بنصّ أبيض، كما في زرّ "Start". */
-  --color-primary: 23 22 28; /* #17161C */
-  --color-primary-soft: 226 228 242;
-  --color-primary-strong: 10 10 14;
+  /*
+   * الذهب لا يصلح تعبئةَ زرّ على الأبيض: تباين #FFC300 مع الأبيض ‎1.6:1‎،
+   * فالحبّة تذوب ونصّها غير مقروء. لذلك يحمل الكحليُّ الإجراءَ الرئيسي في
+   * الوضع الفاتح، ويبقى الذهب لمسةَ إبراز. وفي الوضع الداكن ينقلب الأمر
+   * ويصير الذهب هو الزرّ، وهو موضعه الطبيعي في هذه اللوحة.
+   */
+  --color-primary: 0 29 61; /* #001D3D — Prussian Blue */
+  --color-primary-soft: 230 236 243;
+  --color-primary-strong: 0 8 20; /* #000814 — Ink Black */
   --color-on-primary: 255 255 255;
 
-  /* اللمسة المميّزة: بنفسجي المرجع، للمناسبات والمصاريف المشتركة. */
-  --color-secondary: 84 51 235; /* #5433EB */
-  --color-secondary-soft: 226 221 253;
+  /* المناسبات والمصاريف المشتركة: الكحلي الأفتح، ليتمايز عن الرئيسي. */
+  --color-secondary: 0 53 102; /* #003566 — Regal Navy */
+  --color-secondary-soft: 220 232 245;
   --color-on-secondary: 255 255 255;
 
-  /* دلالات الرصيد. */
-  --color-success: 16 185 129; /* #10B981 */
+  /* دلالات الرصيد: خارج اللوحة، فاللوحة لا تحمل أخضر ولا أحمر. */
+  --color-success: 16 185 129;
   --color-success-soft: 209 250 229;
-  --color-danger: 255 69 58; /* #FF453A */
+  --color-danger: 255 69 58;
   --color-danger-soft: 255 227 225;
-  --color-warning: 245 197 24; /* #F5C518 — ذهبي التقييم في Shop */
-  --color-warning-soft: 254 243 199;
+  --color-warning: 255 195 0; /* #FFC300 — School Bus Yellow */
+  --color-warning-soft: 255 243 204;
 
-  /*
-   * الأسطح: أرضية بيضاء.
-   *
-   * البطاقة بيضاء أيضاً، فلا يفصلها عن الأرضية لون. الفصل يأتي من حدّ
-   * شعري ومن لوح رمادي فاتح للمجموعات — وهي طريقة شاشة Shop نفسها في
-   * المرجع، إذ خلفيتها بيضاء وصور المنتجات على لوح رمادي.
-   */
+  /* الأرضية بيضاء، والفصل بحدّ شعري ولوح رمادي فاتح. */
   --color-base: 255 255 255;
   --color-surface: 255 255 255;
-  --color-surface-raised: 242 243 247; /* #F2F3F7 */
-  --color-border: 229 231 238;
-  --color-border-strong: 203 206 219;
+  --color-surface-raised: 242 244 248;
+  --color-border: 226 230 238;
+  --color-border-strong: 196 205 219;
 
-  --color-text: 16 16 20; /* #101014 */
-  --color-text-muted: 91 91 105; /* #5B5B69 */
-  --color-text-subtle: 142 142 163; /* #8E8EA3 */
+  --color-text: 0 8 20; /* #000814 */
+  --color-text-muted: 67 80 99;
+  --color-text-subtle: 128 140 158;
 
-  /* الطبقة الزجاجية: شريط التنقّل والأوراق السفلية في المرجع ضبابية. */
   --color-glass: 255 255 255;
   --color-glass-border: 255 255 255;
-  --color-overlay: 16 16 20;
+  --color-overlay: 0 8 20;
 }
 
 .dark:root {
-  /* ينقلب الرئيسي إلى أبيض بنصّ داكن، كما في شاشات المرجع الداكنة. */
-  --color-primary: 255 255 255;
-  --color-primary-soft: 42 42 54;
-  --color-primary-strong: 235 235 240;
-  --color-on-primary: 20 19 26; /* #14131A */
+  /* الذهب زرّاً على الكحلي: موضع اللوحة الطبيعي، وتباينه ‎14:1‎. */
+  --color-primary: 255 195 0; /* #FFC300 */
+  --color-primary-soft: 61 47 0;
+  --color-primary-strong: 255 214 10; /* #FFD60A — Gold */
+  --color-on-primary: 0 8 20; /* #000814 */
 
-  --color-secondary: 167 139 250; /* #A78BFA */
-  --color-secondary-soft: 49 40 82;
-  --color-on-secondary: 20 19 26;
+  /*
+   * الكحلي مرفوع درجتين للمناسبات: #003566 نفسه هو لون السطح المرتفع
+   * هنا، فلا يصلح لوناً مميّزاً فوقه.
+   */
+  --color-secondary: 74 135 199;
+  --color-secondary-soft: 0 41 79;
+  --color-on-secondary: 0 8 20;
 
   --color-success: 52 211 153;
-  --color-success-soft: 6 59 47;
+  --color-success-soft: 5 58 46;
   --color-danger: 255 105 97;
-  --color-danger-soft: 69 20 20;
-  --color-warning: 245 197 24;
-  --color-warning-soft: 69 52 6;
+  --color-danger-soft: 74 22 20;
+  --color-warning: 255 214 10; /* #FFD60A */
+  --color-warning-soft: 61 47 0;
 
-  --color-base: 18 18 24; /* #121218 */
-  --color-surface: 29 29 38; /* #1D1D26 */
-  --color-surface-raised: 38 38 47; /* #26262F */
-  --color-border: 46 46 58;
-  --color-border-strong: 62 62 78;
+  --color-base: 0 8 20; /* #000814 — Ink Black */
+  --color-surface: 0 29 61; /* #001D3D — Prussian Blue */
+  --color-surface-raised: 0 53 102; /* #003566 — Regal Navy */
+  --color-border: 10 63 113;
+  --color-border-strong: 21 84 143;
 
-  --color-text: 245 245 247;
-  --color-text-muted: 160 160 176;
-  --color-text-subtle: 110 110 128;
+  --color-text: 240 244 249;
+  --color-text-muted: 147 166 190;
+  --color-text-subtle: 98 116 140;
 
-  --color-glass: 160 160 176;
-  --color-glass-border: 200 200 216;
-  --color-overlay: 8 8 12;
+  --color-glass: 147 166 190;
+  --color-glass-border: 200 216 235;
+  --color-overlay: 0 4 10;
 }
