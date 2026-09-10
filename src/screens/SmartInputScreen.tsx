@@ -6,7 +6,6 @@ import {
   setAudioModeAsync,
   useAudioRecorder,
 } from 'expo-audio';
-import { File } from 'expo-file-system';
 import { Mic, Send, Sparkles, Square, TriangleAlert } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import {
@@ -22,6 +21,7 @@ import {
 
 import { notify, reportError } from '@/lib/alerts';
 import { smartParse } from '@/lib/ai';
+import { readFileAsArrayBuffer } from '@/lib/files';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
 import { formatAmount } from '@/utils/ledger';
@@ -123,9 +123,8 @@ export function SmartInputScreen() {
       if (!uri) throw new Error('لم يُحفظ التسجيل.');
 
       // Gemini يقبل الصوت مباشرةً، فنرسله base64 بدل تفريغه على الجهاز.
-      // readAsStringAsync أُزيل في SDK 57، فنقرأ عبر صنف File ثم نرمّز.
       const { encode } = await import('base64-arraybuffer');
-      const audioBase64 = encode(await new File(uri).arrayBuffer());
+      const audioBase64 = encode(await readFileAsArrayBuffer(uri));
 
       await runParse({
         audioBase64,

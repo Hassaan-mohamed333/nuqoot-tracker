@@ -1,4 +1,5 @@
 import { SEED_CONTACTS, SEED_EVENTS, SEED_TRANSACTIONS } from '@/data/seed';
+import { readFileAsArrayBuffer } from '@/lib/files';
 import { readJson, STORAGE_KEYS, writeJson } from '@/lib/storage';
 import { isSupabaseConfigured, requireSupabase, TABLES } from '@/lib/supabase';
 import type {
@@ -136,12 +137,8 @@ export async function uploadReceipt(localUri: string): Promise<string> {
   } = await client.auth.getUser();
   if (!user) throw new Error('يلزم تسجيل الدخول لرفع الإيصالات.');
 
-  // استيراد كسول: يُبقي expo-file-system خارج مسار الإقلاع، فلا يستطيع
-  // فشلٌ في وحدة أصلية أن يمنع التطبيق من البدء.
-  // SDK 57 أزال readAsStringAsync من الواجهة الرئيسية (يرمي خطأً عند
-  // الاستدعاء)، والبديل هو صنف File الجديد.
-  const { File } = await import('expo-file-system');
-  const bytes = await new File(localUri).arrayBuffer();
+  // القراءة تختلف بين الويب والمنصات الأصلية؛ التفصيل في readFileAsArrayBuffer.
+  const bytes = await readFileAsArrayBuffer(localUri);
 
   const extension = localUri.split('.').pop()?.toLowerCase() ?? 'jpg';
   const contentType = extension === 'png' ? 'image/png' : 'image/jpeg';
