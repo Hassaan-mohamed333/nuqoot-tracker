@@ -9,6 +9,13 @@ interface LedgerSummaryBarProps {
   summary: LedgerSummary;
   /** يُستخدم كشريط ثابت أسفل الشاشة. */
   floating?: boolean;
+  /**
+   * يرفع الشريط فوق شريط التبويبات العائم.
+   *
+   * شريط التبويبات مطلق أيضاً ويعلو هذا الشريط، فكان الصافي يختفي خلفه
+   * في شاشات التبويبات. الشاشات التي لا تحمل تبويبات تتركه `false`.
+   */
+  aboveTabBar?: boolean;
 }
 
 /**
@@ -18,6 +25,7 @@ interface LedgerSummaryBarProps {
 export function LedgerSummaryBar({
   summary,
   floating = true,
+  aboveTabBar = false,
 }: LedgerSummaryBarProps) {
   const theme = getStatusTheme(summary.status);
   const StatusIcon =
@@ -29,9 +37,9 @@ export function LedgerSummaryBar({
 
   return (
     <View
-      className={`border-t border-line bg-surface px-4 pb-6 pt-3 ${
-        floating ? 'absolute inset-x-0 bottom-0' : ''
-      }`}>
+      className={`border-t border-line bg-surface px-4 pt-3 ${
+        aboveTabBar ? 'pb-28' : 'pb-6'
+      } ${floating ? 'absolute inset-x-0 bottom-0' : ''}`}>
       <View className="flex-row-reverse items-center justify-between">
         <View className="flex-row-reverse items-center">
           <View

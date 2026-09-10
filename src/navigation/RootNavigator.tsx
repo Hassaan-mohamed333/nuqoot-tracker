@@ -52,7 +52,12 @@ function TabsNavigator() {
         headerShown: false,
         tabBarActiveTintColor: palette.primary,
         tabBarInactiveTintColor: palette.muted,
-        tabBarLabelStyle: { fontSize: 11 },
+        /*
+         * تسمية أصغر بسطر واحد: 11 مع ارتفاع 64 كانت تقصّ الكلمات
+         * ("ال ئيسية" بدل "الرئيسية")، والعربية أعرض من اللاتينية.
+         */
+        tabBarLabelStyle: { fontSize: 10, marginTop: 2 },
+        tabBarIconStyle: { marginTop: 2 },
         /*
          * شريط عائم بشكل حبّة، لا شريطاً ملتصقاً بأسفل الشاشة: هذا شكله
          * في المرجعين معاً. كونه مطلقاً يعني أنه يغطّي أسفل المحتوى، لذا
@@ -62,11 +67,11 @@ function TabsNavigator() {
           position: 'absolute',
           marginHorizontal: 16,
           marginBottom: Math.max(insets.bottom, 12),
-          height: 64,
-          borderRadius: 32,
+          height: 72,
+          borderRadius: 36,
           borderTopWidth: 0,
-          paddingBottom: 8,
-          paddingTop: 8,
+          paddingBottom: 10,
+          paddingTop: 10,
           backgroundColor: palette.surface,
           shadowColor: '#101014',
           shadowOpacity: 0.18,

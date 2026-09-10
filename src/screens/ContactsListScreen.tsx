@@ -1,33 +1,69 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Archive, Plus, Search, UserPlus } from 'lucide-react-native';
+import { Archive, Plus, Search, UserPlus, X } from 'lucide-react-native';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Pressable, SectionList, Text, TextInput, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  SectionList,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AlphabetIndex } from '@/components/AlphabetIndex';
 import { ContactRow } from '@/components/ContactRow';
 import { LedgerSummaryBar } from '@/components/LedgerSummaryBar';
+import { PressableScale } from '@/components/motion';
+import { Button, IconButton } from '@/components/ui';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
+import { usePalette } from '@/store/ThemeProvider';
 import type { ContactWithSummary } from '@/types';
 import { buildContactSections, INDEX_ALPHABET, summarize } from '@/utils/ledger';
-import { usePalette } from '@/store/ThemeProvider';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 
-/** قائمة جهات الاتصال مرتبة أبجدياً مع فهرس جانبي وشريط ملخص ثابت. */
+/**
+ * مرشّح القائمة.
+ *
+ * `credit` و`debit` يقسمان النشطة حسب اتجاه الصافي، و`archived` عرض منفصل
+ * تماماً لأن المؤرشفة ليست جزءاً من الدفتر الجاري.
+ */
+type ContactFilter = 'all' | 'credit' | 'debit' | 'archived';
+
+/** قائمة جهات الاتصال: بحث، مرشّحات رصيد، فهرس أبجدي، وملخّص ثابت. */
 export function ContactsListScreen() {
   const palette = usePalette();
   const navigation = useNavigation<Navigation>();
   const { contactsWithSummary, archivedContacts, transactions, loading, refresh } =
     useLedger();
-  const [showArchived, setShowArchived] = useState(false);
+  const [filter, setFilter] = useState<ContactFilter>('all');
   const [query, setQuery] = useState('');
   const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
   const listRef = useRef<SectionList<ContactWithSummary>>(null);
 
-  const source = showArchived ? archivedContacts : contactsWithSummary;
+  const showArchived = filter === 'archived';
+
+  // الصافي موجب = دفعتُ أكثر مما استلمت، أي لي عندهم.
+  const creditCount = useMemo(
+    () => contactsWithSummary.filter((row) => row.summary.net > 0).length,
+    [contactsWithSummary],
+  );
+  const debitCount = useMemo(
+    () => contactsWithSummary.filter((row) => row.summary.net < 0).length,
+    [contactsWithSummary],
+  );
+
+  const source = useMemo(() => {
+    if (filter === 'archived') return archivedContacts;
+    if (filter === 'credit')
+      return contactsWithSummary.filter((row) => row.summary.net > 0);
+    if (filter === 'debit')
+      return contactsWithSummary.filter((row) => row.summary.net < 0);
+    return contactsWithSummary;
+  }, [filter, contactsWithSummary, archivedContacts]);
 
   const filtered = useMemo(() => {
     const term = query.trim();
@@ -47,7 +83,7 @@ export function ContactsListScreen() {
     [sections],
   );
 
-  /** ملخص القائمة المعروضة حالياً (يتأثر بالبحث). */
+  /** ملخص القائمة المعروضة حالياً (يتأثر بالبحث وبالمرشّح). */
   const visibleSummary = useMemo(() => {
     const visibleIds = new Set(filtered.map((contact) => contact.id));
     return summarize(
@@ -70,58 +106,85 @@ export function ContactsListScreen() {
     [sections],
   );
 
+  const chips: ReadonlyArray<{
+    key: ContactFilter;
+    label: string;
+    count: number;
+  }> = [
+    { key: 'all', label: 'الكل', count: contactsWithSummary.length },
+    { key: 'credit', label: 'لك عندهم', count: creditCount },
+    { key: 'debit', label: 'عليك لهم', count: debitCount },
+    { key: 'archived', label: 'المؤرشفة', count: archivedContacts.length },
+  ];
+
   return (
     <SafeAreaView className="flex-1 bg-base" edges={['top']}>
       <View className="flex-row-reverse items-center justify-between px-4 pt-2">
-        <Text className="text-right text-2xl font-bold text-ink">
-          جهات الاتصال
-        </Text>
-        <Pressable
+        <Text className="text-right text-display text-ink">جهات الاتصال</Text>
+        <IconButton
           onPress={() => navigation.navigate('AddContact')}
-          accessibilityRole="button"
           accessibilityLabel="إضافة جهة اتصال"
-          className="h-10 w-10 items-center justify-center rounded-full bg-primary">
+          variant="primary">
           <Plus size={20} color={palette.onPrimary} />
-        </Pressable>
+        </IconButton>
       </View>
 
-      <View className="mx-4 mt-3 flex-row-reverse items-center rounded-xl border border-line bg-surface px-3">
+      <View className="mx-4 mt-3 flex-row-reverse items-center rounded-full border border-line bg-surface px-4">
         <Search size={16} color={palette.muted} />
         <TextInput
           value={query}
           onChangeText={setQuery}
           placeholder="ابحث بالاسم أو الهاتف"
           placeholderTextColor={palette.muted}
-          className="mx-2 flex-1 py-2 text-right text-sm text-ink"
+          returnKeyType="search"
+          className="mx-2 flex-1 py-2.5 text-right text-body text-ink"
         />
+        {query.length > 0 ? (
+          <Pressable
+            onPress={() => setQuery('')}
+            accessibilityRole="button"
+            accessibilityLabel="مسح البحث"
+            hitSlop={10}>
+            <X size={16} color={palette.muted} />
+          </Pressable>
+        ) : null}
       </View>
 
-      <View className="mx-4 mt-3 flex-row-reverse">
-        {(
-          [
-            { key: false, label: `النشطة (${contactsWithSummary.length})` },
-            { key: true, label: `المؤرشفة (${archivedContacts.length})` },
-          ] as const
-        ).map((tab) => {
-          const isActive = showArchived === tab.key;
+      {/* أفقي قابل للتمرير: أربع شرائح لا تتّسع لها الشاشات الضيّقة. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        className="mt-3 max-h-11 grow-0"
+        contentContainerClassName="flex-row-reverse px-4">
+        {chips.map((chip) => {
+          const isActive = filter === chip.key;
           return (
-            <Pressable
-              key={String(tab.key)}
-              onPress={() => setShowArchived(tab.key)}
-              accessibilityRole="button"
-              className={`ml-2 rounded-full px-4 py-1.5 ${
+            <PressableScale
+              key={chip.key}
+              onPress={() => setFilter(chip.key)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
+              accessibilityLabel={`${chip.label}، ${chip.count}`}
+              activeScale={0.94}
+              className={`ml-2 h-9 flex-row-reverse items-center rounded-full px-4 ${
                 isActive ? 'bg-primary' : 'border border-line bg-surface'
               }`}>
               <Text
-                className={`text-xs font-semibold ${
+                className={`text-xs font-bold ${
                   isActive ? 'text-primary-fg' : 'text-ink-muted'
                 }`}>
-                {tab.label}
+                {chip.label}
               </Text>
-            </Pressable>
+              <Text
+                className={`mr-1.5 text-[11px] font-bold ${
+                  isActive ? 'text-primary-fg/70' : 'text-ink-subtle'
+                }`}>
+                {chip.count}
+              </Text>
+            </PressableScale>
           );
         })}
-      </View>
+      </ScrollView>
 
       <View className="mt-3 flex-1 flex-row">
         <AlphabetIndex
@@ -140,9 +203,11 @@ export function ContactsListScreen() {
           refreshing={loading}
           onRefresh={() => void refresh()}
           stickySectionHeadersEnabled
+          keyboardShouldPersistTaps="handled"
           onScrollToIndexFailed={() => undefined}
           renderSectionHeader={({ section }) => (
-            <View className="bg-base py-1">
+            // خلفية مصمتة: العناوين لاصقة، فبدونها يمرّ المحتوى تحتها ظاهراً.
+            <View className="bg-base py-1.5">
               <Text className="text-right text-sm font-bold text-primary">
                 {section.letter}
               </Text>
@@ -158,47 +223,86 @@ export function ContactsListScreen() {
           )}
           ListEmptyComponent={
             query.trim() ? (
-              <Text className="mt-8 text-center text-sm text-ink-muted">
+              <Text className="mt-8 text-center text-body text-ink-muted">
                 لا توجد نتائج مطابقة.
               </Text>
             ) : showArchived ? (
-              <View className="mt-10 items-center">
-                <View className="h-14 w-14 items-center justify-center rounded-full bg-line/60">
-                  <Archive size={26} color={palette.muted} />
-                </View>
-                <Text className="mt-3 text-center text-sm font-semibold text-ink">
-                  لا توجد جهات مؤرشفة
-                </Text>
-                <Text className="mt-1 text-center text-xs text-ink-muted">
-                  تظهر هنا الحسابات التي سوّيتها وأرشفتها.
-                </Text>
-              </View>
+              <EmptyState
+                icon={<Archive size={26} color={palette.muted} />}
+                tone="muted"
+                title="لا توجد جهات مؤرشفة"
+                hint="تظهر هنا الحسابات التي سوّيتها وأرشفتها."
+              />
+            ) : filter === 'credit' ? (
+              <EmptyState
+                icon={<UserPlus size={26} color={palette.success} />}
+                tone="success"
+                title="لا أحد يدين لك حالياً"
+                hint="كل من دفعتَ لهم ردّوا ما عليهم."
+              />
+            ) : filter === 'debit' ? (
+              <EmptyState
+                icon={<UserPlus size={26} color={palette.danger} />}
+                tone="danger"
+                title="لا شيء عليك لأحد"
+                hint="لا توجد واجبات مستحقّة عليك الآن."
+              />
             ) : (
-              <View className="mt-10 items-center">
-                <View className="h-14 w-14 items-center justify-center rounded-full bg-primary/15">
-                  <UserPlus size={26} color={palette.primary} />
-                </View>
-                <Text className="mt-3 text-center text-sm font-semibold text-ink">
-                  ابدأ بإضافة أول جهة اتصال
-                </Text>
-                <Text className="mt-1 text-center text-xs text-ink-muted">
-                  بعدها يمكنك تسجيل النقوط والواجبات الخاصة بها.
-                </Text>
-                <Pressable
-                  onPress={() => navigation.navigate('AddContact')}
-                  accessibilityRole="button"
-                  className="mt-4 rounded-full bg-primary px-5 py-2.5">
-                  <Text className="text-sm font-bold text-primary-fg">
-                    إضافة جهة اتصال
-                  </Text>
-                </Pressable>
-              </View>
+              <EmptyState
+                icon={<UserPlus size={26} color={palette.primary} />}
+                tone="primary"
+                title="ابدأ بإضافة أول جهة اتصال"
+                hint="بعدها يمكنك تسجيل النقوط والواجبات الخاصة بها."
+                action={
+                  <Button
+                    title="إضافة جهة اتصال"
+                    size="sm"
+                    block={false}
+                    className="mt-4"
+                    onPress={() => navigation.navigate('AddContact')}
+                  />
+                }
+              />
             )
           }
         />
       </View>
 
-      <LedgerSummaryBar summary={visibleSummary} />
+      <LedgerSummaryBar summary={visibleSummary} aboveTabBar />
     </SafeAreaView>
+  );
+}
+
+interface EmptyStateProps {
+  icon: React.ReactNode;
+  title: string;
+  hint: string;
+  tone: 'primary' | 'success' | 'danger' | 'muted';
+  action?: React.ReactNode;
+}
+
+const TONE_RING: Record<EmptyStateProps['tone'], string> = {
+  primary: 'bg-primary/15',
+  success: 'bg-success/15',
+  danger: 'bg-danger/15',
+  muted: 'bg-line/60',
+};
+
+/** حالة فارغة موحّدة: نغمتها تتبع المرشّح المختار. */
+function EmptyState({ icon, title, hint, tone, action }: EmptyStateProps) {
+  return (
+    <View className="mt-10 items-center">
+      <View
+        className={`h-14 w-14 items-center justify-center rounded-full ${TONE_RING[tone]}`}>
+        {icon}
+      </View>
+      <Text className="mt-3 text-center text-body font-bold text-ink">
+        {title}
+      </Text>
+      <Text className="mt-1 text-center text-caption text-ink-muted">
+        {hint}
+      </Text>
+      {action}
+    </View>
   );
 }

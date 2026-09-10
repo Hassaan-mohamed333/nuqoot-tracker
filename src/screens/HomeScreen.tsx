@@ -280,7 +280,7 @@ export function HomeScreen() {
         )}
       </ScrollView>
 
-      <LedgerSummaryBar summary={totals} />
+      <LedgerSummaryBar summary={totals} aboveTabBar />
     </SafeAreaView>
   );
 }
