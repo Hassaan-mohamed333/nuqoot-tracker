@@ -7,6 +7,7 @@ import {
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { CalendarDays, Home, Users } from 'lucide-react-native';
 import React from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { lazyScreen } from '@/navigation/LazyScreen';
 import type { RootStackParamList, TabParamList } from '@/navigation/types';
@@ -44,6 +45,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function TabsNavigator() {
   const palette = usePalette();
+  const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
       screenOptions={{
@@ -51,10 +53,28 @@ function TabsNavigator() {
         tabBarActiveTintColor: palette.primary,
         tabBarInactiveTintColor: palette.muted,
         tabBarLabelStyle: { fontSize: 11 },
+        /*
+         * شريط عائم بشكل حبّة، لا شريطاً ملتصقاً بأسفل الشاشة: هذا شكله
+         * في المرجعين معاً. كونه مطلقاً يعني أنه يغطّي أسفل المحتوى، لذا
+         * تضيف شاشات التبويبات حشوة سفلية تعادل ارتفاعه.
+         */
         tabBarStyle: {
+          position: 'absolute',
+          marginHorizontal: 16,
+          marginBottom: Math.max(insets.bottom, 12),
+          height: 64,
+          borderRadius: 32,
+          borderTopWidth: 0,
+          paddingBottom: 8,
+          paddingTop: 8,
           backgroundColor: palette.surface,
-          borderTopColor: palette.border,
+          shadowColor: '#101014',
+          shadowOpacity: 0.18,
+          shadowRadius: 24,
+          shadowOffset: { width: 0, height: 10 },
+          elevation: 12,
         },
+        tabBarItemStyle: { borderRadius: 24 },
       }}>
       <Tab.Screen
         name="Home"

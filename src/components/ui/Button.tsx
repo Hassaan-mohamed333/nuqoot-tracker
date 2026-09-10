@@ -6,7 +6,8 @@ import { sv } from '@/lib/variants';
 import { usePalette } from '@/store/ThemeProvider';
 
 const button = sv({
-  base: 'flex-row-reverse items-center justify-center rounded-2xl',
+  // حبّة كاملة الاستدارة: كل أزرار المرجع كذلك، بلا استثناء.
+  base: 'flex-row-reverse items-center justify-center rounded-full',
   variants: {
     variant: {
       primary: 'bg-primary',
@@ -14,14 +15,17 @@ const button = sv({
       success: 'bg-success',
       danger: 'bg-danger',
       outline: 'border border-line-strong bg-transparent',
+      /** حبّة فاتحة فوق صورة أو سطح ملوّن، كأزرار المرجع الدائرية. */
+      contrast: 'bg-surface',
       // لمسة زجاجية: تعبئة شبه شفّافة فوق السطح مع حدّ فاتح.
       glass: 'border border-glass-line/40 bg-glass/15',
       ghost: 'bg-transparent',
     },
     size: {
-      sm: 'px-3 py-2',
-      md: 'px-4 py-3',
-      lg: 'px-5 py-4',
+      // المرجع سخيّ في الحشوة الأفقية، فتبدو الحبّة ممتلئة لا ضيّقة.
+      sm: 'px-4 py-2.5',
+      md: 'px-5 py-3.5',
+      lg: 'px-6 py-4',
     },
     block: { true: 'w-full', false: 'self-start' },
     disabled: { true: 'opacity-45', false: '' },
@@ -38,6 +42,7 @@ const label = sv({
       success: 'text-white',
       danger: 'text-white',
       outline: 'text-ink',
+      contrast: 'text-ink',
       glass: 'text-ink',
       ghost: 'text-primary',
     },
@@ -52,6 +57,7 @@ export type ButtonVariant =
   | 'success'
   | 'danger'
   | 'outline'
+  | 'contrast'
   | 'glass'
   | 'ghost';
 
@@ -119,6 +125,7 @@ const SPINNER_TONE: Record<ButtonVariant, (palette: Palette) => string> = {
   success: () => '#FFFFFF',
   danger: () => '#FFFFFF',
   outline: (palette) => palette.text,
+  contrast: (palette) => palette.text,
   glass: (palette) => palette.text,
   ghost: (palette) => palette.primary,
 };

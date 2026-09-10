@@ -114,7 +114,7 @@ export function ContactsListScreen() {
               }`}>
               <Text
                 className={`text-xs font-semibold ${
-                  isActive ? 'text-white' : 'text-ink-muted'
+                  isActive ? 'text-primary-fg' : 'text-ink-muted'
                 }`}>
                 {tab.label}
               </Text>
@@ -187,8 +187,8 @@ export function ContactsListScreen() {
                 <Pressable
                   onPress={() => navigation.navigate('AddContact')}
                   accessibilityRole="button"
-                  className="mt-4 rounded-2xl bg-primary px-5 py-2.5">
-                  <Text className="text-sm font-bold text-white">
+                  className="mt-4 rounded-full bg-primary px-5 py-2.5">
+                  <Text className="text-sm font-bold text-primary-fg">
                     إضافة جهة اتصال
                   </Text>
                 </Pressable>

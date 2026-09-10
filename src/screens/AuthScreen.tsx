@@ -180,7 +180,7 @@ export function AuthScreen() {
                   }`}>
                   <Text
                     className={`text-xs font-semibold ${
-                      isActive ? 'text-white' : 'text-ink-muted'
+                      isActive ? 'text-primary-fg' : 'text-ink-muted'
                     }`}>
                     {item.label}
                   </Text>
@@ -223,7 +223,7 @@ export function AuthScreen() {
             onPress={() => void handleEmailSubmit()}
             disabled={!isValid || busy}
             accessibilityRole="button"
-            className={`mt-6 flex-row-reverse items-center justify-center rounded-2xl py-3 ${
+            className={`mt-6 flex-row-reverse items-center justify-center rounded-full py-3 ${
               isValid && !busy ? 'bg-primary' : 'bg-line-strong'
             }`}>
             {busy ? (
@@ -231,7 +231,7 @@ export function AuthScreen() {
             ) : (
               <>
                 <LogIn size={18} color={palette.onPrimary} />
-                <Text className="mr-2 text-base font-bold text-white">
+                <Text className="mr-2 text-base font-bold text-primary-fg">
                   {mode === 'signIn' ? 'تسجيل الدخول' : 'إنشاء الحساب'}
                 </Text>
               </>
@@ -249,7 +249,7 @@ export function AuthScreen() {
             disabled={busy}
             accessibilityRole="button"
             accessibilityLabel="تسجيل الدخول بحساب Google"
-            className="flex-row-reverse items-center justify-center rounded-2xl border border-line-strong bg-surface py-3">
+            className="flex-row-reverse items-center justify-center rounded-full border border-line-strong bg-surface py-3">
             <GoogleMark />
             <Text className="mr-2 text-base font-bold text-ink">
               المتابعة بحساب Google
@@ -260,7 +260,7 @@ export function AuthScreen() {
             onPress={() => void handleAnonymous()}
             disabled={busy}
             accessibilityRole="button"
-            className="mt-2 flex-row-reverse items-center justify-center rounded-2xl border border-line bg-surface py-3">
+            className="mt-2 flex-row-reverse items-center justify-center rounded-full border border-line bg-surface py-3">
             <UserRound size={18} color={palette.primary} />
             <Text className="mr-2 text-base font-bold text-primary">
               متابعة كضيف

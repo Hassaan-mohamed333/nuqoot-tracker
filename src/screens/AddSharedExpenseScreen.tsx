@@ -291,7 +291,7 @@ export function AddSharedExpenseScreen() {
           <FadeSlideIn index={2} className="mt-6">
             <SectionTitle>من دفع؟</SectionTitle>
             <Card
-              variant="surface"
+              variant="panel"
               padded={false}
               animate={false}
               className="p-2">
@@ -321,7 +321,7 @@ export function AddSharedExpenseScreen() {
           <FadeSlideIn index={4} className="mt-6">
             <SectionTitle>على من تُقسم؟</SectionTitle>
             <Card
-              variant="surface"
+              variant="panel"
               padded={false}
               animate={false}
               className="p-2">

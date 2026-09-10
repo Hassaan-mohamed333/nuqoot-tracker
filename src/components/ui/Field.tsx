@@ -85,7 +85,7 @@ export function Field({
           },
           ringStyle,
         ]}
-        className="flex-row-reverse items-center rounded-2xl bg-surface px-4">
+        className="flex-row-reverse items-center rounded-tile bg-surface px-4">
         {icon ? <View className="ml-2">{icon}</View> : null}
         <TextInput
           {...rest}

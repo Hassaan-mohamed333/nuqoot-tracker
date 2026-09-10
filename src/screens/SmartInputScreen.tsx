@@ -178,7 +178,7 @@ export function SmartInputScreen() {
             onPress={() => void runParse({ text })}
             disabled={busy || recording || text.trim().length === 0}
             accessibilityRole="button"
-            className={`flex-1 flex-row-reverse items-center justify-center rounded-2xl py-3 ${
+            className={`flex-1 flex-row-reverse items-center justify-center rounded-full py-3 ${
               busy || recording || text.trim().length === 0
                 ? 'bg-line-strong'
                 : 'bg-primary'
@@ -188,7 +188,7 @@ export function SmartInputScreen() {
             ) : (
               <>
                 <Send size={18} color={palette.onPrimary} />
-                <Text className="mr-2 text-base font-bold text-white">تحليل</Text>
+                <Text className="mr-2 text-base font-bold text-primary-fg">تحليل</Text>
               </>
             )}
           </Pressable>
@@ -270,8 +270,8 @@ export function SmartInputScreen() {
             <Pressable
               onPress={applyToForm}
               accessibilityRole="button"
-              className="mt-4 items-center rounded-2xl bg-primary py-3">
-              <Text className="text-base font-bold text-white">
+              className="mt-4 items-center rounded-full bg-primary py-3">
+              <Text className="text-base font-bold text-primary-fg">
                 مراجعة في النموذج
               </Text>
             </Pressable>

@@ -65,22 +65,28 @@ module.exports = {
         debit: token('danger'),
       },
       borderRadius: {
-        xl: '14px',
+        // أنصاف الأقطار مقيسة من المرجع: البطاقات كبيرة الاستدارة،
+        // المربّعات الصغيرة أقلّ، والأزرار حبّة كاملة.
+        xl: '16px',
         '2xl': '20px',
         '3xl': '28px',
-        card: '22px',
+        card: '26px',
+        tile: '16px',
+        sheet: '30px',
       },
       fontSize: {
-        // مقياس مضبوط للعربية: أطوال السطور أقصر والحروف أعرض.
-        'display-lg': ['32px', { lineHeight: '40px', fontWeight: '800' }],
-        display: ['26px', { lineHeight: '34px', fontWeight: '800' }],
-        title: ['19px', { lineHeight: '28px', fontWeight: '700' }],
+        // المرجع يعتمد عناوين كبيرة جداً وفراغاً سخياً حولها.
+        'display-lg': ['34px', { lineHeight: '42px', fontWeight: '700' }],
+        display: ['27px', { lineHeight: '36px', fontWeight: '700' }],
+        title: ['20px', { lineHeight: '28px', fontWeight: '700' }],
         body: ['15px', { lineHeight: '24px' }],
         caption: ['12px', { lineHeight: '18px' }],
       },
       boxShadow: {
-        card: '0 8px 24px -12px rgb(15 23 42 / 0.18)',
-        raised: '0 18px 40px -18px rgb(15 23 42 / 0.28)',
+        // ظلال واسعة وخفيفة، لا حدود حادّة: هكذا تُفصل البطاقات في المرجع.
+        card: '0 10px 30px -14px rgb(16 16 20 / 0.16)',
+        raised: '0 20px 44px -20px rgb(16 16 20 / 0.26)',
+        float: '0 12px 32px -10px rgb(16 16 20 / 0.22)',
       },
     },
   },

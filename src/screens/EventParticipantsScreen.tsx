@@ -251,13 +251,13 @@ export function EventParticipantsScreen() {
           onPress={() => void handleSave()}
           disabled={saving}
           accessibilityRole="button"
-          className={`items-center rounded-2xl py-3 ${
+          className={`items-center rounded-full py-3 ${
             saving ? 'bg-line-strong' : 'bg-primary'
           }`}>
           {saving ? (
             <ActivityIndicator color={palette.onPrimary} />
           ) : (
-            <Text className="text-base font-bold text-white">حفظ المشاركين</Text>
+            <Text className="text-base font-bold text-primary-fg">حفظ المشاركين</Text>
           )}
         </Pressable>
       </View>

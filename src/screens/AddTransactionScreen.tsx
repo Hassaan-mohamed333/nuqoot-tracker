@@ -208,7 +208,7 @@ export function AddTransactionScreen() {
           جهة الاتصال
         </SectionTitle>
 
-        <Card variant="surface" padded={false} animate={false} className="p-2">
+        <Card variant="panel" padded={false} animate={false} className="p-2">
           {sortedContacts.length === 0 ? (
             <View className="items-center p-4">
               <Text className="text-center text-body text-ink">
@@ -259,7 +259,7 @@ export function AddTransactionScreen() {
           المناسبة (اختياري)
         </SectionTitle>
 
-        <Card variant="surface" padded={false} animate={false} className="p-2">
+        <Card variant="panel" padded={false} animate={false} className="p-2">
           <RadioRow
             label="بدون مناسبة"
             selected={eventId === null}

@@ -87,7 +87,7 @@ export function EventsScreen() {
                 }`}>
                 <Text
                   className={`text-xs font-semibold ${
-                    isActive ? 'text-white' : 'text-ink-muted'
+                    isActive ? 'text-primary-fg' : 'text-ink-muted'
                   }`}>
                   {item.label}
                 </Text>
@@ -99,7 +99,7 @@ export function EventsScreen() {
 
       <FlatList
         className="mt-3 flex-1"
-        contentContainerClassName="px-4 pb-8"
+        contentContainerClassName="px-4 pb-32"
         data={visibleEvents}
         keyExtractor={(item) => item.id}
         refreshing={loading}
@@ -131,8 +131,8 @@ export function EventsScreen() {
             <Pressable
               onPress={() => navigation.navigate('AddEvent')}
               accessibilityRole="button"
-              className="mt-4 rounded-2xl bg-primary px-5 py-2.5">
-              <Text className="text-sm font-bold text-white">إضافة مناسبة</Text>
+              className="mt-4 rounded-full bg-primary px-5 py-2.5">
+              <Text className="text-sm font-bold text-primary-fg">إضافة مناسبة</Text>
             </Pressable>
           </View>
         }

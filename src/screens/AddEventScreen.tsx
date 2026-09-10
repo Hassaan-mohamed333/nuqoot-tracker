@@ -117,7 +117,7 @@ export function AddEventScreen() {
                 }`}>
                 <Text
                   className={`text-xs font-semibold ${
-                    isActive ? 'text-white' : 'text-ink-muted'
+                    isActive ? 'text-primary-fg' : 'text-ink-muted'
                   }`}>
                   {item.label}
                 </Text>
@@ -216,13 +216,13 @@ export function AddEventScreen() {
           onPress={() => void handleSave()}
           disabled={!isValid || saving}
           accessibilityRole="button"
-          className={`mt-8 items-center rounded-2xl py-3 ${
+          className={`mt-8 items-center rounded-full py-3 ${
             isValid && !saving ? 'bg-primary' : 'bg-line-strong'
           }`}>
           {saving ? (
             <ActivityIndicator color={palette.onPrimary} />
           ) : (
-            <Text className="text-base font-bold text-white">حفظ المناسبة</Text>
+            <Text className="text-base font-bold text-primary-fg">حفظ المناسبة</Text>
           )}
         </Pressable>
       </ScrollView>

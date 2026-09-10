@@ -120,7 +120,7 @@ export function AddContactScreen() {
               }`}>
               <Text
                 className={`text-xs font-semibold ${
-                  relation === suggestion ? 'text-white' : 'text-ink-muted'
+                  relation === suggestion ? 'text-primary-fg' : 'text-ink-muted'
                 }`}>
                 {suggestion}
               </Text>
@@ -143,13 +143,13 @@ export function AddContactScreen() {
           onPress={() => void handleSave()}
           disabled={!isValid || saving}
           accessibilityRole="button"
-          className={`mt-8 items-center rounded-2xl py-3 ${
+          className={`mt-8 items-center rounded-full py-3 ${
             isValid && !saving ? 'bg-primary' : 'bg-line-strong'
           }`}>
           {saving ? (
             <ActivityIndicator color={palette.onPrimary} />
           ) : (
-            <Text className="text-base font-bold text-white">حفظ جهة الاتصال</Text>
+            <Text className="text-base font-bold text-primary-fg">حفظ جهة الاتصال</Text>
           )}
         </Pressable>
       </ScrollView>

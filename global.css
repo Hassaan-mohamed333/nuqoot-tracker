@@ -12,86 +12,84 @@
  * الفائدة: صنف واحد مثل `bg-surface` يعمل في الوضعين، فلا نكرّر
  * `dark:` على كل عنصر ولا يمكن أن ينسى أحدهم النسخة الليلية.
  *
- * الهوية مصمّمة للوضع الليلي أولاً (قاعدة شبه سوداء ولمسة نيون)، والوضع
- * الفاتح مشتقّ منها لا العكس.
+ * ---------------------------------------------------------------------
+ * المرجع البصري: لقطات Future Pro وShop.
+ *
+ * القراءة من الصور: أرضية بنفسجية فاتحة (بريوينكل)، أسطح بيضاء بزوايا
+ * كبيرة، وأزرار رئيسية سوداء بشكل حبّة كاملة الاستدارة، ولمسة بنفسجية
+ * للعناصر المميّزة. لا وجود لأي لون نيون في المرجع.
+ *
+ * والوضع الداكن مأخوذ من شاشات المرجع الداكنة نفسها: هناك ينقلب الزرّ
+ * الرئيسي إلى حبّة بيضاء بنصّ أسود (زرّ "Let's Start")، لا إلى لون مميّز.
+ * لذلك primary هنا محايد لا ملوّن، وهو ما يجعل الانقلاب طبيعياً.
  */
 :root {
-  /*
-   * اللون المميّز في الوضع الفاتح ليس النيون نفسه.
-   *
-   * الليموني #CCFF00 إضاءته عالية جداً: تباينه مع الأبيض ‎1.2:1‎، فالزرّ
-   * يذوب في البطاقة البيضاء ونصّه غير مقروء. نستعمل هنا الدرجة الغامقة من
-   * العائلة نفسها (تباين ‎5:1‎ مع الأبيض)، ويبقى النيون لِما صُمّم له:
-   * الوضع الليلي.
-   */
-  --color-primary: 77 124 15; /* #4D7C0F */
-  --color-primary-soft: 236 252 203; /* #ECFCCB */
-  --color-primary-strong: 63 98 18; /* #3F6212 */
+  /* الإجراء الرئيسي: حبّة سوداء بنصّ أبيض، كما في زرّ "Start". */
+  --color-primary: 23 22 28; /* #17161C */
+  --color-primary-soft: 226 228 242;
+  --color-primary-strong: 10 10 14;
   --color-on-primary: 255 255 255;
 
-  /* المناسبات والمصاريف المشتركة: بنفسجي سيبراني. */
-  --color-secondary: 99 102 241; /* #6366F1 */
-  --color-secondary-soft: 224 225 253;
+  /* اللمسة المميّزة: بنفسجي المرجع، للمناسبات والمصاريف المشتركة. */
+  --color-secondary: 84 51 235; /* #5433EB */
+  --color-secondary-soft: 226 221 253;
   --color-on-secondary: 255 255 255;
 
-  /* دلالات الرصيد: دائن أخضر، مدين أحمر. */
+  /* دلالات الرصيد. */
   --color-success: 16 185 129; /* #10B981 */
   --color-success-soft: 209 250 229;
   --color-danger: 255 69 58; /* #FF453A */
   --color-danger-soft: 255 227 225;
-  --color-warning: 245 158 11;
+  --color-warning: 245 197 24; /* #F5C518 — ذهبي التقييم في Shop */
   --color-warning-soft: 254 243 199;
 
-  /* الأسطح والنصوص. */
-  --color-base: 244 245 248; /* #F4F5F8 */
-  --color-surface: 255 255 255; /* #FFFFFF */
-  --color-surface-raised: 255 255 255;
-  --color-border: 227 230 237;
-  --color-border-strong: 203 209 221;
+  /* الأسطح: أرضية بنفسجية فاتحة، وبطاقات بيضاء فوقها. */
+  --color-base: 231 233 244; /* #E7E9F4 */
+  --color-surface: 255 255 255;
+  /* اللوح الغائر: شريط "More workouts" في المرجع أغمق من الأرضية قليلاً. */
+  --color-surface-raised: 221 225 241; /* #DDE1F1 */
+  --color-border: 213 216 232;
+  --color-border-strong: 190 195 218;
 
-  --color-text: 15 23 42;
-  --color-text-muted: 100 116 139; /* #64748B */
-  --color-text-subtle: 148 163 184; /* #94A3B8 */
+  --color-text: 16 16 20; /* #101014 */
+  --color-text-muted: 91 91 105; /* #5B5B69 */
+  --color-text-subtle: 142 142 163; /* #8E8EA3 */
 
-  /* طبقة زجاجية: تعبئة وحدّ شبه شفّافين فوق الأسطح. */
+  /* الطبقة الزجاجية: شريط التنقّل والأوراق السفلية في المرجع ضبابية. */
   --color-glass: 255 255 255;
   --color-glass-border: 255 255 255;
-  --color-overlay: 15 23 42;
+  --color-overlay: 16 16 20;
 }
 
 .dark:root {
-  /* النيون: على القاعدة شبه السوداء تباينه ‎17:1‎، ونصّه غامق فوقه. */
-  --color-primary: 204 255 0; /* #CCFF00 */
-  --color-primary-soft: 36 51 0;
-  --color-primary-strong: 184 230 0;
-  --color-on-primary: 9 10 15; /* #090A0F */
+  /* ينقلب الرئيسي إلى أبيض بنصّ داكن، كما في شاشات المرجع الداكنة. */
+  --color-primary: 255 255 255;
+  --color-primary-soft: 42 42 54;
+  --color-primary-strong: 235 235 240;
+  --color-on-primary: 20 19 26; /* #14131A */
 
-  /*
-   * البنفسجي مرفوع درجة عن #6366F1 في الوضع الليلي: نصّ صغير بالقيمة
-   * الأصلية فوق سطح #141722 يقارب ‎4:1‎ وهو دون حدّ القراءة.
-   */
-  --color-secondary: 129 140 248; /* #818CF8 */
-  --color-secondary-soft: 40 43 92;
-  --color-on-secondary: 9 10 15;
+  --color-secondary: 167 139 250; /* #A78BFA */
+  --color-secondary-soft: 49 40 82;
+  --color-on-secondary: 20 19 26;
 
-  --color-success: 16 185 129; /* #10B981 */
+  --color-success: 52 211 153;
   --color-success-soft: 6 59 47;
-  --color-danger: 255 69 58; /* #FF453A */
+  --color-danger: 255 105 97;
   --color-danger-soft: 69 20 20;
-  --color-warning: 251 191 36;
-  --color-warning-soft: 69 45 6;
+  --color-warning: 245 197 24;
+  --color-warning-soft: 69 52 6;
 
-  --color-base: 9 10 15; /* #090A0F */
-  --color-surface: 20 23 34; /* #141722 */
-  --color-surface-raised: 26 30 43;
-  --color-border: 35 40 59; /* #23283B */
-  --color-border-strong: 47 53 80;
+  --color-base: 18 18 24; /* #121218 */
+  --color-surface: 29 29 38; /* #1D1D26 */
+  --color-surface-raised: 38 38 47; /* #26262F */
+  --color-border: 46 46 58;
+  --color-border-strong: 62 62 78;
 
-  --color-text: 248 250 252; /* #F8FAFC */
-  --color-text-muted: 148 163 184; /* #94A3B8 */
-  --color-text-subtle: 100 116 139; /* #64748B */
+  --color-text: 245 245 247;
+  --color-text-muted: 160 160 176;
+  --color-text-subtle: 110 110 128;
 
-  --color-glass: 148 163 184;
-  --color-glass-border: 203 213 225;
-  --color-overlay: 2 3 8;
+  --color-glass: 160 160 176;
+  --color-glass-border: 200 200 216;
+  --color-overlay: 8 8 12;
 }

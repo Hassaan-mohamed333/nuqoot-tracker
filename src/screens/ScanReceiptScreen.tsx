@@ -106,15 +106,15 @@ export function ScanReceiptScreen() {
           onPress={() => void capture()}
           disabled={busy}
           accessibilityRole="button"
-          className="flex-1 flex-row-reverse items-center justify-center rounded-2xl bg-primary py-3">
+          className="flex-1 flex-row-reverse items-center justify-center rounded-full bg-primary py-3">
           <Camera size={18} color={palette.onPrimary} />
-          <Text className="mr-2 text-sm font-bold text-white">تصوير إيصال</Text>
+          <Text className="mr-2 text-sm font-bold text-primary-fg">تصوير إيصال</Text>
         </Pressable>
         <Pressable
           onPress={() => void pick()}
           disabled={busy}
           accessibilityRole="button"
-          className="mr-2 flex-1 flex-row-reverse items-center justify-center rounded-2xl border border-line bg-surface py-3">
+          className="mr-2 flex-1 flex-row-reverse items-center justify-center rounded-full border border-line bg-surface py-3">
           <ImageIcon size={18} color={palette.primary} />
           <Text className="mr-2 text-sm font-bold text-primary">من المعرض</Text>
         </Pressable>
@@ -167,8 +167,8 @@ export function ScanReceiptScreen() {
         <Pressable
           onPress={continueToForm}
           accessibilityRole="button"
-          className="mt-6 items-center rounded-2xl bg-primary py-3">
-          <Text className="text-base font-bold text-white">
+          className="mt-6 items-center rounded-full bg-primary py-3">
+          <Text className="text-base font-bold text-primary-fg">
             متابعة في النموذج
           </Text>
         </Pressable>

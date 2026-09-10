@@ -34,7 +34,7 @@ export function CheckRow({
       accessibilityState={{ checked, disabled }}
       accessibilityLabel={label}
       activeScale={0.985}
-      className={`mb-1 flex-row-reverse items-center rounded-2xl px-3 py-2.5 ${
+      className={`mb-1 flex-row-reverse items-center rounded-tile px-3 py-2.5 ${
         checked ? 'bg-primary/10' : 'bg-transparent'
       } ${disabled ? 'opacity-45' : ''}`}>
       <AnimatedCheck
@@ -81,7 +81,7 @@ export function RadioRow({
       accessibilityState={{ selected }}
       accessibilityLabel={label}
       activeScale={0.985}
-      className={`mb-1 flex-row-reverse items-center rounded-2xl px-3 py-2.5 ${
+      className={`mb-1 flex-row-reverse items-center rounded-tile px-3 py-2.5 ${
         selected ? 'bg-primary/10' : 'bg-transparent'
       }`}>
       <View
@@ -121,7 +121,7 @@ export function SegmentedControl<T extends string>({
 }: SegmentedControlProps<T>) {
   return (
     <View
-      className={`flex-row-reverse rounded-2xl border border-line bg-surface p-1 ${
+      className={`flex-row-reverse rounded-full bg-surface-raised p-1 ${
         className ?? ''
       }`}>
       {options.map((option) => {
@@ -134,7 +134,7 @@ export function SegmentedControl<T extends string>({
             accessibilityState={{ selected: active }}
             accessibilityLabel={option.label}
             activeScale={0.97}
-            className={`flex-1 items-center rounded-xl py-2 ${
+            className={`flex-1 items-center rounded-full py-2.5 ${
               active ? 'bg-primary' : 'bg-transparent'
             }`}>
             <Text

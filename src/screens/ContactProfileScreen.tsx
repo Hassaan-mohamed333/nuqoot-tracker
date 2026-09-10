@@ -182,9 +182,9 @@ export function ContactProfileScreen() {
                 navigation.navigate('AddTransaction', { contactId: contact.id })
               }
               accessibilityRole="button"
-              className="flex-row-reverse items-center rounded-xl bg-primary px-4 py-2">
+              className="flex-row-reverse items-center rounded-full bg-primary px-4 py-2">
               <Plus size={16} color={palette.onPrimary} />
-              <Text className="mr-1 text-sm font-semibold text-white">
+              <Text className="mr-1 text-sm font-semibold text-primary-fg">
                 إضافة حركة
               </Text>
             </Pressable>
@@ -266,7 +266,7 @@ export function ContactProfileScreen() {
                 }`}>
                 <Text
                   className={`text-xs font-semibold ${
-                    isActive ? 'text-white' : 'text-ink-muted'
+                    isActive ? 'text-primary-fg' : 'text-ink-muted'
                   }`}>
                   {item.label}
                 </Text>
@@ -292,8 +292,8 @@ export function ContactProfileScreen() {
                   })
                 }
                 accessibilityRole="button"
-                className="mt-3 rounded-2xl bg-primary px-5 py-2">
-                <Text className="text-sm font-bold text-white">
+                className="mt-3 rounded-full bg-primary px-5 py-2">
+                <Text className="text-sm font-bold text-primary-fg">
                   تسجيل أول حركة
                 </Text>
               </Pressable>

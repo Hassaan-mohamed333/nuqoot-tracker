@@ -57,7 +57,7 @@ export function Sheet({
           entering={SlideInDown.springify().damping(20).stiffness(180)}
           exiting={SlideOutDown.duration(MOTION.duration)}
           style={{ paddingBottom: insets.bottom + 16 }}
-          className="rounded-t-3xl border-t border-line bg-surface px-4 pt-3">
+          className="rounded-t-sheet bg-surface px-4 pt-3 shadow-raised">
           {/* مقبض السحب: إشارة بصرية أن الورقة تُغلق بالسحب للأسفل. */}
           <View className="mb-3 h-1 w-10 self-center rounded-full bg-line-strong" />
 
@@ -122,7 +122,7 @@ export function Dialog({
         <Animated.View
           entering={FadeIn.duration(200).delay(40)}
           exiting={FadeOut.duration(140)}
-          className="w-full rounded-card border border-line bg-surface p-5 shadow-raised">
+          className="w-full rounded-card bg-surface p-5 shadow-raised">
           <Text className="text-right text-title text-ink">{title}</Text>
           {message ? (
             <Text className="mt-2 text-right text-body text-ink-muted">
