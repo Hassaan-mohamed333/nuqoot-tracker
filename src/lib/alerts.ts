@@ -1,5 +1,7 @@
 import { Alert, Platform } from 'react-native';
 
+import { describeSupabaseError } from '@/lib/supabaseError';
+
 /**
  * تنبيهات تعمل على الويب أيضاً.
  *
@@ -27,11 +29,14 @@ export function notify(title: string, message: string): void {
  * يحمل الكائن كاملاً بما فيه رمز الخطأ وأثر النداء.
  */
 export function reportError(title: string, error: unknown): void {
+  // الكائن كاملاً في السجل: أخطاء Supabase تحمل details و hint و code لا
+  // يظهر أيٌّ منها في error.message وحده.
   console.error(`[${title}]`, error);
-  notify(
-    title,
-    error instanceof Error ? error.message : 'حدث خطأ غير متوقع.',
-  );
+  if (error instanceof Error && error.stack) console.error(error.stack);
+
+  // describeSupabaseError يقرأ الحقول من الكائن مهما كان شكله، فلا نسقط
+  // إلى "حدث خطأ غير متوقع" لمجرد أن القيمة ليست من نوع Error.
+  notify(title, describeSupabaseError(error));
 }
 
 interface ConfirmOptions {

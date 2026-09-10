@@ -1,5 +1,6 @@
 import { SEED_CONTACTS, SEED_EVENTS, SEED_TRANSACTIONS } from '@/data/seed';
-import { readFileAsArrayBuffer } from '@/lib/files';
+import { extensionForMime, readLocalFile } from '@/lib/files';
+import { logStepFailure } from '@/lib/supabaseError';
 import { readJson, STORAGE_KEYS, writeJson } from '@/lib/storage';
 import { isSupabaseConfigured, requireSupabase, TABLES } from '@/lib/supabase';
 import type {
@@ -132,24 +133,42 @@ export const RECEIPTS_BUCKET = 'receipts';
 export async function uploadReceipt(localUri: string): Promise<string> {
   const client = requireSupabase();
 
-  const {
-    data: { user },
-  } = await client.auth.getUser();
+  const { data: userData, error: userError } = await client.auth.getUser();
+  if (userError) {
+    logStepFailure('قراءة المستخدم الحالي', userError);
+    throw userError;
+  }
+  const user = userData?.user;
   if (!user) throw new Error('يلزم تسجيل الدخول لرفع الإيصالات.');
 
-  // القراءة تختلف بين الويب والمنصات الأصلية؛ التفصيل في readFileAsArrayBuffer.
-  const bytes = await readFileAsArrayBuffer(localUri);
+  let file;
+  try {
+    file = await readLocalFile(localUri);
+  } catch (error) {
+    logStepFailure('قراءة ملف الإيصال', error);
+    throw error;
+  }
 
-  const extension = localUri.split('.').pop()?.toLowerCase() ?? 'jpg';
-  const contentType = extension === 'png' ? 'image/png' : 'image/jpeg';
-  // المسار يبدأ بمعرّف المستخدم لتستطيع سياسات التخزين عزل الملفات.
+  /**
+   * الامتداد من نوع المحتوى لا من العنوان: على الويب يكون العنوان
+   * "blob:http://localhost:8081/..." فينتج عن اشتقاقه من العنوان مفتاحٌ
+   * يحوي ':' و'/' ترفضه خدمة التخزين.
+   */
+  const extension = extensionForMime(file.mimeType);
   const path = `${user.id}/${Date.now()}.${extension}`;
 
   const { error } = await client.storage
     .from(RECEIPTS_BUCKET)
-    .upload(path, bytes, { contentType, upsert: false });
+    .upload(path, file.bytes, {
+      contentType: file.mimeType,
+      upsert: false,
+    });
 
-  if (error) throw error;
+  if (error) {
+    logStepFailure(`رفع الإيصال إلى ${RECEIPTS_BUCKET}/${path}`, error);
+    throw error;
+  }
+
   return path;
 }
 
@@ -536,7 +555,10 @@ async function persist<TRow extends { id: string }, TInsert>(
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      logStepFailure(`الإدراج في جدول ${table}`, error);
+      throw error;
+    }
     if (data) saved = data as TRow;
   }
 

@@ -21,7 +21,7 @@ import {
 
 import { notify, reportError } from '@/lib/alerts';
 import { smartParse } from '@/lib/ai';
-import { readFileAsArrayBuffer } from '@/lib/files';
+import { readLocalFile } from '@/lib/files';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
 import { formatAmount } from '@/utils/ledger';
@@ -124,7 +124,7 @@ export function SmartInputScreen() {
 
       // Gemini يقبل الصوت مباشرةً، فنرسله base64 بدل تفريغه على الجهاز.
       const { encode } = await import('base64-arraybuffer');
-      const audioBase64 = encode(await readFileAsArrayBuffer(uri));
+      const audioBase64 = encode((await readLocalFile(uri)).bytes);
 
       await runParse({
         audioBase64,
