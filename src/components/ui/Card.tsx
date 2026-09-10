@@ -11,12 +11,12 @@ const card = sv({
   base: 'rounded-card',
   variants: {
     variant: {
-      /** السطح العادي: أبيض بظلّ واسع خفيف، بلا حدّ — كبطاقات المرجع. */
-      surface: 'bg-surface shadow-card',
+      /** السطح العادي: حدّ شعري مع ظلّ خفيف، ليُفصل عن أرضية بلونه. */
+      surface: 'border border-line bg-surface shadow-card',
       /** لوح غائر: أغمق قليلاً من الأرضية، لتجميع عناصر داخل الشاشة. */
       panel: 'bg-surface-raised',
       /** مرتفع: للبطاقة التي تحمل الرقم الأهم. */
-      raised: 'bg-surface shadow-raised',
+      raised: 'border border-line bg-surface shadow-raised',
       /** زجاجي: فوق خلفية ملوّنة أو متدرّجة. */
       glass: 'border border-glass-line/30 bg-glass/12',
       outline: 'border border-line-strong bg-transparent',
