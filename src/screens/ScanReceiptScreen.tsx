@@ -16,6 +16,7 @@ import { notify } from '@/lib/alerts';
 import { scanReceipt, type ReceiptScan } from '@/lib/ai';
 import type { RootStackParamList } from '@/navigation/types';
 import { formatAmount, formatDate } from '@/utils/ledger';
+import { usePalette } from '@/store/ThemeProvider';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 
@@ -24,6 +25,7 @@ type Navigation = NativeStackNavigationProp<RootStackParamList>;
  * ثم متابعة في نموذج الحركة. الصورة تُرفع عند الحفظ لا قبله.
  */
 export function ScanReceiptScreen() {
+  const palette = usePalette();
   const navigation = useNavigation<Navigation>();
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [scan, setScan] = useState<ReceiptScan | null>(null);
@@ -98,13 +100,13 @@ export function ScanReceiptScreen() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-gray-50" contentContainerClassName="p-4 pb-10">
+    <ScrollView className="flex-1 bg-base" contentContainerClassName="p-4 pb-10">
       <View className="flex-row-reverse">
         <Pressable
           onPress={() => void capture()}
           disabled={busy}
           accessibilityRole="button"
-          className="flex-1 flex-row-reverse items-center justify-center rounded-2xl bg-green-600 py-3">
+          className="flex-1 flex-row-reverse items-center justify-center rounded-2xl bg-primary py-3">
           <Camera size={18} color="#ffffff" />
           <Text className="mr-2 text-sm font-bold text-white">تصوير إيصال</Text>
         </Pressable>
@@ -112,9 +114,9 @@ export function ScanReceiptScreen() {
           onPress={() => void pick()}
           disabled={busy}
           accessibilityRole="button"
-          className="mr-2 flex-1 flex-row-reverse items-center justify-center rounded-2xl border border-gray-200 bg-white py-3">
-          <ImageIcon size={18} color="#16a34a" />
-          <Text className="mr-2 text-sm font-bold text-green-700">من المعرض</Text>
+          className="mr-2 flex-1 flex-row-reverse items-center justify-center rounded-2xl border border-line bg-surface py-3">
+          <ImageIcon size={18} color={palette.primary} />
+          <Text className="mr-2 text-sm font-bold text-primary">من المعرض</Text>
         </Pressable>
       </View>
 
@@ -128,23 +130,23 @@ export function ScanReceiptScreen() {
 
       {busy ? (
         <View className="mt-4 items-center">
-          <ActivityIndicator color="#16a34a" />
-          <Text className="mt-2 text-xs text-gray-500">جارٍ قراءة الإيصال…</Text>
+          <ActivityIndicator color={palette.primary} />
+          <Text className="mt-2 text-xs text-ink-muted">جارٍ قراءة الإيصال…</Text>
         </View>
       ) : null}
 
       {error ? (
-        <View className="mt-4 flex-row-reverse items-center rounded-xl bg-amber-50 p-3">
-          <TriangleAlert size={16} color="#b45309" />
-          <Text className="mr-2 flex-1 text-right text-xs text-amber-800">
+        <View className="mt-4 flex-row-reverse items-center rounded-xl bg-warning-soft p-3">
+          <TriangleAlert size={16} color={palette.warning} />
+          <Text className="mr-2 flex-1 text-right text-xs text-ink-muted">
             {error}
           </Text>
         </View>
       ) : null}
 
       {scan ? (
-        <View className="mt-4 rounded-2xl border border-gray-100 bg-white p-4">
-          <Text className="text-right text-sm font-bold text-gray-900">
+        <View className="mt-4 rounded-2xl border border-line bg-surface p-4">
+          <Text className="text-right text-sm font-bold text-ink">
             ما قرأناه
           </Text>
           <Row label="المتجر" value={scan.merchant ?? '—'} />
@@ -165,7 +167,7 @@ export function ScanReceiptScreen() {
         <Pressable
           onPress={continueToForm}
           accessibilityRole="button"
-          className="mt-6 items-center rounded-2xl bg-green-600 py-3">
+          className="mt-6 items-center rounded-2xl bg-primary py-3">
           <Text className="text-base font-bold text-white">
             متابعة في النموذج
           </Text>
@@ -173,7 +175,7 @@ export function ScanReceiptScreen() {
       ) : null}
 
       {imageUri ? (
-        <Text className="mt-2 text-center text-[11px] text-gray-500">
+        <Text className="mt-2 text-center text-[11px] text-ink-muted">
           تُرفع الصورة عند حفظ الحركة، لا قبل ذلك.
         </Text>
       ) : null}
@@ -184,8 +186,8 @@ export function ScanReceiptScreen() {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <View className="mt-2 flex-row-reverse items-center justify-between">
-      <Text className="text-right text-xs text-gray-500">{label}</Text>
-      <Text className="flex-1 text-right text-sm font-semibold text-gray-900">
+      <Text className="text-right text-xs text-ink-muted">{label}</Text>
+      <Text className="flex-1 text-right text-sm font-semibold text-ink">
         {value}
       </Text>
     </View>

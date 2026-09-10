@@ -29,7 +29,7 @@ export function LedgerSummaryBar({
 
   return (
     <View
-      className={`border-t border-gray-200 bg-white px-4 pb-6 pt-3 ${
+      className={`border-t border-line bg-surface px-4 pb-6 pt-3 ${
         floating ? 'absolute inset-x-0 bottom-0' : ''
       }`}>
       <View className="flex-row-reverse items-center justify-between">
@@ -42,7 +42,7 @@ export function LedgerSummaryBar({
             <Text className={`text-right text-lg font-bold ${theme.textClass}`}>
               {formatNet(summary.net, summary.currency)}
             </Text>
-            <Text className="text-right text-[11px] text-gray-500">
+            <Text className="text-right text-[11px] text-ink-muted">
               {describeNet(summary)}
             </Text>
           </View>
@@ -56,16 +56,16 @@ export function LedgerSummaryBar({
       </View>
 
       <View className="mt-3 flex-row-reverse justify-between">
-        <View className="flex-1 items-center rounded-xl bg-green-50 py-2">
-          <Text className="text-[11px] text-gray-500">إجمالي دائن (دفعت)</Text>
-          <Text className="text-sm font-bold text-green-700">
+        <View className="flex-1 items-center rounded-xl bg-primary/10 py-2">
+          <Text className="text-[11px] text-ink-muted">إجمالي دائن (دفعت)</Text>
+          <Text className="text-sm font-bold text-primary">
             {formatAmount(summary.totalOut, summary.currency)}
           </Text>
         </View>
         <View className="mx-2 w-2" />
-        <View className="flex-1 items-center rounded-xl bg-red-50 py-2">
-          <Text className="text-[11px] text-gray-500">إجمالي مدين (استلمت)</Text>
-          <Text className="text-sm font-bold text-red-700">
+        <View className="flex-1 items-center rounded-xl bg-danger-soft py-2">
+          <Text className="text-[11px] text-ink-muted">إجمالي مدين (استلمت)</Text>
+          <Text className="text-sm font-bold text-danger">
             {formatAmount(summary.totalIn, summary.currency)}
           </Text>
         </View>

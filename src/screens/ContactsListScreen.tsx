@@ -12,11 +12,13 @@ import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
 import type { ContactWithSummary } from '@/types';
 import { buildContactSections, INDEX_ALPHABET, summarize } from '@/utils/ledger';
+import { usePalette } from '@/store/ThemeProvider';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 
 /** قائمة جهات الاتصال مرتبة أبجدياً مع فهرس جانبي وشريط ملخص ثابت. */
 export function ContactsListScreen() {
+  const palette = usePalette();
   const navigation = useNavigation<Navigation>();
   const { contactsWithSummary, archivedContacts, transactions, loading, refresh } =
     useLedger();
@@ -69,28 +71,28 @@ export function ContactsListScreen() {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-base" edges={['top']}>
       <View className="flex-row-reverse items-center justify-between px-4 pt-2">
-        <Text className="text-right text-2xl font-bold text-gray-900">
+        <Text className="text-right text-2xl font-bold text-ink">
           جهات الاتصال
         </Text>
         <Pressable
           onPress={() => navigation.navigate('AddContact')}
           accessibilityRole="button"
           accessibilityLabel="إضافة جهة اتصال"
-          className="h-10 w-10 items-center justify-center rounded-full bg-green-600">
+          className="h-10 w-10 items-center justify-center rounded-full bg-primary">
           <Plus size={20} color="#ffffff" />
         </Pressable>
       </View>
 
-      <View className="mx-4 mt-3 flex-row-reverse items-center rounded-xl border border-gray-200 bg-white px-3">
-        <Search size={16} color="#9ca3af" />
+      <View className="mx-4 mt-3 flex-row-reverse items-center rounded-xl border border-line bg-surface px-3">
+        <Search size={16} color={palette.muted} />
         <TextInput
           value={query}
           onChangeText={setQuery}
           placeholder="ابحث بالاسم أو الهاتف"
-          placeholderTextColor="#9ca3af"
-          className="mx-2 flex-1 py-2 text-right text-sm text-gray-900"
+          placeholderTextColor={palette.muted}
+          className="mx-2 flex-1 py-2 text-right text-sm text-ink"
         />
       </View>
 
@@ -108,11 +110,11 @@ export function ContactsListScreen() {
               onPress={() => setShowArchived(tab.key)}
               accessibilityRole="button"
               className={`ml-2 rounded-full px-4 py-1.5 ${
-                isActive ? 'bg-green-600' : 'border border-gray-200 bg-white'
+                isActive ? 'bg-primary' : 'border border-line bg-surface'
               }`}>
               <Text
                 className={`text-xs font-semibold ${
-                  isActive ? 'text-white' : 'text-gray-600'
+                  isActive ? 'text-white' : 'text-ink-muted'
                 }`}>
                 {tab.label}
               </Text>
@@ -140,8 +142,8 @@ export function ContactsListScreen() {
           stickySectionHeadersEnabled
           onScrollToIndexFailed={() => undefined}
           renderSectionHeader={({ section }) => (
-            <View className="bg-gray-50 py-1">
-              <Text className="text-right text-sm font-bold text-green-700">
+            <View className="bg-base py-1">
+              <Text className="text-right text-sm font-bold text-primary">
                 {section.letter}
               </Text>
             </View>
@@ -156,36 +158,36 @@ export function ContactsListScreen() {
           )}
           ListEmptyComponent={
             query.trim() ? (
-              <Text className="mt-8 text-center text-sm text-gray-500">
+              <Text className="mt-8 text-center text-sm text-ink-muted">
                 لا توجد نتائج مطابقة.
               </Text>
             ) : showArchived ? (
               <View className="mt-10 items-center">
-                <View className="h-14 w-14 items-center justify-center rounded-full bg-gray-200">
-                  <Archive size={26} color="#6b7280" />
+                <View className="h-14 w-14 items-center justify-center rounded-full bg-line/60">
+                  <Archive size={26} color={palette.muted} />
                 </View>
-                <Text className="mt-3 text-center text-sm font-semibold text-gray-800">
+                <Text className="mt-3 text-center text-sm font-semibold text-ink">
                   لا توجد جهات مؤرشفة
                 </Text>
-                <Text className="mt-1 text-center text-xs text-gray-500">
+                <Text className="mt-1 text-center text-xs text-ink-muted">
                   تظهر هنا الحسابات التي سوّيتها وأرشفتها.
                 </Text>
               </View>
             ) : (
               <View className="mt-10 items-center">
-                <View className="h-14 w-14 items-center justify-center rounded-full bg-green-100">
-                  <UserPlus size={26} color="#16a34a" />
+                <View className="h-14 w-14 items-center justify-center rounded-full bg-primary/15">
+                  <UserPlus size={26} color={palette.primary} />
                 </View>
-                <Text className="mt-3 text-center text-sm font-semibold text-gray-800">
+                <Text className="mt-3 text-center text-sm font-semibold text-ink">
                   ابدأ بإضافة أول جهة اتصال
                 </Text>
-                <Text className="mt-1 text-center text-xs text-gray-500">
+                <Text className="mt-1 text-center text-xs text-ink-muted">
                   بعدها يمكنك تسجيل النقوط والواجبات الخاصة بها.
                 </Text>
                 <Pressable
                   onPress={() => navigation.navigate('AddContact')}
                   accessibilityRole="button"
-                  className="mt-4 rounded-2xl bg-green-600 px-5 py-2.5">
+                  className="mt-4 rounded-2xl bg-primary px-5 py-2.5">
                   <Text className="text-sm font-bold text-white">
                     إضافة جهة اتصال
                   </Text>

@@ -9,12 +9,14 @@ import { EventCard } from '@/components/EventCard';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
 import type { Event } from '@/types';
+import { usePalette } from '@/store/ThemeProvider';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 type Tab = 'upcoming' | 'past';
 
 /** قائمة المناسبات مقسّمة إلى قادمة وسابقة، مع إجمالي النقوط لكل مناسبة. */
 export function EventsScreen() {
+  const palette = usePalette();
   const navigation = useNavigation<Navigation>();
   const { events, transactions, contacts, loading, refresh } = useLedger();
   const [tab, setTab] = useState<Tab>('upcoming');
@@ -52,17 +54,17 @@ export function EventsScreen() {
   }, [events, tab]);
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-base" edges={['top']}>
       <View className="px-4 pt-2">
         <View className="flex-row-reverse items-center justify-between">
-          <Text className="text-right text-2xl font-bold text-gray-900">
+          <Text className="text-right text-2xl font-bold text-ink">
             المناسبات
           </Text>
           <Pressable
             onPress={() => navigation.navigate('AddEvent')}
             accessibilityRole="button"
             accessibilityLabel="إضافة مناسبة"
-            className="h-10 w-10 items-center justify-center rounded-full bg-green-600">
+            className="h-10 w-10 items-center justify-center rounded-full bg-primary">
             <Plus size={20} color="#ffffff" />
           </Pressable>
         </View>
@@ -81,11 +83,11 @@ export function EventsScreen() {
                 onPress={() => setTab(item.key)}
                 accessibilityRole="button"
                 className={`ml-2 rounded-full px-4 py-1.5 ${
-                  isActive ? 'bg-green-600' : 'bg-white border border-gray-200'
+                  isActive ? 'bg-primary' : 'bg-surface border border-line'
                 }`}>
                 <Text
                   className={`text-xs font-semibold ${
-                    isActive ? 'text-white' : 'text-gray-600'
+                    isActive ? 'text-white' : 'text-ink-muted'
                   }`}>
                   {item.label}
                 </Text>
@@ -118,10 +120,10 @@ export function EventsScreen() {
         )}
         ListEmptyComponent={
           <View className="mt-10 items-center">
-            <View className="h-14 w-14 items-center justify-center rounded-full bg-green-100">
-              <CalendarPlus size={26} color="#16a34a" />
+            <View className="h-14 w-14 items-center justify-center rounded-full bg-primary/15">
+              <CalendarPlus size={26} color={palette.primary} />
             </View>
-            <Text className="mt-3 text-center text-sm font-semibold text-gray-800">
+            <Text className="mt-3 text-center text-sm font-semibold text-ink">
               {tab === 'upcoming'
                 ? 'لا توجد مناسبات قادمة.'
                 : 'لا توجد مناسبات سابقة.'}
@@ -129,7 +131,7 @@ export function EventsScreen() {
             <Pressable
               onPress={() => navigation.navigate('AddEvent')}
               accessibilityRole="button"
-              className="mt-4 rounded-2xl bg-green-600 px-5 py-2.5">
+              className="mt-4 rounded-2xl bg-primary px-5 py-2.5">
               <Text className="text-sm font-bold text-white">إضافة مناسبة</Text>
             </Pressable>
           </View>

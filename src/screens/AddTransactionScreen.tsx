@@ -4,29 +4,29 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   ArrowDownLeft,
   ArrowUpRight,
-  Check,
   Paperclip,
   Plus,
   Users,
   UserPlus,
 } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Text, View } from 'react-native';
 
+import { FadeSlideIn, PressableScale } from '@/components/motion';
+import {
+  Button,
+  Card,
+  Field,
+  RadioRow,
+  Screen,
+  SectionTitle,
+} from '@/components/ui';
 import { reportError } from '@/lib/alerts';
-import type { RootStackParamList } from '@/navigation/types';
 import { uploadReceipt } from '@/lib/repository';
 import { isSupabaseConfigured } from '@/lib/supabase';
+import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
+import { usePalette } from '@/store/ThemeProvider';
 import type { TransactionDirection } from '@/types';
 import { DEFAULT_CURRENCY, formatDate, getNetTheme } from '@/utils/ledger';
 
@@ -38,6 +38,7 @@ export function AddTransactionScreen() {
   const navigation = useNavigation<Navigation>();
   const { params } = useRoute<AddRoute>();
   const { contacts, events, addTransaction } = useLedger();
+  const palette = usePalette();
 
   const [direction, setDirection] = useState<TransactionDirection>('OUT');
   const [contactId, setContactId] = useState<string | null>(
@@ -85,9 +86,7 @@ export function AddTransactionScreen() {
   const isValid = contactId !== null && amountValid;
 
   /** معاينة أثر الحركة على الصافي: OUT يزيده، IN ينقصه. */
-  const previewTheme = getNetTheme(
-    direction === 'OUT' ? 1 : -1,
-  );
+  const previewTheme = getNetTheme(direction === 'OUT' ? 1 : -1);
 
   /**
    * مصروف المناسبة يُقسَّم على أعضائها، وهو مسار مختلف عن حركة شخصية
@@ -135,13 +134,18 @@ export function AddTransactionScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-gray-50"
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView className="flex-1" contentContainerClassName="p-4 pb-10">
-        <Text className="mb-2 text-right text-sm font-bold text-gray-900">
-          نوع الحركة
-        </Text>
+    <Screen
+      footer={
+        <Button
+          title="حفظ الحركة"
+          onPress={() => void handleSave()}
+          disabled={!isValid}
+          loading={saving}
+          size="lg"
+        />
+      }>
+      <FadeSlideIn index={0}>
+        <SectionTitle>نوع الحركة</SectionTitle>
         <View className="flex-row-reverse">
           <DirectionOption
             active={direction === 'OUT'}
@@ -150,10 +154,10 @@ export function AddTransactionScreen() {
             icon={
               <ArrowUpRight
                 size={18}
-                color={direction === 'OUT' ? '#ffffff' : '#16a34a'}
+                color={direction === 'OUT' ? '#FFFFFF' : palette.success}
               />
             }
-            activeClass="bg-green-600"
+            activeClass="bg-success border-success"
             onPress={() => setDirection('OUT')}
           />
           <View className="w-3" />
@@ -164,204 +168,174 @@ export function AddTransactionScreen() {
             icon={
               <ArrowDownLeft
                 size={18}
-                color={direction === 'IN' ? '#ffffff' : '#dc2626'}
+                color={direction === 'IN' ? '#FFFFFF' : palette.danger}
               />
             }
-            activeClass="bg-red-600"
+            activeClass="bg-danger border-danger"
             onPress={() => setDirection('IN')}
           />
         </View>
+      </FadeSlideIn>
 
-        <Text className="mb-2 mt-6 text-right text-sm font-bold text-gray-900">
-          المبلغ
-        </Text>
-        <TextInput
+      <FadeSlideIn index={1} className="mt-6">
+        <Field
+          label="المبلغ"
           value={amount}
           onChangeText={setAmount}
           keyboardType="decimal-pad"
           placeholder="0"
-          placeholderTextColor="#9ca3af"
-          className={`rounded-xl border bg-white px-4 py-3 text-right text-xl font-bold ${previewTheme.textClass} border-gray-200`}
+          emphasis
+          inputClassName={previewTheme.textClass}
+          hint={
+            direction === 'OUT'
+              ? 'يزيد ما لك عند هذا الشخص.'
+              : 'يزيد ما عليك لهذا الشخص.'
+          }
         />
+      </FadeSlideIn>
 
-        <View className="mb-2 mt-6 flex-row-reverse items-center justify-between">
-          <Text className="text-right text-sm font-bold text-gray-900">
-            جهة الاتصال
-          </Text>
-          <Pressable
-            onPress={() =>
-              navigation.navigate('AddContact', { returnTo: 'AddTransaction' })
-            }
-            accessibilityRole="button"
-            className="flex-row-reverse items-center rounded-full border border-green-200 bg-green-50 px-3 py-1">
-            <UserPlus size={14} color="#16a34a" />
-            <Text className="mr-1 text-xs font-semibold text-green-700">
-              جديدة
-            </Text>
-          </Pressable>
-        </View>
-        <View className="rounded-2xl border border-gray-100 bg-white p-2">
+      <FadeSlideIn index={2} className="mt-6">
+        <SectionTitle
+          action={
+            <PillAction
+              label="جديدة"
+              icon={<UserPlus size={14} color={palette.primary} />}
+              onPress={() =>
+                navigation.navigate('AddContact', { returnTo: 'AddTransaction' })
+              }
+            />
+          }>
+          جهة الاتصال
+        </SectionTitle>
+
+        <Card variant="surface" padded={false} animate={false} className="p-2">
           {sortedContacts.length === 0 ? (
             <View className="items-center p-4">
-              <Text className="text-center text-sm text-gray-600">
+              <Text className="text-center text-body text-ink">
                 لا توجد جهات اتصال بعد.
               </Text>
-              <Text className="mt-1 text-center text-xs text-gray-500">
+              <Text className="mt-1 text-center text-caption text-ink-muted">
                 أضف جهة اتصال أولاً لتتمكن من تسجيل حركة.
               </Text>
-              <Pressable
+              <Button
+                title="إضافة جهة اتصال"
+                size="sm"
+                block={false}
+                className="mt-3"
                 onPress={() =>
                   navigation.navigate('AddContact', {
                     returnTo: 'AddTransaction',
                   })
                 }
-                accessibilityRole="button"
-                className="mt-3 rounded-2xl bg-green-600 px-5 py-2">
-                <Text className="text-sm font-bold text-white">
-                  إضافة جهة اتصال
-                </Text>
-              </Pressable>
+              />
             </View>
           ) : (
             sortedContacts.map((contact) => (
-              <Pressable
+              <RadioRow
                 key={contact.id}
-                onPress={() => setContactId(contact.id)}
-                accessibilityRole="button"
-                className={`mb-1 flex-row-reverse items-center justify-between rounded-xl px-3 py-2 ${
-                  contactId === contact.id ? 'bg-green-50' : ''
-                }`}>
-                <Text className="text-right text-sm text-gray-800">
-                  {contact.full_name}
-                </Text>
-                {contactId === contact.id ? (
-                  <Check size={16} color="#16a34a" />
-                ) : null}
-              </Pressable>
+                label={contact.full_name}
+                selected={contactId === contact.id}
+                onSelect={() => setContactId(contact.id)}
+              />
             ))
           )}
-        </View>
+        </Card>
+      </FadeSlideIn>
 
-        <View className="mb-2 mt-6 flex-row-reverse items-center justify-between">
-          <Text className="text-right text-sm font-bold text-gray-900">
-            المناسبة (اختياري)
-          </Text>
-          <Pressable
-            onPress={() =>
-              navigation.navigate('AddEvent', {
-                returnTo: 'AddTransaction',
-                hostContactId: contactId ?? undefined,
-              })
-            }
-            accessibilityRole="button"
-            className="flex-row-reverse items-center rounded-full border border-green-200 bg-green-50 px-3 py-1">
-            <Plus size={14} color="#16a34a" />
-            <Text className="mr-1 text-xs font-semibold text-green-700">
-              جديدة
-            </Text>
-          </Pressable>
-        </View>
-        <View className="rounded-2xl border border-gray-100 bg-white p-2">
-          <Pressable
-            onPress={() => setEventId(null)}
-            accessibilityRole="button"
-            className={`mb-1 flex-row-reverse items-center justify-between rounded-xl px-3 py-2 ${
-              eventId === null ? 'bg-green-50' : ''
-            }`}>
-            <Text className="text-right text-sm text-gray-800">بدون مناسبة</Text>
-            {eventId === null ? <Check size={16} color="#16a34a" /> : null}
-          </Pressable>
+      <FadeSlideIn index={3} className="mt-6">
+        <SectionTitle
+          action={
+            <PillAction
+              label="جديدة"
+              icon={<Plus size={14} color={palette.primary} />}
+              onPress={() =>
+                navigation.navigate('AddEvent', {
+                  returnTo: 'AddTransaction',
+                  hostContactId: contactId ?? undefined,
+                })
+              }
+            />
+          }>
+          المناسبة (اختياري)
+        </SectionTitle>
 
+        <Card variant="surface" padded={false} animate={false} className="p-2">
+          <RadioRow
+            label="بدون مناسبة"
+            selected={eventId === null}
+            onSelect={() => setEventId(null)}
+          />
           {events.map((event) => (
-            <Pressable
+            <RadioRow
               key={event.id}
-              onPress={() => setEventId(event.id)}
-              accessibilityRole="button"
-              className={`mb-1 flex-row-reverse items-center justify-between rounded-xl px-3 py-2 ${
-                eventId === event.id ? 'bg-green-50' : ''
-              }`}>
-              <View className="flex-1">
-                <Text className="text-right text-sm text-gray-800">
-                  {event.title}
-                </Text>
-                <Text className="text-right text-[11px] text-gray-500">
-                  {formatDate(event.event_date)}
-                </Text>
-              </View>
-              {eventId === event.id ? <Check size={16} color="#16a34a" /> : null}
-            </Pressable>
+              label={event.title}
+              caption={formatDate(event.event_date)}
+              selected={eventId === event.id}
+              onSelect={() => setEventId(event.id)}
+            />
           ))}
-        </View>
+        </Card>
+      </FadeSlideIn>
 
-        <Text className="mb-2 mt-6 text-right text-sm font-bold text-gray-900">
-          ملاحظة (اختياري)
-        </Text>
-        <TextInput
+      <FadeSlideIn index={4} className="mt-6">
+        <Field
+          label="ملاحظة (اختياري)"
           value={note}
           onChangeText={setNote}
           placeholder="مثال: نقوط فرح أخيه"
-          placeholderTextColor="#9ca3af"
-          className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-right text-sm text-gray-900"
         />
+      </FadeSlideIn>
 
-        {eventId ? (
-          <View className="mt-4 rounded-2xl border border-green-200 bg-green-50 p-4">
+      {eventId ? (
+        <FadeSlideIn index={5} className="mt-4">
+          {/* مسار المصروف المشترك: بنفسجي، هوية المناسبات في التطبيق. */}
+          <Card variant="secondary" animate={false}>
             <View className="flex-row-reverse items-center">
-              <Users size={16} color="#16a34a" />
-              <Text className="mr-2 text-right text-sm font-bold text-green-800">
+              <Users size={16} color={palette.secondary} />
+              <Text className="mr-2 text-right text-body font-bold text-ink">
                 مصروف مشترك؟
               </Text>
             </View>
-            <Text className="mt-1 text-right text-xs text-green-800">
+            <Text className="mt-1 text-right text-caption text-ink-muted">
               اختر من يشارك في هذا المصروف تحديداً، ويُقسَّم المبلغ على
               المحدّدين وحدهم. المستبعدون لا يتحمّلون شيئاً منه.
             </Text>
-            <Pressable
+            <Button
+              title="متابعة كمصروف مشترك"
+              variant="secondary"
+              size="sm"
+              className="mt-3"
               onPress={continueAsSharedExpense}
-              accessibilityRole="button"
-              className="mt-3 items-center rounded-2xl bg-green-600 py-2.5">
-              <Text className="text-sm font-bold text-white">
-                متابعة كمصروف مشترك
-              </Text>
-            </Pressable>
-            <Text className="mt-2 text-center text-[11px] text-green-800">
+            />
+            <Text className="mt-2 text-center text-caption text-ink-muted">
               أو تابع بالأسفل لتسجيلها حركة شخصية عادية.
             </Text>
-          </View>
-        ) : null}
+          </Card>
+        </FadeSlideIn>
+      ) : null}
 
-        {receiptUri ? (
-          <View className="mt-6 flex-row-reverse items-center rounded-xl bg-green-50 p-3">
-            <Paperclip size={16} color="#16a34a" />
-            <Text className="mr-2 flex-1 text-right text-xs text-green-800">
-              {isSupabaseConfigured
-                ? 'إيصال مرفق — يُرفع عند الحفظ.'
-                : 'إيصال مرفق — يحتاج Supabase ليُرفع.'}
-            </Text>
-            <Pressable
-              onPress={() => setReceiptUri(null)}
-              accessibilityRole="button"
-              className="rounded-full bg-white px-3 py-1">
-              <Text className="text-xs font-bold text-gray-600">إزالة</Text>
-            </Pressable>
-          </View>
-        ) : null}
-
-        <Pressable
-          onPress={() => void handleSave()}
-          disabled={!isValid || saving}
-          accessibilityRole="button"
-          className={`mt-8 items-center rounded-2xl py-3 ${
-            isValid && !saving ? 'bg-green-600' : 'bg-gray-300'
-          }`}>
-          {saving ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <Text className="text-base font-bold text-white">حفظ الحركة</Text>
-          )}
-        </Pressable>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      {receiptUri ? (
+        <FadeSlideIn index={6} className="mt-6">
+          <Card variant="primary" animate={false} padded={false}>
+            <View className="flex-row-reverse items-center p-3">
+              <Paperclip size={16} color={palette.primary} />
+              <Text className="mr-2 flex-1 text-right text-caption text-ink">
+                {isSupabaseConfigured
+                  ? 'إيصال مرفق — يُرفع عند الحفظ.'
+                  : 'إيصال مرفق — يحتاج Supabase ليُرفع.'}
+              </Text>
+              <Button
+                title="إزالة"
+                variant="ghost"
+                size="sm"
+                block={false}
+                onPress={() => setReceiptUri(null)}
+              />
+            </View>
+          </Card>
+        </FadeSlideIn>
+      ) : null}
+    </Screen>
   );
 }
 
@@ -374,6 +348,7 @@ interface DirectionOptionProps {
   onPress: () => void;
 }
 
+/** خيار الاتجاه: بطاقة كبيرة تلوّن بدلالة الحركة عند اختيارها. */
 function DirectionOption({
   active,
   label,
@@ -383,23 +358,49 @@ function DirectionOption({
   onPress,
 }: DirectionOptionProps) {
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
-      accessibilityRole="button"
-      className={`flex-1 items-center rounded-2xl border p-3 ${
-        active ? `${activeClass} border-transparent` : 'border-gray-200 bg-white'
+      accessibilityRole="radio"
+      accessibilityState={{ selected: active }}
+      accessibilityLabel={`${label} — ${hint}`}
+      activeScale={0.965}
+      className={`flex-1 items-center rounded-card border p-3 ${
+        active ? activeClass : 'border-line bg-surface'
       }`}>
       {icon}
       <Text
-        className={`mt-1 text-sm font-bold ${
-          active ? 'text-white' : 'text-gray-800'
+        className={`mt-1 text-body font-bold ${
+          active ? 'text-white' : 'text-ink'
         }`}>
         {label}
       </Text>
       <Text
-        className={`text-[11px] ${active ? 'text-white/80' : 'text-gray-500'}`}>
+        className={`text-caption ${active ? 'text-white/85' : 'text-ink-muted'}`}>
         {hint}
       </Text>
-    </Pressable>
+    </PressableScale>
+  );
+}
+
+/** زرّ صغير بجوار عنوان القسم: "جديدة". */
+function PillAction({
+  label,
+  icon,
+  onPress,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  onPress: () => void;
+}) {
+  return (
+    <PressableScale
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      activeScale={0.94}
+      className="flex-row-reverse items-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1">
+      {icon}
+      <Text className="mr-1 text-caption font-bold text-primary">{label}</Text>
+    </PressableScale>
   );
 }

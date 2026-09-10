@@ -19,12 +19,14 @@ import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
 import type { NewEventMember } from '@/types';
 import { ME_LABEL } from '@/utils/split';
+import { usePalette } from '@/store/ThemeProvider';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 type ParticipantsRoute = RouteProp<RootStackParamList, 'EventParticipants'>;
 
 /** اختيار من يشارك في المناسبة (بمن فيهم المستخدم نفسه). */
 export function EventParticipantsScreen() {
+  const palette = usePalette();
   const navigation = useNavigation<Navigation>();
   const { params } = useRoute<ParticipantsRoute>();
   const { contacts } = useLedger();
@@ -130,42 +132,42 @@ export function EventParticipantsScreen() {
 
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-50">
-        <ActivityIndicator color="#16a34a" />
+      <View className="flex-1 items-center justify-center bg-base">
+        <ActivityIndicator color={palette.primary} />
       </View>
     );
   }
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-base">
       <ScrollView className="flex-1" contentContainerClassName="p-4 pb-28">
-        <Text className="mb-2 text-right text-sm font-bold text-gray-900">
+        <Text className="mb-2 text-right text-sm font-bold text-ink">
           من يشارك في هذه المناسبة؟
         </Text>
 
         {loadError ? (
-          <View className="mb-3 rounded-2xl border border-red-200 bg-red-50 p-3">
-            <Text className="text-right text-xs text-red-700">
+          <View className="mb-3 rounded-2xl border border-danger/25 bg-danger-soft p-3">
+            <Text className="text-right text-xs text-danger">
               تعذّر تحميل المشاركين الحاليين: {loadError}
             </Text>
           </View>
         ) : null}
 
-        <View className="rounded-2xl border border-gray-100 bg-white p-2">
+        <View className="rounded-2xl border border-line bg-surface p-2">
           <Pressable
             onPress={() => setIncludeMe((current) => !current)}
             accessibilityRole="button"
             className={`mb-1 flex-row-reverse items-center justify-between rounded-xl px-3 py-2 ${
-              includeMe ? 'bg-green-50' : ''
+              includeMe ? 'bg-primary/10' : ''
             }`}>
-            <Text className="text-right text-sm font-semibold text-gray-900">
+            <Text className="text-right text-sm font-semibold text-ink">
               {ME_LABEL}
             </Text>
-            {includeMe ? <Check size={16} color="#16a34a" /> : null}
+            {includeMe ? <Check size={16} color={palette.primary} /> : null}
           </Pressable>
 
           {sortedContacts.length === 0 ? (
-            <Text className="p-3 text-right text-xs text-gray-500">
+            <Text className="p-3 text-right text-xs text-ink-muted">
               لا توجد جهات اتصال نشطة.
             </Text>
           ) : (
@@ -175,23 +177,23 @@ export function EventParticipantsScreen() {
                 onPress={() => toggle(contact.id)}
                 accessibilityRole="button"
                 className={`mb-1 flex-row-reverse items-center justify-between rounded-xl px-3 py-2 ${
-                  selected.has(contact.id) ? 'bg-green-50' : ''
+                  selected.has(contact.id) ? 'bg-primary/10' : ''
                 }`}>
-                <Text className="text-right text-sm text-gray-800">
+                <Text className="text-right text-sm text-ink">
                   {contact.full_name}
                 </Text>
                 {selected.has(contact.id) ? (
-                  <Check size={16} color="#16a34a" />
+                  <Check size={16} color={palette.primary} />
                 ) : null}
               </Pressable>
             ))
           )}
         </View>
 
-        <Text className="mb-2 mt-6 text-right text-sm font-bold text-gray-900">
+        <Text className="mb-2 mt-6 text-right text-sm font-bold text-ink">
           أعضاء من خارج جهات الاتصال
         </Text>
-        <Text className="mb-2 text-right text-[11px] text-gray-500">
+        <Text className="mb-2 text-right text-[11px] text-ink-muted">
           لرحلة أو مناسبة عابرة: أضف اسماً دون إنشاء جهة اتصال. أرصدة هؤلاء
           تبقى داخل هذه المناسبة ولا تدخل دفتر النقوط.
         </Text>
@@ -203,8 +205,8 @@ export function EventParticipantsScreen() {
             onSubmitEditing={addGuest}
             returnKeyType="done"
             placeholder="اسم العضو"
-            placeholderTextColor="#9ca3af"
-            className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 text-right text-sm text-gray-900"
+            placeholderTextColor={palette.muted}
+            className="flex-1 rounded-xl border border-line bg-surface px-4 py-3 text-right text-sm text-ink"
           />
           <Pressable
             onPress={addGuest}
@@ -212,19 +214,19 @@ export function EventParticipantsScreen() {
             accessibilityRole="button"
             accessibilityLabel="إضافة عضو"
             className={`mr-2 h-12 w-12 items-center justify-center rounded-xl ${
-              guestDraft.trim().length === 0 ? 'bg-gray-300' : 'bg-green-600'
+              guestDraft.trim().length === 0 ? 'bg-line-strong' : 'bg-primary'
             }`}>
             <UserPlus size={20} color="#ffffff" />
           </Pressable>
         </View>
 
         {guests.length > 0 ? (
-          <View className="mt-2 rounded-2xl border border-gray-100 bg-white p-2">
+          <View className="mt-2 rounded-2xl border border-line bg-surface p-2">
             {guests.map((name) => (
               <View
                 key={name}
                 className="mb-1 flex-row-reverse items-center justify-between rounded-xl px-3 py-2">
-                <Text className="text-right text-sm text-gray-800">{name}</Text>
+                <Text className="text-right text-sm text-ink">{name}</Text>
                 <Pressable
                   onPress={() =>
                     setGuests((current) => current.filter((g) => g !== name))
@@ -232,25 +234,25 @@ export function EventParticipantsScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={`إزالة ${name}`}
                   hitSlop={8}>
-                  <X size={16} color="#9ca3af" />
+                  <X size={16} color={palette.muted} />
                 </Pressable>
               </View>
             ))}
           </View>
         ) : null}
 
-        <Text className="mt-4 text-right text-[11px] text-gray-500">
+        <Text className="mt-4 text-right text-[11px] text-ink-muted">
           المجموع: {selected.size + guests.length + (includeMe ? 1 : 0)} مشارك.
         </Text>
       </ScrollView>
 
-      <View className="absolute inset-x-0 bottom-0 border-t border-gray-200 bg-white p-4 pb-6">
+      <View className="absolute inset-x-0 bottom-0 border-t border-line bg-surface p-4 pb-6">
         <Pressable
           onPress={() => void handleSave()}
           disabled={saving}
           accessibilityRole="button"
           className={`items-center rounded-2xl py-3 ${
-            saving ? 'bg-gray-300' : 'bg-green-600'
+            saving ? 'bg-line-strong' : 'bg-primary'
           }`}>
           {saving ? (
             <ActivityIndicator color="#ffffff" />

@@ -5,41 +5,46 @@ import {
   useRoute,
 } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Check, CloudOff, UserPlus } from 'lucide-react-native';
+import { CloudOff, TriangleAlert, UserPlus } from 'lucide-react-native';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Text, TextInput, View } from 'react-native';
 
+import { BalanceBar, FadeSlideIn } from '@/components/motion';
+import {
+  Button,
+  Card,
+  CheckRow,
+  Field,
+  RadioRow,
+  Screen,
+  SectionTitle,
+  SegmentedControl,
+} from '@/components/ui';
 import { reportError } from '@/lib/alerts';
 import type { EventLedger } from '@/lib/repository';
 import { createSharedExpense, fetchEventLedger } from '@/lib/repository';
 import { describeSupabaseError, logStepFailure } from '@/lib/supabaseError';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
+import { usePalette } from '@/store/ThemeProvider';
 import type { EventParticipant, SplitMode } from '@/types';
 import { DEFAULT_CURRENCY, formatAmount } from '@/utils/ledger';
-import {
-  participantName,
-  sharesMatchAmount,
-  splitEqually,
-} from '@/utils/split';
+import { participantName, sharesMatchAmount, splitEqually } from '@/utils/split';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 type ExpenseRoute = RouteProp<RootStackParamList, 'AddSharedExpense'>;
+
+const SPLIT_MODES = [
+  { value: 'equal' as const, label: 'بالتساوي' },
+  { value: 'custom' as const, label: 'حصص مخصّصة' },
+];
 
 /** تسجيل مصروف جماعي وتقسيمه بالتساوي أو بحصص مخصّصة. */
 export function AddSharedExpenseScreen() {
   const navigation = useNavigation<Navigation>();
   const { params } = useRoute<ExpenseRoute>();
   const { contacts } = useLedger();
+  const palette = usePalette();
 
   const [participants, setParticipants] = useState<EventParticipant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,13 +158,23 @@ export function AddSharedExpenseScreen() {
     }));
   }, [amountValid, includedList, mode, parsedAmount, customShares]);
 
+  /** الحصة لكل مشارك، لعرضها بجانب اسمه بلا إعادة حساب في كل صف. */
+  const shareByParticipant = useMemo(
+    () =>
+      new Map(shares.map((share) => [share.participant_id, share.share_amount])),
+    [shares],
+  );
+
   const sharesTotal = shares.reduce(
-    (sum, share) => sum + (Number.isFinite(share.share_amount) ? share.share_amount : 0),
+    (sum, share) =>
+      sum + (Number.isFinite(share.share_amount) ? share.share_amount : 0),
     0,
   );
   const sharesValid =
     shares.length > 0 &&
-    shares.every((share) => Number.isFinite(share.share_amount) && share.share_amount >= 0) &&
+    shares.every(
+      (share) => Number.isFinite(share.share_amount) && share.share_amount >= 0,
+    ) &&
     sharesMatchAmount(shares, parsedAmount);
 
   const isValid =
@@ -207,213 +222,188 @@ export function AddSharedExpenseScreen() {
 
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-50">
-        <ActivityIndicator color="#16a34a" />
+      <View className="flex-1 items-center justify-center bg-base">
+        <ActivityIndicator color={palette.primary} />
       </View>
     );
   }
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-gray-50"
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView className="flex-1" contentContainerClassName="p-4 pb-10">
-        <Text className="mb-2 text-right text-sm font-bold text-gray-900">
-          الوصف
-        </Text>
-        <TextInput
+    <Screen
+      footer={
+        <Button
+          title="حفظ المصروف"
+          onPress={() => void handleSave()}
+          disabled={!isValid}
+          loading={saving}
+          size="lg"
+        />
+      }>
+      <FadeSlideIn index={0}>
+        <Field
+          label="الوصف"
           value={description}
           onChangeText={setDescription}
           placeholder="مثال: عشاء المطعم"
-          placeholderTextColor="#9ca3af"
-          className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-right text-base text-gray-900"
         />
+      </FadeSlideIn>
 
-        <Text className="mb-2 mt-6 text-right text-sm font-bold text-gray-900">
-          المبلغ الإجمالي
-        </Text>
-        <TextInput
+      <FadeSlideIn index={1} className="mt-6">
+        <Field
+          label="المبلغ الإجمالي"
           value={amount}
           onChangeText={setAmount}
           keyboardType="decimal-pad"
           placeholder="0"
-          placeholderTextColor="#9ca3af"
-          className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-right text-xl font-bold text-gray-900"
+          emphasis
         />
+      </FadeSlideIn>
 
-        {loadError ? (
-          <View className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-3">
-            <Text className="text-right text-xs text-red-700">
+      {loadError ? (
+        <Card variant="danger" className="mt-6" padded={false} animate={false}>
+          <View className="flex-row-reverse items-center p-3">
+            <TriangleAlert size={16} color={palette.danger} />
+            <Text className="mr-2 flex-1 text-right text-caption text-danger">
               تعذّر تحميل المشاركين: {loadError}
             </Text>
           </View>
-        ) : null}
+        </Card>
+      ) : null}
 
-        {offline ? (
-          <View className="mt-6 flex-row-reverse items-center rounded-2xl border border-amber-200 bg-amber-50 p-3">
-            <CloudOff size={14} color="#b45309" />
-            <Text className="mr-2 flex-1 text-right text-[11px] text-amber-800">
+      {offline ? (
+        <Card
+          variant="outline"
+          className="mt-6 border-warning/40"
+          padded={false}
+          animate={false}>
+          <View className="flex-row-reverse items-center p-3">
+            <CloudOff size={16} color={palette.warning} />
+            <Text className="mr-2 flex-1 text-right text-caption text-ink-muted">
               نسخة محلية: تعذّر الوصول للخادم، والاختيار يجري على آخر قائمة
               مشاركين محفوظة على الجهاز.
             </Text>
           </View>
-        ) : null}
+        </Card>
+      ) : null}
 
-        {hasParticipants ? (
-          <>
-            <Text className="mb-2 mt-6 text-right text-sm font-bold text-gray-900">
-              من دفع؟
-            </Text>
-            <View className="rounded-2xl border border-gray-100 bg-white p-2">
+      {hasParticipants ? (
+        <>
+          <FadeSlideIn index={2} className="mt-6">
+            <SectionTitle>من دفع؟</SectionTitle>
+            <Card
+              variant="surface"
+              padded={false}
+              animate={false}
+              className="p-2">
               {participants.map((row) => (
-                <Pressable
+                <RadioRow
                   key={row.id}
-                  onPress={() => setPayerId(row.id)}
-                  accessibilityRole="button"
-                  className={`mb-1 flex-row-reverse items-center justify-between rounded-xl px-3 py-2 ${
-                    payerId === row.id ? 'bg-green-50' : ''
-                  }`}>
-                  <Text className="text-right text-sm text-gray-800">
-                    {nameOf(row)}
-                  </Text>
-                  {payerId === row.id ? <Check size={16} color="#16a34a" /> : null}
-                </Pressable>
+                  label={nameOf(row)}
+                  selected={payerId === row.id}
+                  onSelect={() => setPayerId(row.id)}
+                />
               ))}
-            </View>
+            </Card>
+          </FadeSlideIn>
 
-            <Text className="mb-2 mt-6 text-right text-sm font-bold text-gray-900">
-              طريقة القسمة
-            </Text>
-            <View className="flex-row-reverse">
-              {(
-                [
-                  { key: 'equal', label: 'بالتساوي' },
-                  { key: 'custom', label: 'حصص مخصّصة' },
-                ] as const
-              ).map((option) => (
-                <Pressable
-                  key={option.key}
-                  onPress={() => {
-                    setMode(option.key);
-                    if (option.key === 'custom') seedCustomFromEqual();
-                  }}
-                  accessibilityRole="button"
-                  className={`ml-2 rounded-full px-4 py-1.5 ${
-                    mode === option.key
-                      ? 'bg-green-600'
-                      : 'border border-gray-200 bg-white'
-                  }`}>
-                  <Text
-                    className={`text-xs font-semibold ${
-                      mode === option.key ? 'text-white' : 'text-gray-600'
-                    }`}>
-                    {option.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+          <FadeSlideIn index={3} className="mt-6">
+            <SectionTitle>طريقة القسمة</SectionTitle>
+            <SegmentedControl
+              options={SPLIT_MODES}
+              value={mode}
+              onChange={(next) => {
+                setMode(next);
+                if (next === 'custom') seedCustomFromEqual();
+              }}
+            />
+          </FadeSlideIn>
 
-            <Text className="mb-2 mt-4 text-right text-sm font-bold text-gray-900">
-              على من تُقسم؟
-            </Text>
-            <View className="rounded-2xl border border-gray-100 bg-white p-2">
+          <FadeSlideIn index={4} className="mt-6">
+            <SectionTitle>على من تُقسم؟</SectionTitle>
+            <Card
+              variant="surface"
+              padded={false}
+              animate={false}
+              className="p-2">
               {participants.map((row) => {
-                const key = row.id;
-                const included = includedKeys.has(key);
-                const equalShare =
-                  mode === 'equal' && amountValid && includedList.length > 0
-                    ? splitEqually(parsedAmount, includedList.length)[
-                        includedList.findIndex((member) => member.id === key)
-                      ]
-                    : null;
+                const included = includedKeys.has(row.id);
+                const share = shareByParticipant.get(row.id);
 
                 return (
-                  <View
-                    key={key}
-                    className={`mb-1 flex-row-reverse items-center rounded-xl px-3 py-2 ${
-                      included ? 'bg-green-50' : ''
-                    }`}>
-                    <Pressable
-                      onPress={() => toggleIncluded(key)}
-                      accessibilityRole="button"
-                      className="flex-1 flex-row-reverse items-center">
-                      {included ? <Check size={16} color="#16a34a" /> : null}
-                      <Text className="mr-2 text-right text-sm text-gray-800">
-                        {nameOf(row)}
-                      </Text>
-                    </Pressable>
-
-                    {included && mode === 'custom' ? (
-                      <TextInput
-                        value={customShares[key] ?? ''}
-                        onChangeText={(value) =>
-                          setCustomShares((current) => ({ ...current, [key]: value }))
-                        }
-                        keyboardType="decimal-pad"
-                        placeholder="0"
-                        placeholderTextColor="#9ca3af"
-                        className="w-24 rounded-lg border border-gray-200 bg-white px-2 py-1 text-right text-sm text-gray-900"
-                      />
-                    ) : included && equalShare !== null ? (
-                      <Text className="text-sm font-semibold text-gray-700">
-                        {formatAmount(equalShare, DEFAULT_CURRENCY)}
-                      </Text>
-                    ) : null}
-                  </View>
+                  <CheckRow
+                    key={row.id}
+                    label={nameOf(row)}
+                    checked={included}
+                    onToggle={() => toggleIncluded(row.id)}
+                    trailing={
+                      included && mode === 'custom' ? (
+                        <TextInput
+                          value={customShares[row.id] ?? ''}
+                          onChangeText={(value) =>
+                            setCustomShares((current) => ({
+                              ...current,
+                              [row.id]: value,
+                            }))
+                          }
+                          keyboardType="decimal-pad"
+                          placeholder="0"
+                          placeholderTextColor={palette.muted}
+                          className="w-24 rounded-xl border border-line bg-surface px-2 py-1.5 text-right text-body text-ink"
+                        />
+                      ) : included && share !== undefined ? (
+                        <Text className="text-body font-bold text-ink">
+                          {formatAmount(share, DEFAULT_CURRENCY)}
+                        </Text>
+                      ) : null
+                    }
+                  />
                 );
               })}
-            </View>
-          </>
-        ) : (
-          <View className="mt-6 rounded-2xl border border-gray-100 bg-white p-4">
-            <Text className="text-right text-sm font-bold text-gray-900">
+            </Card>
+
+            {/* شريط المطابقة: يُظهر بُعد مجموع الحصص عن المبلغ بلا حساب ذهني. */}
+            {amountValid && shares.length > 0 ? (
+              <View className="mt-3">
+                <BalanceBar
+                  ratio={parsedAmount === 0 ? 0 : sharesTotal / parsedAmount}
+                  color={sharesValid ? palette.success : palette.danger}
+                  trackColor={palette.border}
+                />
+                <Text
+                  className={`mt-1.5 text-right text-caption ${
+                    sharesValid ? 'text-ink-muted' : 'text-danger'
+                  }`}>
+                  مجموع الحصص {formatAmount(sharesTotal, DEFAULT_CURRENCY)} من{' '}
+                  {formatAmount(parsedAmount, DEFAULT_CURRENCY)}
+                  {sharesValid ? '' : ' — يجب أن يتطابقا.'}
+                </Text>
+              </View>
+            ) : null}
+          </FadeSlideIn>
+        </>
+      ) : (
+        <FadeSlideIn index={2} className="mt-6">
+          <Card variant="surface" animate={false}>
+            <Text className="text-right text-body font-bold text-ink">
               لا يوجد مشاركون في هذه المناسبة بعد
             </Text>
-            <Text className="mt-1 text-right text-xs text-gray-500">
+            <Text className="mt-1 text-right text-caption text-ink-muted">
               المصروف الجماعي يُقسَّم على أعضاء المناسبة، فأضِف الأعضاء أولاً —
               من جهات الاتصال أو بأسماء حرة لمن ليس في الدفتر.
             </Text>
-            <Pressable
+            <Button
+              title="إضافة مشاركين"
+              className="mt-3"
+              icon={<UserPlus size={16} color="#FFFFFF" />}
               onPress={() =>
                 navigation.navigate('EventParticipants', {
                   eventId: params.eventId,
                 })
               }
-              accessibilityRole="button"
-              className="mt-3 flex-row-reverse items-center justify-center rounded-2xl bg-green-600 py-2.5">
-              <UserPlus size={16} color="#ffffff" />
-              <Text className="mr-2 text-sm font-bold text-white">
-                إضافة مشاركين
-              </Text>
-            </Pressable>
-          </View>
-        )}
-
-        {amountValid && shares.length > 0 ? (
-          <Text
-            className={`mt-2 text-right text-xs ${
-              sharesValid ? 'text-gray-500' : 'text-red-600'
-            }`}>
-            مجموع الحصص {formatAmount(sharesTotal, DEFAULT_CURRENCY)} من{' '}
-            {formatAmount(parsedAmount, DEFAULT_CURRENCY)}
-            {sharesValid ? '' : ' — يجب أن يتطابقا.'}
-          </Text>
-        ) : null}
-
-        <Pressable
-          onPress={() => void handleSave()}
-          disabled={!isValid || saving}
-          accessibilityRole="button"
-          className={`mt-8 items-center rounded-2xl py-3 ${
-            isValid && !saving ? 'bg-green-600' : 'bg-gray-300'
-          }`}>
-          {saving ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <Text className="text-base font-bold text-white">حفظ المصروف</Text>
-          )}
-        </Pressable>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            />
+          </Card>
+        </FadeSlideIn>
+      )}
+    </Screen>
   );
 }

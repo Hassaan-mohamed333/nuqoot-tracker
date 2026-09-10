@@ -20,6 +20,7 @@ import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
 import type { EventType } from '@/types';
 import { formatDate } from '@/utils/ledger';
+import { usePalette } from '@/store/ThemeProvider';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 type AddEventRoute = RouteProp<RootStackParamList, 'AddEvent'>;
@@ -35,6 +36,7 @@ const EVENT_TYPES: { key: EventType; label: string }[] = [
 
 /** شاشة إضافة مناسبة جديدة. */
 export function AddEventScreen() {
+  const palette = usePalette();
   const navigation = useNavigation<Navigation>();
   const { params } = useRoute<AddEventRoute>();
   const { contacts, addEvent } = useLedger();
@@ -85,21 +87,21 @@ export function AddEventScreen() {
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-gray-50"
+      className="flex-1 bg-base"
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView className="flex-1" contentContainerClassName="p-4 pb-10">
-        <Text className="mb-2 text-right text-sm font-bold text-gray-900">
+        <Text className="mb-2 text-right text-sm font-bold text-ink">
           عنوان المناسبة
         </Text>
         <TextInput
           value={title}
           onChangeText={setTitle}
           placeholder="مثال: فرح أحمد"
-          placeholderTextColor="#9ca3af"
-          className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-right text-base text-gray-900"
+          placeholderTextColor={palette.muted}
+          className="rounded-xl border border-line bg-surface px-4 py-3 text-right text-base text-ink"
         />
 
-        <Text className="mb-2 mt-6 text-right text-sm font-bold text-gray-900">
+        <Text className="mb-2 mt-6 text-right text-sm font-bold text-ink">
           النوع
         </Text>
         <View className="flex-row-reverse flex-wrap">
@@ -111,11 +113,11 @@ export function AddEventScreen() {
                 onPress={() => setEventType(item.key)}
                 accessibilityRole="button"
                 className={`mb-2 ml-2 rounded-full px-4 py-1.5 ${
-                  isActive ? 'bg-green-600' : 'border border-gray-200 bg-white'
+                  isActive ? 'bg-primary' : 'border border-line bg-surface'
                 }`}>
                 <Text
                   className={`text-xs font-semibold ${
-                    isActive ? 'text-white' : 'text-gray-600'
+                    isActive ? 'text-white' : 'text-ink-muted'
                   }`}>
                   {item.label}
                 </Text>
@@ -124,17 +126,17 @@ export function AddEventScreen() {
           })}
         </View>
 
-        <Text className="mb-2 mt-4 text-right text-sm font-bold text-gray-900">
+        <Text className="mb-2 mt-4 text-right text-sm font-bold text-ink">
           التاريخ
         </Text>
         <Pressable
           onPress={() => setShowPicker(true)}
           accessibilityRole="button"
-          className="flex-row-reverse items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3">
-          <Text className="text-right text-base text-gray-900">
+          className="flex-row-reverse items-center justify-between rounded-xl border border-line bg-surface px-4 py-3">
+          <Text className="text-right text-base text-ink">
             {formatDate(eventDate.toISOString())}
           </Text>
-          <CalendarDays size={18} color="#6b7280" />
+          <CalendarDays size={18} color={palette.muted} />
         </Pressable>
 
         {showPicker ? (
@@ -150,22 +152,22 @@ export function AddEventScreen() {
           />
         ) : null}
 
-        <Text className="mb-2 mt-6 text-right text-sm font-bold text-gray-900">
+        <Text className="mb-2 mt-6 text-right text-sm font-bold text-ink">
           صاحب المناسبة (اختياري)
         </Text>
-        <View className="rounded-2xl border border-gray-100 bg-white p-2">
+        <View className="rounded-2xl border border-line bg-surface p-2">
           <Pressable
             onPress={() => setHostContactId(null)}
             accessibilityRole="button"
             className={`mb-1 flex-row-reverse items-center justify-between rounded-xl px-3 py-2 ${
-              hostContactId === null ? 'bg-green-50' : ''
+              hostContactId === null ? 'bg-primary/10' : ''
             }`}>
-            <Text className="text-right text-sm text-gray-800">بدون تحديد</Text>
-            {hostContactId === null ? <Check size={16} color="#16a34a" /> : null}
+            <Text className="text-right text-sm text-ink">بدون تحديد</Text>
+            {hostContactId === null ? <Check size={16} color={palette.primary} /> : null}
           </Pressable>
 
           {sortedContacts.length === 0 ? (
-            <Text className="px-3 py-2 text-right text-xs text-gray-500">
+            <Text className="px-3 py-2 text-right text-xs text-ink-muted">
               لا توجد جهات اتصال بعد.
             </Text>
           ) : (
@@ -175,39 +177,39 @@ export function AddEventScreen() {
                 onPress={() => setHostContactId(contact.id)}
                 accessibilityRole="button"
                 className={`mb-1 flex-row-reverse items-center justify-between rounded-xl px-3 py-2 ${
-                  hostContactId === contact.id ? 'bg-green-50' : ''
+                  hostContactId === contact.id ? 'bg-primary/10' : ''
                 }`}>
-                <Text className="text-right text-sm text-gray-800">
+                <Text className="text-right text-sm text-ink">
                   {contact.full_name}
                 </Text>
                 {hostContactId === contact.id ? (
-                  <Check size={16} color="#16a34a" />
+                  <Check size={16} color={palette.primary} />
                 ) : null}
               </Pressable>
             ))
           )}
         </View>
 
-        <Text className="mb-2 mt-6 text-right text-sm font-bold text-gray-900">
+        <Text className="mb-2 mt-6 text-right text-sm font-bold text-ink">
           المكان (اختياري)
         </Text>
         <TextInput
           value={location}
           onChangeText={setLocation}
           placeholder="مثال: قاعة النيل"
-          placeholderTextColor="#9ca3af"
-          className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-right text-sm text-gray-900"
+          placeholderTextColor={palette.muted}
+          className="rounded-xl border border-line bg-surface px-4 py-3 text-right text-sm text-ink"
         />
 
-        <Text className="mb-2 mt-6 text-right text-sm font-bold text-gray-900">
+        <Text className="mb-2 mt-6 text-right text-sm font-bold text-ink">
           ملاحظات (اختياري)
         </Text>
         <TextInput
           value={notes}
           onChangeText={setNotes}
           placeholder="أي تفاصيل تخص المناسبة"
-          placeholderTextColor="#9ca3af"
-          className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-right text-sm text-gray-900"
+          placeholderTextColor={palette.muted}
+          className="rounded-xl border border-line bg-surface px-4 py-3 text-right text-sm text-ink"
         />
 
         <Pressable
@@ -215,7 +217,7 @@ export function AddEventScreen() {
           disabled={!isValid || saving}
           accessibilityRole="button"
           className={`mt-8 items-center rounded-2xl py-3 ${
-            isValid && !saving ? 'bg-green-600' : 'bg-gray-300'
+            isValid && !saving ? 'bg-primary' : 'bg-line-strong'
           }`}>
           {saving ? (
             <ActivityIndicator color="#ffffff" />

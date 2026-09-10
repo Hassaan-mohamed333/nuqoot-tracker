@@ -26,6 +26,7 @@ import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
 import { formatAmount } from '@/utils/ledger';
 import { isUsableParse, type ParsedTransaction } from '@/utils/parseTransactionText';
+import { usePalette } from '@/store/ThemeProvider';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 
@@ -39,6 +40,7 @@ const EXAMPLES = [
  * تُراجَع في نموذج الإضافة قبل الحفظ. لا يُحفظ شيء من هنا مباشرة.
  */
 export function SmartInputScreen() {
+  const palette = usePalette();
   const navigation = useNavigation<Navigation>();
   const { contacts } = useLedger();
 
@@ -149,16 +151,16 @@ export function SmartInputScreen() {
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-gray-50"
+      className="flex-1 bg-base"
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView className="flex-1" contentContainerClassName="p-4 pb-10">
         <View className="flex-row-reverse items-center">
-          <Sparkles size={18} color="#16a34a" />
-          <Text className="mr-2 text-right text-base font-bold text-gray-900">
+          <Sparkles size={18} color={palette.primary} />
+          <Text className="mr-2 text-right text-base font-bold text-ink">
             اكتب أو تكلّم
           </Text>
         </View>
-        <Text className="mt-1 text-right text-xs text-gray-500">
+        <Text className="mt-1 text-right text-xs text-ink-muted">
           مثال: {EXAMPLES[0]}
         </Text>
 
@@ -167,8 +169,8 @@ export function SmartInputScreen() {
           onChangeText={setText}
           multiline
           placeholder="اكتب ما حدث بلغتك…"
-          placeholderTextColor="#9ca3af"
-          className="mt-3 min-h-24 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-right text-base text-gray-900"
+          placeholderTextColor={palette.muted}
+          className="mt-3 min-h-24 rounded-2xl border border-line bg-surface px-4 py-3 text-right text-base text-ink"
         />
 
         <View className="mt-3 flex-row-reverse">
@@ -178,8 +180,8 @@ export function SmartInputScreen() {
             accessibilityRole="button"
             className={`flex-1 flex-row-reverse items-center justify-center rounded-2xl py-3 ${
               busy || recording || text.trim().length === 0
-                ? 'bg-gray-300'
-                : 'bg-green-600'
+                ? 'bg-line-strong'
+                : 'bg-primary'
             }`}>
             {busy ? (
               <ActivityIndicator color="#ffffff" />
@@ -199,34 +201,34 @@ export function SmartInputScreen() {
             accessibilityRole="button"
             accessibilityLabel={recording ? 'إيقاف التسجيل' : 'تسجيل صوتي'}
             className={`mr-2 h-12 w-12 items-center justify-center rounded-2xl ${
-              recording ? 'bg-red-600' : 'border border-gray-200 bg-white'
+              recording ? 'bg-danger' : 'border border-line bg-surface'
             }`}>
             {recording ? (
               <Square size={18} color="#ffffff" />
             ) : (
-              <Mic size={20} color="#16a34a" />
+              <Mic size={20} color={palette.primary} />
             )}
           </Pressable>
         </View>
 
         {recording ? (
-          <Text className="mt-2 text-center text-xs text-red-600">
+          <Text className="mt-2 text-center text-xs text-danger">
             جارٍ التسجيل… اضغط المربع للإيقاف والتحليل.
           </Text>
         ) : null}
 
         {notice ? (
-          <View className="mt-4 flex-row-reverse items-center rounded-xl bg-amber-50 p-3">
-            <TriangleAlert size={16} color="#b45309" />
-            <Text className="mr-2 flex-1 text-right text-xs text-amber-800">
+          <View className="mt-4 flex-row-reverse items-center rounded-xl bg-warning-soft p-3">
+            <TriangleAlert size={16} color={palette.warning} />
+            <Text className="mr-2 flex-1 text-right text-xs text-ink-muted">
               {notice}
             </Text>
           </View>
         ) : null}
 
         {result ? (
-          <View className="mt-4 rounded-2xl border border-gray-100 bg-white p-4">
-            <Text className="text-right text-sm font-bold text-gray-900">
+          <View className="mt-4 rounded-2xl border border-line bg-surface p-4">
+            <Text className="text-right text-sm font-bold text-ink">
               ما فهمناه
             </Text>
 
@@ -260,7 +262,7 @@ export function SmartInputScreen() {
             <Row label="الملاحظة" value={result.note ?? '—'} />
 
             {result.contactName && !matchedContact ? (
-              <Text className="mt-2 text-right text-[11px] text-amber-700">
+              <Text className="mt-2 text-right text-[11px] text-ink-muted">
                 لا توجد جهة اتصال بهذا الاسم — ستحتاج لاختيارها أو إضافتها.
               </Text>
             ) : null}
@@ -268,12 +270,12 @@ export function SmartInputScreen() {
             <Pressable
               onPress={applyToForm}
               accessibilityRole="button"
-              className="mt-4 items-center rounded-2xl bg-green-600 py-3">
+              className="mt-4 items-center rounded-2xl bg-primary py-3">
               <Text className="text-base font-bold text-white">
                 مراجعة في النموذج
               </Text>
             </Pressable>
-            <Text className="mt-2 text-center text-[11px] text-gray-500">
+            <Text className="mt-2 text-center text-[11px] text-ink-muted">
               لا يُحفظ شيء قبل مراجعتك.
             </Text>
           </View>
@@ -286,8 +288,8 @@ export function SmartInputScreen() {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <View className="mt-2 flex-row-reverse items-center justify-between">
-      <Text className="text-right text-xs text-gray-500">{label}</Text>
-      <Text className="text-right text-sm font-semibold text-gray-900">
+      <Text className="text-right text-xs text-ink-muted">{label}</Text>
+      <Text className="text-right text-sm font-semibold text-ink">
         {value}
       </Text>
     </View>

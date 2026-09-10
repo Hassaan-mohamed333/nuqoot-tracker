@@ -4,9 +4,11 @@ import {
   CalendarPlus,
   CloudOff,
   LogOut,
+  Moon,
   Plus,
   ScanLine,
   Sparkles,
+  Sun,
   UserPlus,
 } from 'lucide-react-native';
 import React, { useMemo } from 'react';
@@ -20,6 +22,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppLogo } from '@/components/brand/AppLogo';
+import { PressableScale } from '@/components/motion';
 import { confirmAction, reportError } from '@/lib/alerts';
 import { EventCard } from '@/components/EventCard';
 import { LedgerSummaryBar } from '@/components/LedgerSummaryBar';
@@ -27,6 +31,7 @@ import { TransactionCard } from '@/components/TransactionCard';
 import type { RootStackParamList } from '@/navigation/types';
 import { useAuth } from '@/store/AuthProvider';
 import { useLedger } from '@/store/LedgerProvider';
+import { usePalette, useTheme } from '@/store/ThemeProvider';
 import { formatAmount } from '@/utils/ledger';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
@@ -35,6 +40,8 @@ type Navigation = NativeStackNavigationProp<RootStackParamList>;
 export function HomeScreen() {
   const navigation = useNavigation<Navigation>();
   const { authDisabled, user, signOut } = useAuth();
+  const { scheme, toggle } = useTheme();
+  const palette = usePalette();
   const {
     totals,
     transactions,
@@ -86,7 +93,7 @@ export function HomeScreen() {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-base" edges={['top']}>
       <ScrollView
         className="flex-1"
         contentContainerClassName="p-4 pb-56"
@@ -94,43 +101,66 @@ export function HomeScreen() {
           <RefreshControl refreshing={loading} onRefresh={() => void refresh()} />
         }>
         <View className="flex-row-reverse items-center justify-between">
-          <View>
-            <Text className="text-right text-2xl font-bold text-gray-900">
-              النقوط والواجبات
-            </Text>
-            <Text className="text-right text-xs text-gray-500">
-              {contacts.length} جهة اتصال · {transactions.length} حركة
-            </Text>
-            {user ? (
-              <Text className="text-right text-[11px] text-gray-400">
-                {user.email ?? 'حساب ضيف'}
+          <View className="flex-1 flex-row-reverse items-center">
+            <AppLogo size={44} variant="badge" />
+            <View className="mr-3 flex-1">
+              <Text className="text-right text-display text-ink">
+                النقوط والواجبات
               </Text>
-            ) : null}
+              <Text className="text-right text-caption text-ink-muted">
+                {contacts.length} جهة اتصال · {transactions.length} حركة
+              </Text>
+              {user ? (
+                <Text className="text-right text-caption text-ink-subtle">
+                  {user.email ?? 'حساب ضيف'}
+                </Text>
+              ) : null}
+            </View>
           </View>
           <View className="flex-row-reverse items-center">
-            <Pressable
+            <PressableScale
               onPress={() => navigation.navigate('AddTransaction')}
               accessibilityRole="button"
               accessibilityLabel="إضافة حركة جديدة"
-              className="h-11 w-11 items-center justify-center rounded-full bg-green-600">
-              <Plus size={22} color="#ffffff" />
-            </Pressable>
+              activeScale={0.9}
+              className="h-11 w-11 items-center justify-center rounded-full bg-primary">
+              <Plus size={22} color={palette.onPrimary} />
+            </PressableScale>
+
+            {/* تبديل الوضع الليلي: بلا هذا الزرّ لا يمكن الوصول إليه إلا
+                من إعدادات النظام. */}
+            <PressableScale
+              onPress={toggle}
+              accessibilityRole="button"
+              accessibilityLabel={
+                scheme === 'dark' ? 'التبديل للوضع الفاتح' : 'التبديل للوضع الليلي'
+              }
+              activeScale={0.9}
+              className="mr-2 h-11 w-11 items-center justify-center rounded-full border border-line bg-surface">
+              {scheme === 'dark' ? (
+                <Sun size={20} color={palette.muted} />
+              ) : (
+                <Moon size={20} color={palette.muted} />
+              )}
+            </PressableScale>
+
             {authDisabled ? null : (
-              <Pressable
+              <PressableScale
                 onPress={() => void confirmSignOut()}
                 accessibilityRole="button"
                 accessibilityLabel="تسجيل الخروج"
-                className="mr-2 h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white">
-                <LogOut size={20} color="#6b7280" />
-              </Pressable>
+                activeScale={0.9}
+                className="mr-2 h-11 w-11 items-center justify-center rounded-full border border-line bg-surface">
+                <LogOut size={20} color={palette.muted} />
+              </PressableScale>
             )}
           </View>
         </View>
 
         {offline ? (
-          <View className="mt-3 flex-row-reverse items-center rounded-xl bg-amber-50 p-3">
-            <CloudOff size={16} color="#b45309" />
-            <Text className="mr-2 flex-1 text-right text-xs text-amber-800">
+          <View className="mt-3 flex-row-reverse items-center rounded-xl bg-warning-soft p-3">
+            <CloudOff size={16} color={palette.warning} />
+            <Text className="mr-2 flex-1 text-right text-xs text-ink-muted">
               {authDisabled
                 ? 'وضع محلي: البيانات محفوظة على الجهاز. اضبط مفاتيح Supabase للمزامنة.'
                 : 'تعذّر الوصول إلى الخادم. تُعرض آخر نسخة محفوظة على الجهاز.'}
@@ -139,18 +169,18 @@ export function HomeScreen() {
         ) : null}
 
         {!loading && contacts.length === 0 ? (
-          <View className="mt-4 rounded-2xl border border-gray-100 bg-white p-5">
-            <Text className="text-right text-base font-bold text-gray-900">
+          <View className="mt-4 rounded-2xl border border-line bg-surface p-5">
+            <Text className="text-right text-base font-bold text-ink">
               لنبدأ من الصفر
             </Text>
-            <Text className="mt-1 text-right text-xs text-gray-500">
+            <Text className="mt-1 text-right text-xs text-ink-muted">
               أضف جهات الاتصال والمناسبات، ثم سجّل النقوط والواجبات بينكم.
             </Text>
 
             <Pressable
               onPress={() => navigation.navigate('AddContact')}
               accessibilityRole="button"
-              className="mt-4 flex-row-reverse items-center justify-center rounded-2xl bg-green-600 py-3">
+              className="mt-4 flex-row-reverse items-center justify-center rounded-2xl bg-primary py-3">
               <UserPlus size={18} color="#ffffff" />
               <Text className="mr-2 text-sm font-bold text-white">
                 إضافة جهة اتصال
@@ -160,9 +190,9 @@ export function HomeScreen() {
             <Pressable
               onPress={() => navigation.navigate('AddEvent')}
               accessibilityRole="button"
-              className="mt-2 flex-row-reverse items-center justify-center rounded-2xl border border-gray-200 bg-white py-3">
-              <CalendarPlus size={18} color="#16a34a" />
-              <Text className="mr-2 text-sm font-bold text-green-700">
+              className="mt-2 flex-row-reverse items-center justify-center rounded-2xl border border-line bg-surface py-3">
+              <CalendarPlus size={18} color={palette.primary} />
+              <Text className="mr-2 text-sm font-bold text-primary">
                 إضافة مناسبة
               </Text>
             </Pressable>
@@ -173,42 +203,42 @@ export function HomeScreen() {
           <Pressable
             onPress={() => navigation.navigate('SmartInput')}
             accessibilityRole="button"
-            className="flex-1 flex-row-reverse items-center justify-center rounded-2xl bg-green-600 py-3">
+            className="flex-1 flex-row-reverse items-center justify-center rounded-2xl bg-primary py-3">
             <Sparkles size={18} color="#ffffff" />
             <Text className="mr-2 text-sm font-bold text-white">إدخال ذكي</Text>
           </Pressable>
           <Pressable
             onPress={() => navigation.navigate('ScanReceipt')}
             accessibilityRole="button"
-            className="mr-2 flex-1 flex-row-reverse items-center justify-center rounded-2xl border border-gray-200 bg-white py-3">
-            <ScanLine size={18} color="#16a34a" />
-            <Text className="mr-2 text-sm font-bold text-green-700">
+            className="mr-2 flex-1 flex-row-reverse items-center justify-center rounded-2xl border border-line bg-surface py-3">
+            <ScanLine size={18} color={palette.primary} />
+            <Text className="mr-2 text-sm font-bold text-primary">
               قراءة إيصال
             </Text>
           </Pressable>
         </View>
 
         <View className="mt-3 flex-row-reverse">
-          <View className="flex-1 rounded-2xl border border-gray-100 bg-white p-4">
-            <Text className="text-right text-xs text-gray-500">إجمالي ما دفعت</Text>
-            <Text className="text-right text-lg font-bold text-green-700">
+          <View className="flex-1 rounded-2xl border border-line bg-surface p-4">
+            <Text className="text-right text-xs text-ink-muted">إجمالي ما دفعت</Text>
+            <Text className="text-right text-lg font-bold text-primary">
               {formatAmount(totals.totalOut, totals.currency)}
             </Text>
           </View>
           <View className="w-3" />
-          <View className="flex-1 rounded-2xl border border-gray-100 bg-white p-4">
-            <Text className="text-right text-xs text-gray-500">إجمالي ما استلمت</Text>
-            <Text className="text-right text-lg font-bold text-red-700">
+          <View className="flex-1 rounded-2xl border border-line bg-surface p-4">
+            <Text className="text-right text-xs text-ink-muted">إجمالي ما استلمت</Text>
+            <Text className="text-right text-lg font-bold text-danger">
               {formatAmount(totals.totalIn, totals.currency)}
             </Text>
           </View>
         </View>
 
-        <Text className="mb-2 mt-6 text-right text-base font-bold text-gray-900">
+        <Text className="mb-2 mt-6 text-right text-base font-bold text-ink">
           مناسبات قادمة
         </Text>
         {upcomingEvents.length === 0 ? (
-          <Text className="text-right text-sm text-gray-500">
+          <Text className="text-right text-sm text-ink-muted">
             لا توجد مناسبات قادمة.
           </Text>
         ) : (
@@ -225,13 +255,13 @@ export function HomeScreen() {
           ))
         )}
 
-        <Text className="mb-2 mt-6 text-right text-base font-bold text-gray-900">
+        <Text className="mb-2 mt-6 text-right text-base font-bold text-ink">
           آخر الحركات
         </Text>
         {loading && transactions.length === 0 ? (
-          <ActivityIndicator color="#16a34a" />
+          <ActivityIndicator color={palette.primary} />
         ) : recentTransactions.length === 0 ? (
-          <Text className="text-right text-sm text-gray-500">
+          <Text className="text-right text-sm text-ink-muted">
             لم تُسجَّل أي حركة بعد.
           </Text>
         ) : (

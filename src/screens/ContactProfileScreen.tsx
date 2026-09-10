@@ -30,6 +30,7 @@ import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
 import type { TransactionDirection } from '@/types';
 import { formatAmount, summarize } from '@/utils/ledger';
+import { usePalette } from '@/store/ThemeProvider';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 type ProfileRoute = RouteProp<RootStackParamList, 'ContactProfile'>;
@@ -44,6 +45,7 @@ const FILTERS: { key: Filter; label: string }[] = [
 
 /** ملف جهة الاتصال: الرصيد، سجل الحركات (وارد/صادر)، والمناسبات المرتبطة. */
 export function ContactProfileScreen() {
+  const palette = usePalette();
   const navigation = useNavigation<Navigation>();
   const { params } = useRoute<ProfileRoute>();
   const [filter, setFilter] = useState<Filter>('ALL');
@@ -108,11 +110,11 @@ export function ContactProfileScreen() {
 
   if (!contact) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-gray-50 px-8">
+      <SafeAreaView className="flex-1 items-center justify-center bg-base px-8">
         {loading ? (
-          <ActivityIndicator color="#16a34a" />
+          <ActivityIndicator color={palette.primary} />
         ) : (
-          <Text className="text-center text-sm text-gray-500">
+          <Text className="text-center text-sm text-ink-muted">
             {error ?? 'جهة الاتصال غير موجودة.'}
           </Text>
         )}
@@ -121,7 +123,7 @@ export function ContactProfileScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={['bottom']}>
+    <SafeAreaView className="flex-1 bg-base" edges={['bottom']}>
       <ScrollView
         className="flex-1"
         contentContainerClassName="p-4 pb-56"
@@ -129,44 +131,44 @@ export function ContactProfileScreen() {
           <RefreshControl refreshing={loading} onRefresh={() => void refresh()} />
         }>
         {error ? (
-          <View className="mb-3 flex-row-reverse items-center rounded-xl bg-red-50 p-3">
-            <TriangleAlert size={16} color="#b91c1c" />
-            <Text className="mr-2 flex-1 text-right text-xs text-red-800">
+          <View className="mb-3 flex-row-reverse items-center rounded-xl bg-danger-soft p-3">
+            <TriangleAlert size={16} color={palette.danger} />
+            <Text className="mr-2 flex-1 text-right text-xs text-danger">
               {error}
             </Text>
             <Pressable
               onPress={() => void refresh()}
               accessibilityRole="button"
-              className="rounded-full bg-white px-3 py-1">
-              <Text className="text-xs font-bold text-red-700">إعادة</Text>
+              className="rounded-full bg-surface px-3 py-1">
+              <Text className="text-xs font-bold text-danger">إعادة</Text>
             </Pressable>
           </View>
         ) : data?.offline ? (
-          <View className="mb-3 flex-row-reverse items-center rounded-xl bg-amber-50 p-3">
-            <CloudOff size={16} color="#b45309" />
-            <Text className="mr-2 flex-1 text-right text-xs text-amber-800">
+          <View className="mb-3 flex-row-reverse items-center rounded-xl bg-warning-soft p-3">
+            <CloudOff size={16} color={palette.warning} />
+            <Text className="mr-2 flex-1 text-right text-xs text-ink-muted">
               تُعرض نسخة محفوظة على الجهاز.
             </Text>
           </View>
         ) : null}
 
-        <View className="items-center rounded-2xl border border-gray-100 bg-white p-5">
-          <View className="h-16 w-16 items-center justify-center rounded-full bg-green-100">
-            <Text className="text-2xl font-bold text-green-700">
+        <View className="items-center rounded-2xl border border-line bg-surface p-5">
+          <View className="h-16 w-16 items-center justify-center rounded-full bg-primary/15">
+            <Text className="text-2xl font-bold text-primary">
               {contact.full_name.trim().charAt(0)}
             </Text>
           </View>
-          <Text className="mt-3 text-lg font-bold text-gray-900">
+          <Text className="mt-3 text-lg font-bold text-ink">
             {contact.full_name}
           </Text>
-          <Text className="text-xs text-gray-500">
+          <Text className="text-xs text-ink-muted">
             {contact.relation ?? 'بدون تصنيف'}
           </Text>
 
           {contact.phone ? (
             <View className="mt-1 flex-row-reverse items-center">
-              <Phone size={13} color="#6b7280" />
-              <Text className="mr-1 text-xs text-gray-600">{contact.phone}</Text>
+              <Phone size={13} color={palette.muted} />
+              <Text className="mr-1 text-xs text-ink-muted">{contact.phone}</Text>
             </View>
           ) : null}
 
@@ -180,7 +182,7 @@ export function ContactProfileScreen() {
                 navigation.navigate('AddTransaction', { contactId: contact.id })
               }
               accessibilityRole="button"
-              className="flex-row-reverse items-center rounded-xl bg-green-600 px-4 py-2">
+              className="flex-row-reverse items-center rounded-xl bg-primary px-4 py-2">
               <Plus size={16} color="#ffffff" />
               <Text className="mr-1 text-sm font-semibold text-white">
                 إضافة حركة
@@ -191,9 +193,9 @@ export function ContactProfileScreen() {
               <Pressable
                 onPress={() => void confirmArchive()}
                 accessibilityRole="button"
-                className="mr-2 flex-row-reverse items-center rounded-xl border border-gray-300 bg-white px-4 py-2">
-                <Archive size={16} color="#374151" />
-                <Text className="mr-1 text-sm font-semibold text-gray-700">
+                className="mr-2 flex-row-reverse items-center rounded-xl border border-line-strong bg-surface px-4 py-2">
+                <Archive size={16} color={palette.text} />
+                <Text className="mr-1 text-sm font-semibold text-ink">
                   تسوية وأرشفة
                 </Text>
               </Pressable>
@@ -203,9 +205,9 @@ export function ContactProfileScreen() {
               <Pressable
                 onPress={() => void restore()}
                 accessibilityRole="button"
-                className="mr-2 flex-row-reverse items-center rounded-xl border border-gray-300 bg-white px-4 py-2">
-                <ArchiveRestore size={16} color="#374151" />
-                <Text className="mr-1 text-sm font-semibold text-gray-700">
+                className="mr-2 flex-row-reverse items-center rounded-xl border border-line-strong bg-surface px-4 py-2">
+                <ArchiveRestore size={16} color={palette.text} />
+                <Text className="mr-1 text-sm font-semibold text-ink">
                   استعادة
                 </Text>
               </Pressable>
@@ -213,8 +215,8 @@ export function ContactProfileScreen() {
           </View>
 
           {isArchived ? (
-            <View className="mt-3 rounded-full bg-gray-200 px-3 py-1">
-              <Text className="text-[11px] font-semibold text-gray-600">
+            <View className="mt-3 rounded-full bg-line/60 px-3 py-1">
+              <Text className="text-[11px] font-semibold text-ink-muted">
                 مؤرشف — الحساب مسوّى
               </Text>
             </View>
@@ -222,32 +224,32 @@ export function ContactProfileScreen() {
         </View>
 
         <View className="mt-4 flex-row-reverse">
-          <View className="flex-1 rounded-2xl border border-gray-100 bg-white p-3">
-            <Text className="text-right text-[11px] text-gray-500">
+          <View className="flex-1 rounded-2xl border border-line bg-surface p-3">
+            <Text className="text-right text-[11px] text-ink-muted">
               إجمالي دائن
             </Text>
-            <Text className="text-right text-base font-bold text-green-700">
+            <Text className="text-right text-base font-bold text-primary">
               {formatAmount(summary.totalOut, summary.currency)}
             </Text>
           </View>
           <View className="w-3" />
-          <View className="flex-1 rounded-2xl border border-gray-100 bg-white p-3">
-            <Text className="text-right text-[11px] text-gray-500">
+          <View className="flex-1 rounded-2xl border border-line bg-surface p-3">
+            <Text className="text-right text-[11px] text-ink-muted">
               إجمالي مدين
             </Text>
-            <Text className="text-right text-base font-bold text-red-700">
+            <Text className="text-right text-base font-bold text-danger">
               {formatAmount(summary.totalIn, summary.currency)}
             </Text>
           </View>
         </View>
 
         {contact.notes ? (
-          <Text className="mt-3 text-right text-xs text-gray-600">
+          <Text className="mt-3 text-right text-xs text-ink-muted">
             ملاحظات: {contact.notes}
           </Text>
         ) : null}
 
-        <Text className="mb-2 mt-6 text-right text-base font-bold text-gray-900">
+        <Text className="mb-2 mt-6 text-right text-base font-bold text-ink">
           سجل الحركات
         </Text>
 
@@ -260,11 +262,11 @@ export function ContactProfileScreen() {
                 onPress={() => setFilter(item.key)}
                 accessibilityRole="button"
                 className={`ml-2 rounded-full px-3 py-1 ${
-                  isActive ? 'bg-green-600' : 'bg-white border border-gray-200'
+                  isActive ? 'bg-primary' : 'bg-surface border border-line'
                 }`}>
                 <Text
                   className={`text-xs font-semibold ${
-                    isActive ? 'text-white' : 'text-gray-600'
+                    isActive ? 'text-white' : 'text-ink-muted'
                   }`}>
                   {item.label}
                 </Text>
@@ -274,10 +276,10 @@ export function ContactProfileScreen() {
         </View>
 
         {loading && transactions.length === 0 ? (
-          <ActivityIndicator color="#16a34a" />
+          <ActivityIndicator color={palette.primary} />
         ) : visibleTransactions.length === 0 ? (
-          <View className="items-center rounded-2xl border border-gray-100 bg-white p-6">
-            <Text className="text-center text-sm text-gray-600">
+          <View className="items-center rounded-2xl border border-line bg-surface p-6">
+            <Text className="text-center text-sm text-ink-muted">
               {transactions.length === 0
                 ? 'لا توجد حركات مسجّلة مع هذا الشخص بعد.'
                 : 'لا توجد حركات في هذا التصنيف.'}
@@ -290,7 +292,7 @@ export function ContactProfileScreen() {
                   })
                 }
                 accessibilityRole="button"
-                className="mt-3 rounded-2xl bg-green-600 px-5 py-2">
+                className="mt-3 rounded-2xl bg-primary px-5 py-2">
                 <Text className="text-sm font-bold text-white">
                   تسجيل أول حركة
                 </Text>
@@ -311,11 +313,11 @@ export function ContactProfileScreen() {
           ))
         )}
 
-        <Text className="mb-2 mt-6 text-right text-base font-bold text-gray-900">
+        <Text className="mb-2 mt-6 text-right text-base font-bold text-ink">
           المناسبات المرتبطة
         </Text>
         {events.length === 0 ? (
-          <Text className="text-right text-sm text-gray-500">
+          <Text className="text-right text-sm text-ink-muted">
             لا توجد مناسبات مسجّلة.
           </Text>
         ) : (

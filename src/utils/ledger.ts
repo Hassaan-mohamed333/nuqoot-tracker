@@ -32,29 +32,39 @@ interface StatusTheme {
   bgClass: string;
   /** أصناف NativeWind للحدود. */
   borderClass: string;
+  /**
+   * مفتاح اللون في لوحة الوضع الحالي.
+   *
+   * `color` أعلاه ثابت للوضع الفاتح، ولا يصلح للأيقونات في الوضع الليلي.
+   * من يملك `usePalette()` يقرأ اللون الصحيح عبر هذا المفتاح.
+   */
+  colorKey: 'success' | 'danger' | 'muted';
 }
 
 const STATUS_THEME: Record<LedgerStatus, StatusTheme> = {
   credit: {
     label: 'دائن',
-    color: '#16a34a',
-    textClass: 'text-green-700',
-    bgClass: 'bg-green-100',
-    borderClass: 'border-green-200',
+    color: '#10B981',
+    colorKey: 'success',
+    textClass: 'text-credit',
+    bgClass: 'bg-success-soft',
+    borderClass: 'border-success/25',
   },
   debit: {
     label: 'مدين',
-    color: '#dc2626',
-    textClass: 'text-red-700',
-    bgClass: 'bg-red-100',
-    borderClass: 'border-red-200',
+    color: '#EF4444',
+    colorKey: 'danger',
+    textClass: 'text-debit',
+    bgClass: 'bg-danger-soft',
+    borderClass: 'border-danger/25',
   },
   settled: {
     label: 'متعادل',
-    color: '#6b7280',
-    textClass: 'text-gray-600',
-    bgClass: 'bg-gray-100',
-    borderClass: 'border-gray-200',
+    color: '#64748B',
+    colorKey: 'muted',
+    textClass: 'text-ink-muted',
+    bgClass: 'bg-line/40',
+    borderClass: 'border-line',
   },
 };
 

@@ -16,6 +16,7 @@ import {
 import { reportError } from '@/lib/alerts';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
+import { usePalette } from '@/store/ThemeProvider';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 type AddContactRoute = RouteProp<RootStackParamList, 'AddContact'>;
@@ -31,6 +32,7 @@ const RELATION_SUGGESTIONS = [
 
 /** شاشة إضافة جهة اتصال جديدة. */
 export function AddContactScreen() {
+  const palette = usePalette();
   const navigation = useNavigation<Navigation>();
   const { params } = useRoute<AddContactRoute>();
   const { addContact } = useLedger();
@@ -69,21 +71,21 @@ export function AddContactScreen() {
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-gray-50"
+      className="flex-1 bg-base"
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView className="flex-1" contentContainerClassName="p-4 pb-10">
-        <Text className="mb-2 text-right text-sm font-bold text-gray-900">
+        <Text className="mb-2 text-right text-sm font-bold text-ink">
           الاسم
         </Text>
         <TextInput
           value={fullName}
           onChangeText={setFullName}
           placeholder="الاسم كاملاً"
-          placeholderTextColor="#9ca3af"
-          className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-right text-base text-gray-900"
+          placeholderTextColor={palette.muted}
+          className="rounded-xl border border-line bg-surface px-4 py-3 text-right text-base text-ink"
         />
 
-        <Text className="mb-2 mt-6 text-right text-sm font-bold text-gray-900">
+        <Text className="mb-2 mt-6 text-right text-sm font-bold text-ink">
           رقم الهاتف (اختياري)
         </Text>
         <TextInput
@@ -91,19 +93,19 @@ export function AddContactScreen() {
           onChangeText={setPhone}
           keyboardType="phone-pad"
           placeholder="01xxxxxxxxx"
-          placeholderTextColor="#9ca3af"
-          className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-right text-base text-gray-900"
+          placeholderTextColor={palette.muted}
+          className="rounded-xl border border-line bg-surface px-4 py-3 text-right text-base text-ink"
         />
 
-        <Text className="mb-2 mt-6 text-right text-sm font-bold text-gray-900">
+        <Text className="mb-2 mt-6 text-right text-sm font-bold text-ink">
           صلة القرابة (اختياري)
         </Text>
         <TextInput
           value={relation}
           onChangeText={setRelation}
           placeholder="مثال: ابن العم"
-          placeholderTextColor="#9ca3af"
-          className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-right text-base text-gray-900"
+          placeholderTextColor={palette.muted}
+          className="rounded-xl border border-line bg-surface px-4 py-3 text-right text-base text-ink"
         />
         <View className="mt-2 flex-row-reverse flex-wrap">
           {RELATION_SUGGESTIONS.map((suggestion) => (
@@ -113,12 +115,12 @@ export function AddContactScreen() {
               accessibilityRole="button"
               className={`mb-2 ml-2 rounded-full px-3 py-1 ${
                 relation === suggestion
-                  ? 'bg-green-600'
-                  : 'border border-gray-200 bg-white'
+                  ? 'bg-primary'
+                  : 'border border-line bg-surface'
               }`}>
               <Text
                 className={`text-xs font-semibold ${
-                  relation === suggestion ? 'text-white' : 'text-gray-600'
+                  relation === suggestion ? 'text-white' : 'text-ink-muted'
                 }`}>
                 {suggestion}
               </Text>
@@ -126,15 +128,15 @@ export function AddContactScreen() {
           ))}
         </View>
 
-        <Text className="mb-2 mt-4 text-right text-sm font-bold text-gray-900">
+        <Text className="mb-2 mt-4 text-right text-sm font-bold text-ink">
           ملاحظات (اختياري)
         </Text>
         <TextInput
           value={notes}
           onChangeText={setNotes}
           placeholder="أي تفاصيل تساعدك على تذكّره"
-          placeholderTextColor="#9ca3af"
-          className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-right text-sm text-gray-900"
+          placeholderTextColor={palette.muted}
+          className="rounded-xl border border-line bg-surface px-4 py-3 text-right text-sm text-ink"
         />
 
         <Pressable
@@ -142,7 +144,7 @@ export function AddContactScreen() {
           disabled={!isValid || saving}
           accessibilityRole="button"
           className={`mt-8 items-center rounded-2xl py-3 ${
-            isValid && !saving ? 'bg-green-600' : 'bg-gray-300'
+            isValid && !saving ? 'bg-primary' : 'bg-line-strong'
           }`}>
           {saving ? (
             <ActivityIndicator color="#ffffff" />

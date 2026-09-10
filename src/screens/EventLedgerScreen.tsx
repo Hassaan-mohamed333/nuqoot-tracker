@@ -5,23 +5,20 @@ import {
   ArrowLeftRight,
   CloudOff,
   Plus,
+  Receipt,
   TriangleAlert,
   Users,
 } from 'lucide-react-native';
 import React, { useMemo } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BalanceBar, FadeSlideIn, staggerDelay } from '@/components/motion';
+import { Button, Card, SectionTitle } from '@/components/ui';
 import { useEventLedger } from '@/hooks/useEventLedger';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
+import { usePalette } from '@/store/ThemeProvider';
 import { formatAmount, formatDate } from '@/utils/ledger';
 import {
   computeEventBalances,
@@ -39,6 +36,7 @@ export function EventLedgerScreen() {
   const { params } = useRoute<LedgerRoute>();
   const { contacts, getEventById } = useLedger();
   const { data, loading, error, refresh } = useEventLedger(params.eventId);
+  const palette = usePalette();
 
   const event = data?.event ?? getEventById(params.eventId) ?? null;
   const participants = useMemo(() => data?.participants ?? [], [data]);
@@ -52,6 +50,12 @@ export function EventLedgerScreen() {
   const settlements = useMemo(() => settleBalances(balances), [balances]);
   const total = useMemo(() => totalEventSpend(expenses), [expenses]);
   const currency = expenses[0]?.currency ?? 'EGP';
+
+  // مرجع تطبيع أشرطة الأرصدة: أكبر رصيد مطلق يملأ الشريط كاملاً.
+  const maxAbsNet = useMemo(
+    () => balances.reduce((max, row) => Math.max(max, Math.abs(row.net)), 0),
+    [balances],
+  );
 
   const contactNames = useMemo(
     () => new Map(contacts.map((contact) => [contact.id, contact.full_name])),
@@ -71,11 +75,11 @@ export function EventLedgerScreen() {
 
   if (!event) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-gray-50 px-8">
+      <SafeAreaView className="flex-1 items-center justify-center bg-base px-8">
         {loading ? (
-          <ActivityIndicator color="#16a34a" />
+          <ActivityIndicator color={palette.primary} />
         ) : (
-          <Text className="text-center text-sm text-gray-500">
+          <Text className="text-center text-body text-ink-muted">
             {error ?? 'المناسبة غير موجودة.'}
           </Text>
         )}
@@ -83,190 +87,216 @@ export function EventLedgerScreen() {
     );
   }
 
+  const noParticipants = participants.length === 0;
+
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={['bottom']}>
+    <SafeAreaView className="flex-1 bg-base" edges={['bottom']}>
       <ScrollView
         className="flex-1"
         contentContainerClassName="p-4 pb-10"
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={() => void refresh()} />
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={() => void refresh()}
+            tintColor={palette.primary}
+          />
         }>
         {error ? (
-          <View className="mb-3 flex-row-reverse items-center rounded-xl bg-red-50 p-3">
-            <TriangleAlert size={16} color="#b91c1c" />
-            <Text className="mr-2 flex-1 text-right text-xs text-red-800">
-              {error}
-            </Text>
-          </View>
+          <Card variant="danger" className="mb-3" padded={false}>
+            <View className="flex-row-reverse items-center p-3">
+              <TriangleAlert size={16} color={palette.danger} />
+              <Text className="mr-2 flex-1 text-right text-caption text-danger">
+                {error}
+              </Text>
+            </View>
+          </Card>
         ) : data?.offline ? (
-          <View className="mb-3 flex-row-reverse items-center rounded-xl bg-amber-50 p-3">
-            <CloudOff size={16} color="#b45309" />
-            <Text className="mr-2 flex-1 text-right text-xs text-amber-800">
-              تُعرض نسخة محفوظة على الجهاز.
-            </Text>
-          </View>
+          <Card variant="outline" className="mb-3 border-warning/40" padded={false}>
+            <View className="flex-row-reverse items-center p-3">
+              <CloudOff size={16} color={palette.warning} />
+              <Text className="mr-2 flex-1 text-right text-caption text-ink-muted">
+                تُعرض نسخة محفوظة على الجهاز.
+              </Text>
+            </View>
+          </Card>
         ) : null}
 
-        <View className="rounded-2xl border border-gray-100 bg-white p-4">
-          <Text className="text-right text-lg font-bold text-gray-900">
-            {event.title}
-          </Text>
-          <Text className="mt-1 text-right text-xs text-gray-500">
+        {/* بطاقة المناسبة: البنفسجي هوية المناسبات والمصاريف المشتركة. */}
+        <Card variant="secondary" index={0}>
+          <Text className="text-right text-display text-ink">{event.title}</Text>
+          <Text className="mt-1 text-right text-caption text-ink-muted">
             {formatDate(event.event_date)}
             {event.location ? ` · ${event.location}` : ''}
           </Text>
 
-          <View className="mt-3 flex-row-reverse items-center justify-between">
+          <View className="mt-4 flex-row-reverse items-end justify-between">
             <View>
-              <Text className="text-right text-[11px] text-gray-500">
+              <Text className="text-right text-caption text-ink-muted">
                 إجمالي المصروف
               </Text>
-              <Text className="text-right text-xl font-bold text-gray-900">
+              <Text className="text-right text-display-lg text-ink">
                 {formatAmount(total, currency)}
               </Text>
             </View>
-            <View className="flex-row-reverse items-center rounded-full bg-gray-100 px-3 py-1">
-              <Users size={14} color="#6b7280" />
-              <Text className="mr-1 text-xs font-semibold text-gray-600">
+            <View className="flex-row-reverse items-center rounded-full bg-secondary/15 px-3 py-1.5">
+              <Users size={14} color={palette.secondary} />
+              <Text className="mr-1.5 text-caption font-bold text-secondary">
                 {participants.length} مشارك
               </Text>
             </View>
           </View>
 
           <View className="mt-4 flex-row-reverse">
-            <Pressable
+            <Button
+              title="مصروف جماعي"
+              variant="secondary"
+              size="sm"
+              block={false}
+              disabled={noParticipants}
               onPress={() =>
                 navigation.navigate('AddSharedExpense', { eventId: event.id })
               }
-              accessibilityRole="button"
-              disabled={participants.length === 0}
-              className={`flex-row-reverse items-center rounded-xl px-4 py-2 ${
-                participants.length === 0 ? 'bg-gray-300' : 'bg-green-600'
-              }`}>
-              <Plus size={16} color="#ffffff" />
-              <Text className="mr-1 text-sm font-semibold text-white">
-                مصروف جماعي
-              </Text>
-            </Pressable>
-
-            <Pressable
+              icon={<Plus size={16} color="#FFFFFF" />}
+              className="flex-1"
+            />
+            <Button
+              title="المشاركون"
+              variant="outline"
+              size="sm"
+              block={false}
               onPress={() =>
                 navigation.navigate('EventParticipants', { eventId: event.id })
               }
-              accessibilityRole="button"
-              className="mr-2 flex-row-reverse items-center rounded-xl border border-gray-300 bg-white px-4 py-2">
-              <Users size={16} color="#374151" />
-              <Text className="mr-1 text-sm font-semibold text-gray-700">
-                المشاركون
-              </Text>
-            </Pressable>
+              icon={<Users size={16} color={palette.text} />}
+              className="mr-2 flex-1"
+            />
           </View>
-        </View>
+        </Card>
 
-        {participants.length === 0 ? (
-          <View className="mt-4 items-center rounded-2xl border border-gray-100 bg-white p-6">
-            <Text className="text-center text-sm text-gray-600">
+        {noParticipants ? (
+          <Card variant="surface" className="mt-4 items-center" index={1}>
+            <Text className="text-center text-body text-ink-muted">
               حدّد المشاركين أولاً لتتمكن من تقسيم المصاريف.
             </Text>
-            <Pressable
+            <Button
+              title="تحديد المشاركين"
+              variant="primary"
+              size="sm"
+              block={false}
+              className="mt-3"
               onPress={() =>
                 navigation.navigate('EventParticipants', { eventId: event.id })
               }
-              accessibilityRole="button"
-              className="mt-3 rounded-2xl bg-green-600 px-5 py-2">
-              <Text className="text-sm font-bold text-white">
-                تحديد المشاركين
-              </Text>
-            </Pressable>
-          </View>
+            />
+          </Card>
         ) : null}
 
-        <Text className="mb-2 mt-6 text-right text-base font-bold text-gray-900">
-          التسوية — من يدفع لمن
-        </Text>
+        <SectionTitle className="mb-2 mt-6">التسوية — من يدفع لمن</SectionTitle>
         {settlements.length === 0 ? (
-          <View className="rounded-2xl border border-gray-100 bg-white p-4">
-            <Text className="text-center text-sm text-gray-500">
+          <Card variant="surface" index={2}>
+            <Text className="text-center text-body text-ink-muted">
               {expenses.length === 0
                 ? 'لا توجد مصاريف بعد.'
                 : 'الحسابات متعادلة — لا أحد يدين لأحد.'}
             </Text>
-          </View>
+          </Card>
         ) : (
           settlements.map((settlement, index) => (
-            <View
+            <Card
               key={`${settlement.fromName}-${settlement.toName}-${index}`}
-              className="mb-2 flex-row-reverse items-center rounded-2xl border border-gray-100 bg-white p-3">
-              <ArrowLeftRight size={18} color="#16a34a" />
-              <Text className="mx-3 flex-1 text-right text-sm text-gray-800">
-                <Text className="font-bold">{settlement.fromName}</Text> يدفع لـ{' '}
-                <Text className="font-bold">{settlement.toName}</Text>
-              </Text>
-              <Text className="text-sm font-bold text-green-700">
-                {formatAmount(settlement.amount, currency)}
-              </Text>
-            </View>
+              variant="surface"
+              className="mb-2"
+              padded={false}
+              index={index + 2}>
+              <View className="flex-row-reverse items-center p-3">
+                <ArrowLeftRight size={18} color={palette.primary} />
+                <Text className="mx-3 flex-1 text-right text-body text-ink">
+                  <Text className="font-bold">{settlement.fromName}</Text> يدفع لـ{' '}
+                  <Text className="font-bold">{settlement.toName}</Text>
+                </Text>
+                <Text className="text-body font-bold text-primary">
+                  {formatAmount(settlement.amount, currency)}
+                </Text>
+              </View>
+            </Card>
           ))
         )}
 
-        <Text className="mb-2 mt-6 text-right text-base font-bold text-gray-900">
-          أرصدة المشاركين
-        </Text>
-        {balances.map((balance) => (
-          <View
-            key={balance.participantId}
-            className="mb-2 flex-row-reverse items-center rounded-2xl border border-gray-100 bg-white p-3">
-            <View className="flex-1">
-              <Text className="text-right text-sm font-semibold text-gray-900">
-                {balance.name}
-              </Text>
-              <Text className="text-right text-[11px] text-gray-500">
-                دفع {formatAmount(balance.paid, currency)} · عليه{' '}
-                {formatAmount(balance.owed, currency)}
-              </Text>
-            </View>
-            <Text
-              className={`text-sm font-bold ${
-                balance.net > 0
-                  ? 'text-green-700'
-                  : balance.net < 0
-                    ? 'text-red-700'
-                    : 'text-gray-500'
-              }`}>
-              {balance.net > 0 ? '+' : balance.net < 0 ? '−' : ''}
-              {formatAmount(balance.net, currency)}
-            </Text>
-          </View>
-        ))}
-
-        <Text className="mb-2 mt-6 text-right text-base font-bold text-gray-900">
-          المصاريف
-        </Text>
-        {loading && expenses.length === 0 ? (
-          <ActivityIndicator color="#16a34a" />
-        ) : expenses.length === 0 ? (
-          <Text className="text-right text-sm text-gray-500">
-            لم تُسجَّل مصاريف بعد.
-          </Text>
-        ) : (
-          expenses.map((expense) => (
-            <View
-              key={expense.id}
-              className="mb-2 rounded-2xl border border-gray-100 bg-white p-3">
-              <View className="flex-row-reverse items-center justify-between">
-                <Text className="flex-1 text-right text-sm font-semibold text-gray-900">
-                  {expense.description}
-                </Text>
-                <Text className="text-sm font-bold text-gray-900">
-                  {formatAmount(expense.amount, expense.currency)}
+        <SectionTitle className="mb-2 mt-6">أرصدة المشاركين</SectionTitle>
+        {balances.map((balance, index) => {
+          const positive = balance.net > 0;
+          const settled = balance.net === 0;
+          return (
+            <Card
+              key={balance.participantId}
+              variant="surface"
+              className="mb-2"
+              index={index}>
+              <View className="flex-row-reverse items-center">
+                <View className="flex-1">
+                  <Text className="text-right text-body font-bold text-ink">
+                    {balance.name}
+                  </Text>
+                  <Text className="text-right text-caption text-ink-muted">
+                    دفع {formatAmount(balance.paid, currency)} · عليه{' '}
+                    {formatAmount(balance.owed, currency)}
+                  </Text>
+                </View>
+                <Text
+                  className={`text-body font-bold ${
+                    settled ? 'text-ink-muted' : positive ? 'text-credit' : 'text-debit'
+                  }`}>
+                  {positive ? '+' : balance.net < 0 ? '−' : ''}
+                  {formatAmount(Math.abs(balance.net), currency)}
                 </Text>
               </View>
-              <Text className="mt-1 text-right text-[11px] text-gray-500">
-                دفعها {payerName(expense.payer_participant_id)} ·{' '}
-                {formatDate(expense.occurred_at)} · مقسومة على{' '}
-                {expense.shares.length}
-              </Text>
-            </View>
+
+              {/* شريط الرصيد: يجعل حجم الفروق مقروءاً دون قراءة كل رقم. */}
+              <View className="mt-2.5">
+                <BalanceBar
+                  ratio={maxAbsNet === 0 ? 0 : Math.abs(balance.net) / maxAbsNet}
+                  color={settled ? palette.muted : positive ? palette.success : palette.danger}
+                  trackColor={palette.border}
+                  delay={staggerDelay(index)}
+                />
+              </View>
+            </Card>
+          );
+        })}
+
+        <SectionTitle className="mb-2 mt-6">المصاريف</SectionTitle>
+        {loading && expenses.length === 0 ? (
+          <ActivityIndicator color={palette.primary} />
+        ) : expenses.length === 0 ? (
+          <Card variant="outline" index={0}>
+            <Text className="text-center text-body text-ink-muted">
+              لم تُسجَّل مصاريف بعد.
+            </Text>
+          </Card>
+        ) : (
+          expenses.map((expense, index) => (
+            <FadeSlideIn key={expense.id} index={index}>
+              <Card variant="surface" className="mb-2" animate={false}>
+                <View className="flex-row-reverse items-center justify-between">
+                  <View className="flex-1 flex-row-reverse items-center">
+                    <View className="h-9 w-9 items-center justify-center rounded-xl bg-secondary/15">
+                      <Receipt size={16} color={palette.secondary} />
+                    </View>
+                    <Text className="mr-2.5 flex-1 text-right text-body font-bold text-ink">
+                      {expense.description}
+                    </Text>
+                  </View>
+                  <Text className="text-body font-bold text-ink">
+                    {formatAmount(expense.amount, expense.currency)}
+                  </Text>
+                </View>
+                <Text className="mt-1.5 text-right text-caption text-ink-muted">
+                  دفعها {payerName(expense.payer_participant_id)} ·{' '}
+                  {formatDate(expense.occurred_at)} · مقسومة على{' '}
+                  {expense.shares.length}
+                </Text>
+              </Card>
+            </FadeSlideIn>
           ))
         )}
       </ScrollView>

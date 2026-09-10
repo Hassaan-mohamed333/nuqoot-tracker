@@ -18,8 +18,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
+import { AppLogo } from '@/components/brand/AppLogo';
 import { notify, reportError } from '@/lib/alerts';
 import { useAuth } from '@/store/AuthProvider';
+import { usePalette } from '@/store/ThemeProvider';
 
 type Mode = 'signIn' | 'signUp';
 
@@ -52,6 +54,7 @@ function GoogleMark() {
  * فلا تُقرأ أو تُكتب أي بيانات قبل وجود جلسة.
  */
 export function AuthScreen() {
+  const palette = usePalette();
   const {
     signInWithEmail,
     signUpWithEmail,
@@ -126,7 +129,7 @@ export function AuthScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView className="flex-1 bg-base">
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -134,28 +137,26 @@ export function AuthScreen() {
           className="flex-1"
           contentContainerClassName="flex-grow justify-center p-6">
           <View className="items-center">
-            <View className="h-16 w-16 items-center justify-center rounded-2xl bg-green-600">
-              <Text className="text-2xl font-bold text-white">ن</Text>
-            </View>
-            <Text className="mt-3 text-2xl font-bold text-gray-900">نقوط</Text>
-            <Text className="mt-1 text-center text-xs text-gray-500">
+            <AppLogo size={72} variant="badge" animated />
+            <Text className="mt-3 text-display text-ink">نقوط</Text>
+            <Text className="mt-1 text-center text-caption text-ink-muted">
               سجّل الدخول لحفظ نقوطك وواجباتك ومزامنتها بين أجهزتك.
             </Text>
           </View>
 
           {formError ? (
-            <View className="mt-6 flex-row-reverse items-center rounded-xl bg-red-50 p-3">
-              <TriangleAlert size={16} color="#b91c1c" />
-              <Text className="mr-2 flex-1 text-right text-xs text-red-800">
+            <View className="mt-6 flex-row-reverse items-center rounded-xl bg-danger-soft p-3">
+              <TriangleAlert size={16} color={palette.danger} />
+              <Text className="mr-2 flex-1 text-right text-xs text-danger">
                 {formError}
               </Text>
             </View>
           ) : null}
 
           {initError ? (
-            <View className="mt-6 flex-row-reverse items-center rounded-xl bg-amber-50 p-3">
-              <TriangleAlert size={16} color="#b45309" />
-              <Text className="mr-2 flex-1 text-right text-xs text-amber-800">
+            <View className="mt-6 flex-row-reverse items-center rounded-xl bg-warning-soft p-3">
+              <TriangleAlert size={16} color={palette.warning} />
+              <Text className="mr-2 flex-1 text-right text-xs text-ink-muted">
                 تعذّر استعادة جلستك السابقة ({initError}) — سجّل الدخول مجدداً.
               </Text>
             </View>
@@ -175,11 +176,11 @@ export function AuthScreen() {
                   onPress={() => setMode(item.key)}
                   accessibilityRole="button"
                   className={`ml-2 rounded-full px-4 py-1.5 ${
-                    isActive ? 'bg-green-600' : 'border border-gray-200 bg-white'
+                    isActive ? 'bg-primary' : 'border border-line bg-surface'
                   }`}>
                   <Text
                     className={`text-xs font-semibold ${
-                      isActive ? 'text-white' : 'text-gray-600'
+                      isActive ? 'text-white' : 'text-ink-muted'
                     }`}>
                     {item.label}
                   </Text>
@@ -188,11 +189,11 @@ export function AuthScreen() {
             })}
           </View>
 
-          <Text className="mb-2 mt-6 text-right text-sm font-bold text-gray-900">
+          <Text className="mb-2 mt-6 text-right text-sm font-bold text-ink">
             البريد الإلكتروني
           </Text>
-          <View className="flex-row-reverse items-center rounded-xl border border-gray-200 bg-white px-3">
-            <Mail size={16} color="#9ca3af" />
+          <View className="flex-row-reverse items-center rounded-xl border border-line bg-surface px-3">
+            <Mail size={16} color={palette.muted} />
             <TextInput
               value={email}
               onChangeText={setEmail}
@@ -200,12 +201,12 @@ export function AuthScreen() {
               autoComplete="email"
               keyboardType="email-address"
               placeholder="name@example.com"
-              placeholderTextColor="#9ca3af"
-              className="mx-2 flex-1 py-3 text-right text-sm text-gray-900"
+              placeholderTextColor={palette.muted}
+              className="mx-2 flex-1 py-3 text-right text-sm text-ink"
             />
           </View>
 
-          <Text className="mb-2 mt-4 text-right text-sm font-bold text-gray-900">
+          <Text className="mb-2 mt-4 text-right text-sm font-bold text-ink">
             كلمة المرور
           </Text>
           <TextInput
@@ -214,8 +215,8 @@ export function AuthScreen() {
             secureTextEntry
             autoCapitalize="none"
             placeholder="٦ أحرف على الأقل"
-            placeholderTextColor="#9ca3af"
-            className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-right text-sm text-gray-900"
+            placeholderTextColor={palette.muted}
+            className="rounded-xl border border-line bg-surface px-4 py-3 text-right text-sm text-ink"
           />
 
           <Pressable
@@ -223,7 +224,7 @@ export function AuthScreen() {
             disabled={!isValid || busy}
             accessibilityRole="button"
             className={`mt-6 flex-row-reverse items-center justify-center rounded-2xl py-3 ${
-              isValid && !busy ? 'bg-green-600' : 'bg-gray-300'
+              isValid && !busy ? 'bg-primary' : 'bg-line-strong'
             }`}>
             {busy ? (
               <ActivityIndicator color="#ffffff" />
@@ -238,9 +239,9 @@ export function AuthScreen() {
           </Pressable>
 
           <View className="my-5 flex-row items-center">
-            <View className="h-px flex-1 bg-gray-200" />
-            <Text className="mx-3 text-xs text-gray-400">أو</Text>
-            <View className="h-px flex-1 bg-gray-200" />
+            <View className="h-px flex-1 bg-line/60" />
+            <Text className="mx-3 text-xs text-ink-subtle">أو</Text>
+            <View className="h-px flex-1 bg-line/60" />
           </View>
 
           <Pressable
@@ -248,9 +249,9 @@ export function AuthScreen() {
             disabled={busy}
             accessibilityRole="button"
             accessibilityLabel="تسجيل الدخول بحساب Google"
-            className="flex-row-reverse items-center justify-center rounded-2xl border border-gray-300 bg-white py-3">
+            className="flex-row-reverse items-center justify-center rounded-2xl border border-line-strong bg-surface py-3">
             <GoogleMark />
-            <Text className="mr-2 text-base font-bold text-gray-700">
+            <Text className="mr-2 text-base font-bold text-ink">
               المتابعة بحساب Google
             </Text>
           </Pressable>
@@ -259,14 +260,14 @@ export function AuthScreen() {
             onPress={() => void handleAnonymous()}
             disabled={busy}
             accessibilityRole="button"
-            className="mt-2 flex-row-reverse items-center justify-center rounded-2xl border border-gray-200 bg-white py-3">
-            <UserRound size={18} color="#16a34a" />
-            <Text className="mr-2 text-base font-bold text-green-700">
+            className="mt-2 flex-row-reverse items-center justify-center rounded-2xl border border-line bg-surface py-3">
+            <UserRound size={18} color={palette.primary} />
+            <Text className="mr-2 text-base font-bold text-primary">
               متابعة كضيف
             </Text>
           </Pressable>
 
-          <Text className="mt-3 text-center text-[11px] text-gray-500">
+          <Text className="mt-3 text-center text-[11px] text-ink-muted">
             حساب الضيف يحفظ بياناتك على هذا الجهاز فقط. اربطه ببريد لاحقاً
             للمزامنة.
           </Text>

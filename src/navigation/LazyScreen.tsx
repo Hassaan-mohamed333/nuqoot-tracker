@@ -1,6 +1,8 @@
 import React, { Suspense } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
+import { usePalette } from '@/store/ThemeProvider';
+
 /**
  * تحميل كسول لشاشة، مع عزل أخطائها.
  *
@@ -29,9 +31,10 @@ export function lazyScreen(
 }
 
 function ScreenFallback() {
+  const palette = usePalette();
   return (
-    <View className="flex-1 items-center justify-center bg-gray-50">
-      <ActivityIndicator color="#16a34a" />
+    <View className="flex-1 items-center justify-center bg-base">
+      <ActivityIndicator color={palette.primary} />
     </View>
   );
 }
@@ -57,14 +60,14 @@ class ScreenErrorBoundary extends React.Component<
   render() {
     if (this.state.message !== null) {
       return (
-        <View className="flex-1 items-center justify-center bg-gray-50 px-8">
-          <Text className="text-center text-sm font-semibold text-gray-800">
+        <View className="flex-1 items-center justify-center bg-base px-8">
+          <Text className="text-center text-sm font-semibold text-ink">
             تعذّر تحميل هذه الشاشة
           </Text>
-          <Text className="mt-2 text-center text-xs text-gray-500">
+          <Text className="mt-2 text-center text-xs text-ink-muted">
             {this.state.message}
           </Text>
-          <Text className="mt-3 text-center text-[11px] text-gray-400">
+          <Text className="mt-3 text-center text-[11px] text-ink-subtle">
             الميزات التي تحتاج الكاميرا أو الميكروفون تتطلب development build،
             ولا تعمل في Expo Go.
           </Text>

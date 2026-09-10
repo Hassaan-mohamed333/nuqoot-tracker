@@ -40,10 +40,10 @@ export function AlphabetIndex({
             <Text
               className={
                 isSelected
-                  ? 'text-[11px] font-bold text-green-700'
+                  ? 'text-[11px] font-bold text-primary'
                   : isActive
-                    ? 'text-[11px] font-semibold text-gray-700'
-                    : 'text-[11px] text-gray-300'
+                    ? 'text-[11px] font-semibold text-ink'
+                    : 'text-[11px] text-ink-subtle'
               }>
               {letter}
             </Text>

@@ -1,5 +1,9 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { NavigationContainer } from '@react-navigation/native';
+import {
+  DarkTheme,
+  DefaultTheme,
+  NavigationContainer,
+} from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { CalendarDays, Home, Users } from 'lucide-react-native';
 import React from 'react';
@@ -15,6 +19,7 @@ import { EventLedgerScreen } from '@/screens/EventLedgerScreen';
 import { EventParticipantsScreen } from '@/screens/EventParticipantsScreen';
 import { EventsScreen } from '@/screens/EventsScreen';
 import { HomeScreen } from '@/screens/HomeScreen';
+import { usePalette, useTheme } from '@/store/ThemeProvider';
 
 /**
  * هذه الشاشات وحدها تلمس وحدات أصلية (منتقي التاريخ، الكاميرا،
@@ -38,13 +43,18 @@ const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function TabsNavigator() {
+  const palette = usePalette();
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#16a34a',
-        tabBarInactiveTintColor: '#9ca3af',
+        tabBarActiveTintColor: palette.primary,
+        tabBarInactiveTintColor: palette.muted,
         tabBarLabelStyle: { fontSize: 11 },
+        tabBarStyle: {
+          backgroundColor: palette.surface,
+          borderTopColor: palette.border,
+        },
       }}>
       <Tab.Screen
         name="Home"
@@ -77,13 +87,34 @@ function TabsNavigator() {
 }
 
 export function RootNavigator() {
+  const palette = usePalette();
+  const { scheme } = useTheme();
+
+  /**
+   * سمة التنقّل تُضبط هنا أيضاً، لا في أصناف الشاشات وحدها: الخلفية بين
+   * الشاشات أثناء الانتقال يرسمها المتنقّل نفسه، فتظهر وميضاً أبيض في
+   * الوضع الليلي إن بقيت على القيمة الافتراضية.
+   */
+  const navigationTheme = {
+    ...(scheme === 'dark' ? DarkTheme : DefaultTheme),
+    colors: {
+      ...(scheme === 'dark' ? DarkTheme : DefaultTheme).colors,
+      primary: palette.primary,
+      background: palette.base,
+      card: palette.surface,
+      text: palette.text,
+      border: palette.border,
+    },
+  };
+
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={navigationTheme}>
       <Stack.Navigator
         screenOptions={{
           headerTitleAlign: 'center',
-          headerStyle: { backgroundColor: '#ffffff' },
-          headerTintColor: '#111827',
+          headerStyle: { backgroundColor: palette.surface },
+          headerTintColor: palette.text,
+          contentStyle: { backgroundColor: palette.base },
         }}>
         <Stack.Screen
           name="Tabs"

@@ -1,3 +1,82 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * رموز التصميم (design tokens) كمتغيّرات CSS.
+ *
+ * القيم مكوّنات RGB مفصولة بمسافات لا ألوان كاملة، حتى تعمل صيغة
+ * `rgb(var(--token) / <alpha-value>)` في tailwind.config.js وتبقى أدوات
+ * الشفافية مثل `bg-primary/10` صالحة.
+ *
+ * الفائدة: صنف واحد مثل `bg-surface` يعمل في الوضعين، فلا نكرّر
+ * `dark:` على كل عنصر ولا يمكن أن ينسى أحدهم النسخة الليلية.
+ */
+:root {
+  /* الهوية: أزرق ياقوتي للإجراءات الأساسية والعلامة. */
+  --color-primary: 15 82 186; /* #0F52BA */
+  --color-primary-soft: 219 232 252;
+  --color-primary-strong: 10 58 133;
+  --color-on-primary: 255 255 255;
+
+  /* المناسبات والمصاريف المشتركة: بنفسجي ملكي. */
+  --color-secondary: 124 58 237; /* #7C3AED */
+  --color-secondary-soft: 237 230 254;
+  --color-on-secondary: 255 255 255;
+
+  /* دلالات الرصيد: دائن أخضر، مدين أحمر. */
+  --color-success: 16 185 129; /* #10B981 */
+  --color-success-soft: 209 250 229;
+  --color-danger: 239 68 68; /* #EF4444 */
+  --color-danger-soft: 254 226 226;
+  --color-warning: 245 158 11;
+  --color-warning-soft: 254 243 199;
+
+  /* الأسطح والنصوص. */
+  --color-base: 248 250 252; /* #F8FAFC */
+  --color-surface: 255 255 255; /* #FFFFFF */
+  --color-surface-raised: 255 255 255;
+  --color-border: 226 232 240;
+  --color-border-strong: 203 213 225;
+
+  --color-text: 15 23 42;
+  --color-text-muted: 100 116 139; /* #64748B */
+  --color-text-subtle: 148 163 184;
+
+  /* طبقة زجاجية: تعبئة وحدّ شبه شفّافين فوق الأسطح. */
+  --color-glass: 255 255 255;
+  --color-glass-border: 255 255 255;
+  --color-overlay: 15 23 42;
+}
+
+.dark:root {
+  --color-primary: 96 150 255;
+  --color-primary-soft: 25 45 84;
+  --color-primary-strong: 147 187 255;
+  --color-on-primary: 8 17 34;
+
+  --color-secondary: 167 122 250;
+  --color-secondary-soft: 49 33 85;
+  --color-on-secondary: 12 8 26;
+
+  --color-success: 52 211 153;
+  --color-success-soft: 6 59 47;
+  --color-danger: 248 113 113;
+  --color-danger-soft: 69 20 20;
+  --color-warning: 251 191 36;
+  --color-warning-soft: 69 45 6;
+
+  --color-base: 11 15 23; /* #0B0F17 */
+  --color-surface: 30 41 59; /* #1E293B */
+  --color-surface-raised: 40 53 74;
+  --color-border: 51 65 85;
+  --color-border-strong: 71 85 105;
+
+  --color-text: 241 245 249;
+  --color-text-muted: 148 163 184;
+  --color-text-subtle: 100 116 139;
+
+  --color-glass: 148 163 184;
+  --color-glass-border: 203 213 225;
+  --color-overlay: 2 6 15;
+}
