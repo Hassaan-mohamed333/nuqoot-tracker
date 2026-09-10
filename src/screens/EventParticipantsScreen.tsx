@@ -216,7 +216,7 @@ export function EventParticipantsScreen() {
             className={`mr-2 h-12 w-12 items-center justify-center rounded-xl ${
               guestDraft.trim().length === 0 ? 'bg-line-strong' : 'bg-primary'
             }`}>
-            <UserPlus size={20} color="#ffffff" />
+            <UserPlus size={20} color={palette.onPrimary} />
           </Pressable>
         </View>
 
@@ -255,7 +255,7 @@ export function EventParticipantsScreen() {
             saving ? 'bg-line-strong' : 'bg-primary'
           }`}>
           {saving ? (
-            <ActivityIndicator color="#ffffff" />
+            <ActivityIndicator color={palette.onPrimary} />
           ) : (
             <Text className="text-base font-bold text-white">حفظ المشاركين</Text>
           )}

@@ -107,7 +107,7 @@ export function ScanReceiptScreen() {
           disabled={busy}
           accessibilityRole="button"
           className="flex-1 flex-row-reverse items-center justify-center rounded-2xl bg-primary py-3">
-          <Camera size={18} color="#ffffff" />
+          <Camera size={18} color={palette.onPrimary} />
           <Text className="mr-2 text-sm font-bold text-white">تصوير إيصال</Text>
         </Pressable>
         <Pressable

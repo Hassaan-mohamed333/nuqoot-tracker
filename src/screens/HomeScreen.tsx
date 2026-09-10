@@ -181,7 +181,7 @@ export function HomeScreen() {
               onPress={() => navigation.navigate('AddContact')}
               accessibilityRole="button"
               className="mt-4 flex-row-reverse items-center justify-center rounded-2xl bg-primary py-3">
-              <UserPlus size={18} color="#ffffff" />
+              <UserPlus size={18} color={palette.onPrimary} />
               <Text className="mr-2 text-sm font-bold text-white">
                 إضافة جهة اتصال
               </Text>
@@ -204,7 +204,7 @@ export function HomeScreen() {
             onPress={() => navigation.navigate('SmartInput')}
             accessibilityRole="button"
             className="flex-1 flex-row-reverse items-center justify-center rounded-2xl bg-primary py-3">
-            <Sparkles size={18} color="#ffffff" />
+            <Sparkles size={18} color={palette.onPrimary} />
             <Text className="mr-2 text-sm font-bold text-white">إدخال ذكي</Text>
           </Pressable>
           <Pressable

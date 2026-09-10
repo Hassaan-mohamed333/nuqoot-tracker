@@ -147,7 +147,7 @@ export function AddContactScreen() {
             isValid && !saving ? 'bg-primary' : 'bg-line-strong'
           }`}>
           {saving ? (
-            <ActivityIndicator color="#ffffff" />
+            <ActivityIndicator color={palette.onPrimary} />
           ) : (
             <Text className="text-base font-bold text-white">حفظ جهة الاتصال</Text>
           )}

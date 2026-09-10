@@ -1,12 +1,14 @@
 import React from 'react';
 import type { ViewStyle } from 'react-native';
 import { Text, View } from 'react-native';
-import { tv } from 'tailwind-variants';
 
 import { FadeSlideIn, PressableScale } from '@/components/motion';
+import { sv } from '@/lib/variants';
 
-const card = tv({
-  base: 'rounded-card p-4',
+const card = sv({
+  // بلا حشوة في الأساس: لو وضعناها هنا لاجتمع `p-4` مع `p-2` القادم من
+  // المستدعي، ولا يفوز الأخير في السلسلة بل ترتيبُ قواعد Tailwind.
+  base: 'rounded-card',
   variants: {
     variant: {
       /** السطح العادي: حدّ رفيع بدل ظلّ ثقيل. */
@@ -20,8 +22,9 @@ const card = tv({
       secondary: 'border border-secondary/25 bg-secondary/10',
       success: 'border border-success/25 bg-success-soft',
       danger: 'border border-danger/25 bg-danger-soft',
+      warning: 'border border-warning/30 bg-warning-soft',
     },
-    padded: { true: '', false: 'p-0' },
+    padded: { true: 'p-4', false: '' },
   },
   defaultVariants: { variant: 'surface', padded: true },
 });
@@ -34,7 +37,8 @@ export type CardVariant =
   | 'primary'
   | 'secondary'
   | 'success'
-  | 'danger';
+  | 'danger'
+  | 'warning';
 
 interface CardProps {
   children: React.ReactNode;

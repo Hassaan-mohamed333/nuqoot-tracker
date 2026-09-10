@@ -19,7 +19,7 @@ import Svg, {
   Stop,
 } from 'react-native-svg';
 
-import { usePalette } from '@/store/ThemeProvider';
+import { PALETTE, usePalette } from '@/store/ThemeProvider';
 
 export type LogoVariant = 'mark' | 'badge' | 'full';
 export type LogoTone = 'brand' | 'mono' | 'inverse';
@@ -51,9 +51,17 @@ export function AppLogo({
 
   const isBadge = variant === 'badge' || variant === 'full';
 
-  // على الخلفية المتدرّجة يكون الرسم أبيض؛ وإلا يأخذ لون النغمة.
+  /*
+   * الشارة لوح داكن ثابت في الوضعين، والرسم عليه بلون الهوية.
+   *
+   * كانت الخلفية متدرّجة من اللون الأساسي والرسم أبيض؛ مع الليموني النيون
+   * صار الأبيض على الفاتح غير مرئي تقريباً. واللوح الداكن أصحّ كعلامة على
+   * أي حال: أيقونة التطبيق لا تتبدّل مع سمة الجهاز.
+   */
   const glyphColor = isBadge
-    ? '#FFFFFF'
+    ? tone === 'mono'
+      ? '#F8FAFC'
+      : PALETTE.dark.primary
     : tone === 'mono'
       ? palette.text
       : tone === 'inverse'
@@ -74,14 +82,8 @@ export function AppLogo({
         <>
           <Defs>
             <LinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-              <Stop
-                offset="0"
-                stopColor={tone === 'mono' ? palette.text : palette.primary}
-              />
-              <Stop
-                offset="1"
-                stopColor={tone === 'mono' ? palette.muted : palette.secondary}
-              />
+              <Stop offset="0" stopColor={PALETTE.dark.surface} />
+              <Stop offset="1" stopColor={PALETTE.dark.base} />
             </LinearGradient>
           </Defs>
           <Rect

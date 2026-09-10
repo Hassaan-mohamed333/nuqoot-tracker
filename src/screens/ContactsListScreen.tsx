@@ -81,7 +81,7 @@ export function ContactsListScreen() {
           accessibilityRole="button"
           accessibilityLabel="إضافة جهة اتصال"
           className="h-10 w-10 items-center justify-center rounded-full bg-primary">
-          <Plus size={20} color="#ffffff" />
+          <Plus size={20} color={palette.onPrimary} />
         </Pressable>
       </View>
 

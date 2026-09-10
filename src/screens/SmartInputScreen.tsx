@@ -184,10 +184,10 @@ export function SmartInputScreen() {
                 : 'bg-primary'
             }`}>
             {busy ? (
-              <ActivityIndicator color="#ffffff" />
+              <ActivityIndicator color={palette.onPrimary} />
             ) : (
               <>
-                <Send size={18} color="#ffffff" />
+                <Send size={18} color={palette.onPrimary} />
                 <Text className="mr-2 text-base font-bold text-white">تحليل</Text>
               </>
             )}

@@ -183,7 +183,7 @@ export function ContactProfileScreen() {
               }
               accessibilityRole="button"
               className="flex-row-reverse items-center rounded-xl bg-primary px-4 py-2">
-              <Plus size={16} color="#ffffff" />
+              <Plus size={16} color={palette.onPrimary} />
               <Text className="mr-1 text-sm font-semibold text-white">
                 إضافة حركة
               </Text>

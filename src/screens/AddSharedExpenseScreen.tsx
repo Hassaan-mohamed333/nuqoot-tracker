@@ -272,8 +272,8 @@ export function AddSharedExpenseScreen() {
 
       {offline ? (
         <Card
-          variant="outline"
-          className="mt-6 border-warning/40"
+          variant="warning"
+          className="mt-6"
           padded={false}
           animate={false}>
           <View className="flex-row-reverse items-center p-3">
@@ -394,7 +394,7 @@ export function AddSharedExpenseScreen() {
             <Button
               title="إضافة مشاركين"
               className="mt-3"
-              icon={<UserPlus size={16} color="#FFFFFF" />}
+              icon={<UserPlus size={16} color={palette.onPrimary} />}
               onPress={() =>
                 navigation.navigate('EventParticipants', {
                   eventId: params.eventId,

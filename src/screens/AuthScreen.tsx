@@ -227,10 +227,10 @@ export function AuthScreen() {
               isValid && !busy ? 'bg-primary' : 'bg-line-strong'
             }`}>
             {busy ? (
-              <ActivityIndicator color="#ffffff" />
+              <ActivityIndicator color={palette.onPrimary} />
             ) : (
               <>
-                <LogIn size={18} color="#ffffff" />
+                <LogIn size={18} color={palette.onPrimary} />
                 <Text className="mr-2 text-base font-bold text-white">
                   {mode === 'signIn' ? 'تسجيل الدخول' : 'إنشاء الحساب'}
                 </Text>

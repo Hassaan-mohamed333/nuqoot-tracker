@@ -52,7 +52,7 @@ const STATUS_THEME: Record<LedgerStatus, StatusTheme> = {
   },
   debit: {
     label: 'مدين',
-    color: '#EF4444',
+    color: '#FF453A',
     colorKey: 'danger',
     textClass: 'text-debit',
     bgClass: 'bg-danger-soft',

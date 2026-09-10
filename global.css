@@ -11,37 +11,47 @@
  *
  * الفائدة: صنف واحد مثل `bg-surface` يعمل في الوضعين، فلا نكرّر
  * `dark:` على كل عنصر ولا يمكن أن ينسى أحدهم النسخة الليلية.
+ *
+ * الهوية مصمّمة للوضع الليلي أولاً (قاعدة شبه سوداء ولمسة نيون)، والوضع
+ * الفاتح مشتقّ منها لا العكس.
  */
 :root {
-  /* الهوية: أزرق ياقوتي للإجراءات الأساسية والعلامة. */
-  --color-primary: 15 82 186; /* #0F52BA */
-  --color-primary-soft: 219 232 252;
-  --color-primary-strong: 10 58 133;
+  /*
+   * اللون المميّز في الوضع الفاتح ليس النيون نفسه.
+   *
+   * الليموني #CCFF00 إضاءته عالية جداً: تباينه مع الأبيض ‎1.2:1‎، فالزرّ
+   * يذوب في البطاقة البيضاء ونصّه غير مقروء. نستعمل هنا الدرجة الغامقة من
+   * العائلة نفسها (تباين ‎5:1‎ مع الأبيض)، ويبقى النيون لِما صُمّم له:
+   * الوضع الليلي.
+   */
+  --color-primary: 77 124 15; /* #4D7C0F */
+  --color-primary-soft: 236 252 203; /* #ECFCCB */
+  --color-primary-strong: 63 98 18; /* #3F6212 */
   --color-on-primary: 255 255 255;
 
-  /* المناسبات والمصاريف المشتركة: بنفسجي ملكي. */
-  --color-secondary: 124 58 237; /* #7C3AED */
-  --color-secondary-soft: 237 230 254;
+  /* المناسبات والمصاريف المشتركة: بنفسجي سيبراني. */
+  --color-secondary: 99 102 241; /* #6366F1 */
+  --color-secondary-soft: 224 225 253;
   --color-on-secondary: 255 255 255;
 
   /* دلالات الرصيد: دائن أخضر، مدين أحمر. */
   --color-success: 16 185 129; /* #10B981 */
   --color-success-soft: 209 250 229;
-  --color-danger: 239 68 68; /* #EF4444 */
-  --color-danger-soft: 254 226 226;
+  --color-danger: 255 69 58; /* #FF453A */
+  --color-danger-soft: 255 227 225;
   --color-warning: 245 158 11;
   --color-warning-soft: 254 243 199;
 
   /* الأسطح والنصوص. */
-  --color-base: 248 250 252; /* #F8FAFC */
+  --color-base: 244 245 248; /* #F4F5F8 */
   --color-surface: 255 255 255; /* #FFFFFF */
   --color-surface-raised: 255 255 255;
-  --color-border: 226 232 240;
-  --color-border-strong: 203 213 225;
+  --color-border: 227 230 237;
+  --color-border-strong: 203 209 221;
 
   --color-text: 15 23 42;
   --color-text-muted: 100 116 139; /* #64748B */
-  --color-text-subtle: 148 163 184;
+  --color-text-subtle: 148 163 184; /* #94A3B8 */
 
   /* طبقة زجاجية: تعبئة وحدّ شبه شفّافين فوق الأسطح. */
   --color-glass: 255 255 255;
@@ -50,33 +60,38 @@
 }
 
 .dark:root {
-  --color-primary: 96 150 255;
-  --color-primary-soft: 25 45 84;
-  --color-primary-strong: 147 187 255;
-  --color-on-primary: 8 17 34;
+  /* النيون: على القاعدة شبه السوداء تباينه ‎17:1‎، ونصّه غامق فوقه. */
+  --color-primary: 204 255 0; /* #CCFF00 */
+  --color-primary-soft: 36 51 0;
+  --color-primary-strong: 184 230 0;
+  --color-on-primary: 9 10 15; /* #090A0F */
 
-  --color-secondary: 167 122 250;
-  --color-secondary-soft: 49 33 85;
-  --color-on-secondary: 12 8 26;
+  /*
+   * البنفسجي مرفوع درجة عن #6366F1 في الوضع الليلي: نصّ صغير بالقيمة
+   * الأصلية فوق سطح #141722 يقارب ‎4:1‎ وهو دون حدّ القراءة.
+   */
+  --color-secondary: 129 140 248; /* #818CF8 */
+  --color-secondary-soft: 40 43 92;
+  --color-on-secondary: 9 10 15;
 
-  --color-success: 52 211 153;
+  --color-success: 16 185 129; /* #10B981 */
   --color-success-soft: 6 59 47;
-  --color-danger: 248 113 113;
+  --color-danger: 255 69 58; /* #FF453A */
   --color-danger-soft: 69 20 20;
   --color-warning: 251 191 36;
   --color-warning-soft: 69 45 6;
 
-  --color-base: 11 15 23; /* #0B0F17 */
-  --color-surface: 30 41 59; /* #1E293B */
-  --color-surface-raised: 40 53 74;
-  --color-border: 51 65 85;
-  --color-border-strong: 71 85 105;
+  --color-base: 9 10 15; /* #090A0F */
+  --color-surface: 20 23 34; /* #141722 */
+  --color-surface-raised: 26 30 43;
+  --color-border: 35 40 59; /* #23283B */
+  --color-border-strong: 47 53 80;
 
-  --color-text: 241 245 249;
-  --color-text-muted: 148 163 184;
-  --color-text-subtle: 100 116 139;
+  --color-text: 248 250 252; /* #F8FAFC */
+  --color-text-muted: 148 163 184; /* #94A3B8 */
+  --color-text-subtle: 100 116 139; /* #64748B */
 
   --color-glass: 148 163 184;
   --color-glass-border: 203 213 225;
-  --color-overlay: 2 6 15;
+  --color-overlay: 2 3 8;
 }

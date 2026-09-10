@@ -8,6 +8,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import { Platform } from 'react-native';
 
 /** تفضيل المستخدم، لا الوضع الفعلي: `system` يتبع إعداد الجهاز. */
 export type ThemePreference = 'light' | 'dark' | 'system';
@@ -71,6 +72,28 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const scheme: 'light' | 'dark' = colorScheme === 'dark' ? 'dark' : 'light';
 
+  /*
+   * تطبيق تفضيل النظام على الويب بأنفسنا.
+   *
+   * مع `darkMode: 'class'` لا يقرأ NativeWind على الويب استعلام
+   * prefers-color-scheme إطلاقاً: يثبّت القيمة الابتدائية على 'light' ما لم
+   * يكن صنف `dark` موجوداً على <html> لحظة التحميل. فيبقى وضع `system` —
+   * وهو التفضيل الافتراضي — فاتحاً أبداً مهما كان إعداد الجهاز.
+   *
+   * والأسوأ أن قيمة جافاسكربت ولوحة الألوان قد تسبق الأصناف، فيظهر زرّ
+   * ليموني نيون على صفحة بيضاء. نقرأ الاستعلام هنا ونتابع تغيّره.
+   */
+  useEffect(() => {
+    if (Platform.OS !== 'web' || preference !== 'system') return;
+    const query = globalThis.matchMedia?.('(prefers-color-scheme: dark)');
+    if (!query) return;
+
+    const apply = () => setColorScheme(query.matches ? 'dark' : 'light');
+    apply();
+    query.addEventListener('change', apply);
+    return () => query.removeEventListener('change', apply);
+  }, [preference, setColorScheme]);
+
   const toggle = useCallback(() => {
     setPreference(scheme === 'dark' ? 'light' : 'dark');
   }, [scheme, setPreference]);
@@ -99,30 +122,33 @@ export function useTheme(): ThemeContextValue {
  */
 export const PALETTE = {
   light: {
-    primary: '#0F52BA',
-    secondary: '#7C3AED',
+    // الدرجة الغامقة من الليموني: النيون نفسه غير مقروء على الأبيض.
+    primary: '#4D7C0F',
+    secondary: '#6366F1',
     success: '#10B981',
-    danger: '#EF4444',
+    danger: '#FF453A',
     warning: '#F59E0B',
-    base: '#F8FAFC',
+    base: '#F4F5F8',
     surface: '#FFFFFF',
-    border: '#E2E8F0',
+    border: '#E3E6ED',
     text: '#0F172A',
     muted: '#64748B',
     onPrimary: '#FFFFFF',
+    onSecondary: '#FFFFFF',
   },
   dark: {
-    primary: '#6096FF',
-    secondary: '#A77AFA',
-    success: '#34D399',
-    danger: '#F87171',
+    primary: '#CCFF00',
+    secondary: '#818CF8',
+    success: '#10B981',
+    danger: '#FF453A',
     warning: '#FBBF24',
-    base: '#0B0F17',
-    surface: '#1E293B',
-    border: '#334155',
-    text: '#F1F5F9',
+    base: '#090A0F',
+    surface: '#141722',
+    border: '#23283B',
+    text: '#F8FAFC',
     muted: '#94A3B8',
-    onPrimary: '#081122',
+    onPrimary: '#090A0F',
+    onSecondary: '#090A0F',
   },
 } as const;
 

@@ -111,7 +111,7 @@ export function EventLedgerScreen() {
             </View>
           </Card>
         ) : data?.offline ? (
-          <Card variant="outline" className="mb-3 border-warning/40" padded={false}>
+          <Card variant="warning" className="mb-3" padded={false}>
             <View className="flex-row-reverse items-center p-3">
               <CloudOff size={16} color={palette.warning} />
               <Text className="mr-2 flex-1 text-right text-caption text-ink-muted">
@@ -156,7 +156,7 @@ export function EventLedgerScreen() {
               onPress={() =>
                 navigation.navigate('AddSharedExpense', { eventId: event.id })
               }
-              icon={<Plus size={16} color="#FFFFFF" />}
+              icon={<Plus size={16} color={palette.onSecondary} />}
               className="flex-1"
             />
             <Button

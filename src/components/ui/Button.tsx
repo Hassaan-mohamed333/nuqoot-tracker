@@ -1,11 +1,11 @@
 import React from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
-import { tv } from 'tailwind-variants';
 
 import { PressableScale } from '@/components/motion';
+import { sv } from '@/lib/variants';
 import { usePalette } from '@/store/ThemeProvider';
 
-const button = tv({
+const button = sv({
   base: 'flex-row-reverse items-center justify-center rounded-2xl',
   variants: {
     variant: {
@@ -29,8 +29,8 @@ const button = tv({
   defaultVariants: { variant: 'primary', size: 'md', block: true },
 });
 
-const label = tv({
-  base: 'font-bold text-center',
+const label = sv({
+  base: 'text-center font-bold',
   variants: {
     variant: {
       primary: 'text-primary-fg',
@@ -86,15 +86,8 @@ export function Button({
   const palette = usePalette();
   const inactive = disabled || loading;
 
-  // لون المؤشّر يتبع لون النص، وإلا اختفى فوق التعبئة الداكنة.
-  const spinnerColor =
-    variant === 'outline' || variant === 'glass'
-      ? palette.text
-      : variant === 'ghost'
-        ? palette.primary
-        : palette.onPrimary === '#FFFFFF' || variant !== 'primary'
-          ? '#FFFFFF'
-          : palette.onPrimary;
+  // لون المؤشّر يتبع لون النص، وإلا اختفى فوق التعبئة.
+  const spinnerColor = SPINNER_TONE[variant](palette);
 
   return (
     <PressableScale
@@ -116,3 +109,16 @@ export function Button({
     </PressableScale>
   );
 }
+
+type Palette = ReturnType<typeof usePalette>;
+
+/** لون مؤشّر التحميل لكل نغمة، مطابقاً للون النص في `label` أعلاه. */
+const SPINNER_TONE: Record<ButtonVariant, (palette: Palette) => string> = {
+  primary: (palette) => palette.onPrimary,
+  secondary: (palette) => palette.onSecondary,
+  success: () => '#FFFFFF',
+  danger: () => '#FFFFFF',
+  outline: (palette) => palette.text,
+  glass: (palette) => palette.text,
+  ghost: (palette) => palette.primary,
+};
