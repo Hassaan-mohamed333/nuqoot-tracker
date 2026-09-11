@@ -37,7 +37,7 @@ export function LedgerSummaryBar({
 
   return (
     <View
-      className={`border-t border-line bg-surface px-4 pt-3 ${
+      className={`border-t border-line bg-accent-soft px-4 pt-3 ${
         aboveTabBar ? 'pb-28' : 'pb-6'
       } ${floating ? 'absolute inset-x-0 bottom-0' : ''}`}>
       <View className="flex-row-reverse items-center justify-between">

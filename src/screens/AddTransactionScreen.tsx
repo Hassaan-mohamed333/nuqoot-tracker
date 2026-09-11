@@ -199,7 +199,7 @@ export function AddTransactionScreen() {
           action={
             <PillAction
               label="جديدة"
-              icon={<UserPlus size={14} color={palette.primary} />}
+              icon={<UserPlus size={14} color={palette.text} />}
               onPress={() =>
                 navigation.navigate('AddContact', { returnTo: 'AddTransaction' })
               }
@@ -247,7 +247,7 @@ export function AddTransactionScreen() {
           action={
             <PillAction
               label="جديدة"
-              icon={<Plus size={14} color={palette.primary} />}
+              icon={<Plus size={14} color={palette.text} />}
               onPress={() =>
                 navigation.navigate('AddEvent', {
                   returnTo: 'AddTransaction',
@@ -398,9 +398,9 @@ function PillAction({
       accessibilityRole="button"
       accessibilityLabel={label}
       activeScale={0.94}
-      className="flex-row-reverse items-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1">
+      className="flex-row-reverse items-center rounded-full border border-accent/50 bg-accent-soft px-3 py-1">
       {icon}
-      <Text className="mr-1 text-caption font-bold text-primary">{label}</Text>
+      <Text className="mr-1 text-caption font-bold text-ink">{label}</Text>
     </PressableScale>
   );
 }

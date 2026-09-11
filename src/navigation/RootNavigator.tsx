@@ -7,6 +7,7 @@ import {
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { CalendarDays, Home, Users } from 'lucide-react-native';
 import React from 'react';
+import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { lazyScreen } from '@/navigation/LazyScreen';
@@ -43,6 +44,24 @@ const ScanReceiptScreen = lazyScreen(() =>
 const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+/** حبّة ذهبية خلف أيقونة التبويب النشط، وشفافة فيما عداه. */
+function TabIcon({
+  focused,
+  children,
+}: {
+  focused: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <View
+      className={`items-center justify-center rounded-full px-5 py-1 ${
+        focused ? 'bg-accent' : 'bg-transparent'
+      }`}>
+      {children}
+    </View>
+  );
+}
+
 function TabsNavigator() {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
@@ -50,7 +69,16 @@ function TabsNavigator() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: palette.primary,
+        /*
+         * الحبّة الذهبية تُرسم داخل الأيقونة لا عبر
+         * `tabBarActiveBackgroundColor`: تلك تملأ مستطيل العنصر كاملاً،
+         * فتتجاوز استدارة الشريط وتظهر مربّعة عند الحافة، ومعها اختفت
+         * التسميات لضيق ما تبقّى من ارتفاع.
+         *
+         * والتسمية النشطة حبرية لا ذهبية: الذهب على سطح فاتح تباينه
+         * ‎1.4:1‎ فلا يصلح لوناً لنصّ.
+         */
+        tabBarActiveTintColor: palette.text,
         tabBarInactiveTintColor: palette.muted,
         /*
          * تسمية أصغر بسطر واحد: 11 مع ارتفاع 64 كانت تقصّ الكلمات
@@ -78,15 +106,21 @@ function TabsNavigator() {
           shadowRadius: 24,
           shadowOffset: { width: 0, height: 10 },
           elevation: 12,
+          overflow: 'hidden',
         },
-        tabBarItemStyle: { borderRadius: 24 },
+        // يمنع أي تعبئة من تجاوز استدارة الشريط العائم.
+        tabBarItemStyle: { borderRadius: 26 },
       }}>
       <Tab.Screen
         name="Home"
         component={HomeScreen}
         options={{
           title: 'الرئيسية',
-          tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon focused={focused}>
+              <Home size={size} color={focused ? palette.onAccent : color} />
+            </TabIcon>
+          ),
         }}
       />
       <Tab.Screen
@@ -94,7 +128,11 @@ function TabsNavigator() {
         component={ContactsListScreen}
         options={{
           title: 'جهات الاتصال',
-          tabBarIcon: ({ color, size }) => <Users size={size} color={color} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon focused={focused}>
+              <Users size={size} color={focused ? palette.onAccent : color} />
+            </TabIcon>
+          ),
         }}
       />
       <Tab.Screen
@@ -102,8 +140,10 @@ function TabsNavigator() {
         component={EventsScreen}
         options={{
           title: 'المناسبات',
-          tabBarIcon: ({ color, size }) => (
-            <CalendarDays size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon focused={focused}>
+              <CalendarDays size={size} color={focused ? palette.onAccent : color} />
+            </TabIcon>
           ),
         }}
       />

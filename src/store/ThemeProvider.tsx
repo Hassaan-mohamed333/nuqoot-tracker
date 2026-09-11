@@ -122,24 +122,27 @@ export function useTheme(): ThemeContextValue {
  */
 export const PALETTE = {
   light: {
-    // الكحلي يحمل الإجراء الرئيسي: الذهب غير مقروء على الأبيض.
+    // الكحلي يحمل الإجراء الرئيسي؛ الذهب مؤشّر تفعيل لا لون نصّ.
     primary: '#001D3D',
+    accent: '#FFD60A',
     secondary: '#003566',
     success: '#10B981',
     danger: '#FF453A',
     warning: '#FFC300',
-    base: '#FFFFFF',
+    base: '#F4F6F9',
     surface: '#FFFFFF',
-    surfaceRaised: '#F2F4F8',
-    border: '#E2E6EE',
+    surfaceRaised: '#EDF1F6',
+    border: '#E2E8F0',
     text: '#000814',
-    muted: '#435063',
+    muted: '#003566',
+    subtle: '#4A6B8F',
     onPrimary: '#FFFFFF',
     onSecondary: '#FFFFFF',
+    onAccent: '#000814',
   },
   dark: {
-    // الذهب زرّاً على الكحلي: موضعه الطبيعي في هذه اللوحة.
     primary: '#FFC300',
+    accent: '#FFD60A',
     secondary: '#4A87C7',
     success: '#34D399',
     danger: '#FF6961',
@@ -150,8 +153,10 @@ export const PALETTE = {
     border: '#0A3F71',
     text: '#F0F4F9',
     muted: '#93A6BE',
+    subtle: '#62748C',
     onPrimary: '#000814',
     onSecondary: '#000814',
+    onAccent: '#000814',
   },
 } as const;
 

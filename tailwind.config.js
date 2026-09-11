@@ -22,6 +22,12 @@ module.exports = {
           strong: token('primary-strong'),
           fg: token('on-primary'),
         },
+        /** مؤشّر الحالة النشطة: ذهب، ونصّه دائماً `accent-fg` الداكن. */
+        accent: {
+          DEFAULT: token('accent'),
+          soft: token('accent-soft'),
+          fg: token('on-accent'),
+        },
         secondary: {
           DEFAULT: token('secondary'),
           soft: token('secondary-soft'),
@@ -38,6 +44,7 @@ module.exports = {
         warning: {
           DEFAULT: token('warning'),
           soft: token('warning-soft'),
+          fg: token('on-warning'),
         },
 
         base: token('base'),

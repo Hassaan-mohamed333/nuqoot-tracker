@@ -97,7 +97,7 @@ export function Field({
             focus.value = 0;
             onBlur?.(event);
           }}
-          placeholderTextColor={palette.muted}
+          placeholderTextColor={palette.subtle}
           className={`flex-1 py-3 text-right ${
             emphasis ? 'text-xl font-bold' : 'text-base'
           } ${inputClassName ?? 'text-ink'}`}

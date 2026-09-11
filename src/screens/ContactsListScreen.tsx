@@ -135,7 +135,7 @@ export function ContactsListScreen() {
           value={query}
           onChangeText={setQuery}
           placeholder="ابحث بالاسم أو الهاتف"
-          placeholderTextColor={palette.muted}
+          placeholderTextColor={palette.subtle}
           returnKeyType="search"
           className="mx-2 flex-1 py-2.5 text-right text-body text-ink"
         />

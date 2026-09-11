@@ -22,17 +22,23 @@
  */
 :root {
   /*
-   * الذهب لا يصلح تعبئةَ زرّ على الأبيض: تباين #FFC300 مع الأبيض ‎1.6:1‎،
-   * فالحبّة تذوب ونصّها غير مقروء. لذلك يحمل الكحليُّ الإجراءَ الرئيسي في
-   * الوضع الفاتح، ويبقى الذهب لمسةَ إبراز. وفي الوضع الداكن ينقلب الأمر
-   * ويصير الذهب هو الزرّ، وهو موضعه الطبيعي في هذه اللوحة.
+   * الإجراء الرئيسي كحلي، ومؤشّر التفعيل ذهبي.
+   *
+   * الذهب لا يصلح لوناً لنصّ ولا لتعبئة زرّ فوق الأبيض: تباين #FFD60A مع
+   * الأبيض ‎1.4:1‎. فحيثما ظهر الذهب يكون تعبئةً صريحة يعلوها نصّ داكن
+   * (--color-on-accent)، لا لوناً للنصّ نفسه.
    */
   --color-primary: 0 29 61; /* #001D3D — Prussian Blue */
   --color-primary-soft: 230 236 243;
   --color-primary-strong: 0 8 20; /* #000814 — Ink Black */
   --color-on-primary: 255 255 255;
 
-  /* المناسبات والمصاريف المشتركة: الكحلي الأفتح، ليتمايز عن الرئيسي. */
+  /* مؤشّر الحالة النشطة: ذهب بنصّ حبري. */
+  --color-accent: 255 214 10; /* #FFD60A — Gold */
+  --color-accent-soft: 255 251 235; /* #FFFBEB — حاوية بلمسة ذهبية */
+  --color-on-accent: 0 8 20; /* #000814 */
+
+  /* المناسبات والمصاريف المشتركة. */
   --color-secondary: 0 53 102; /* #003566 — Regal Navy */
   --color-secondary-soft: 220 232 245;
   --color-on-secondary: 255 255 255;
@@ -43,18 +49,19 @@
   --color-danger: 255 69 58;
   --color-danger-soft: 255 227 225;
   --color-warning: 255 195 0; /* #FFC300 — School Bus Yellow */
-  --color-warning-soft: 255 243 204;
+  --color-warning-soft: 255 251 235; /* #FFFBEB */
+  --color-on-warning: 0 8 20;
 
-  /* الأرضية بيضاء، والفصل بحدّ شعري ولوح رمادي فاتح. */
-  --color-base: 255 255 255;
+  /* الأرضية إردوازية فاتحة، والبطاقات بيضاء فوقها بحدّ #E2E8F0. */
+  --color-base: 244 246 249; /* #F4F6F9 */
   --color-surface: 255 255 255;
-  --color-surface-raised: 242 244 248;
-  --color-border: 226 230 238;
-  --color-border-strong: 196 205 219;
+  --color-surface-raised: 237 241 246;
+  --color-border: 226 232 240; /* #E2E8F0 */
+  --color-border-strong: 199 211 226;
 
-  --color-text: 0 8 20; /* #000814 */
-  --color-text-muted: 67 80 99;
-  --color-text-subtle: 128 140 158;
+  --color-text: 0 8 20; /* #000814 — Ink Black */
+  --color-text-muted: 0 53 102; /* #003566 — Regal Navy، النصّ الثانوي */
+  --color-text-subtle: 74 107 143;
 
   --color-glass: 255 255 255;
   --color-glass-border: 255 255 255;
@@ -76,12 +83,18 @@
   --color-secondary-soft: 0 41 79;
   --color-on-secondary: 0 8 20;
 
+  /* مؤشّر الحالة النشطة: ذهب بنصّ حبري، كما في الوضع الفاتح. */
+  --color-accent: 255 214 10; /* #FFD60A */
+  --color-accent-soft: 61 47 0;
+  --color-on-accent: 0 8 20;
+
   --color-success: 52 211 153;
   --color-success-soft: 5 58 46;
   --color-danger: 255 105 97;
   --color-danger-soft: 74 22 20;
   --color-warning: 255 214 10; /* #FFD60A */
   --color-warning-soft: 61 47 0;
+  --color-on-warning: 0 8 20;
 
   --color-base: 0 8 20; /* #000814 — Ink Black */
   --color-surface: 0 29 61; /* #001D3D — Prussian Blue */

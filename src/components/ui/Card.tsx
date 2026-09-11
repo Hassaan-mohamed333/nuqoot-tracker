@@ -25,6 +25,8 @@ const card = sv({
       success: 'border border-success/25 bg-success-soft',
       danger: 'border border-danger/25 bg-danger-soft',
       warning: 'border border-warning/30 bg-warning-soft',
+      /** حاوية بلمسة ذهبية: ملخّصات وأرصدة مبرَزة. */
+      accent: 'border border-accent/40 bg-accent-soft',
     },
     padded: { true: 'p-4', false: '' },
   },
@@ -41,7 +43,8 @@ export type CardVariant =
   | 'secondary'
   | 'success'
   | 'danger'
-  | 'warning';
+  | 'warning'
+  | 'accent';
 
 interface CardProps {
   children: React.ReactNode;
