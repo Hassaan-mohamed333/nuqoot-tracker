@@ -157,7 +157,7 @@ export function AuthScreen() {
             <View className="mt-6 flex-row-reverse items-center rounded-xl bg-warning-soft p-3">
               <TriangleAlert size={16} color={palette.warning} />
               <Text className="mr-2 flex-1 text-right text-xs text-ink-muted">
-                تعذّر استعادة جلستك السابقة ({initError}) — سجّل الدخول مجدداً.
+                {initError}
               </Text>
             </View>
           ) : null}

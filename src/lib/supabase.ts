@@ -1,5 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import {
+  createClient,
+  type SupabaseClient,
+  type SupportedStorage,
+} from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
 
@@ -50,22 +54,45 @@ const fetchWithTimeout: typeof fetch = async (input, init) => {
 };
 
 /**
+ * مخزن الجلسة ومُحقّق PKCE.
+ *
+ * على الويب `window.localStorage` مباشرة لا AsyncStorage: نسخة AsyncStorage
+ * للويب غلاف وعود حول localStorage نفسه، فلا تضيف شيئاً وتُقحم طبقة غير
+ * متزامنة في مسار يجري أثناء إقلاع العميل وقبل إعادة التوجيه. والمخزن
+ * المتزامن هو ما يتوقّعه supabase-js افتراضياً على المتصفّح.
+ *
+ * `undefined` تعني «استعمل الافتراضي»، وهي الحالة الصحيحة في بيئة بلا
+ * نافذة (تصيير على الخادم) حيث لا وجود لـ localStorage أصلاً.
+ */
+const authStorage: SupportedStorage | undefined =
+  Platform.OS === 'web'
+    ? typeof window !== 'undefined'
+      ? window.localStorage
+      : undefined
+    : AsyncStorage;
+
+/**
  * العميل يكون null عندما لا تتوفر بيانات الاتصال، حتى لا ينهار التطبيق
  * أثناء التطوير قبل ربط قاعدة البيانات.
  */
 export const supabase: SupabaseClient | null = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
-        storage: AsyncStorage,
+        storage: authStorage,
         autoRefreshToken: true,
         persistSession: true,
         /**
-         * على الويب يعود مزوّد OAuth إلى صفحة التطبيق ومعه الرمز في
-         * العنوان، ولا بد أن يقرأه supabase-js ويُبدّله بجلسة. على المنصات
-         * الأصلية لا يوجد شريط عنوان، والتبديل يتم يدوياً بعد إغلاق
-         * متصفّح المصادقة.
+         * التبديل يدوي على المنصّات كلها، بما فيها الويب.
+         *
+         * حين يتكفّل supabase-js بالتقاط `?code=` تلقائياً يجري التبديل
+         * داخله: فشلُه لا يصل إلينا، فتعود الشاشة إلى الدخول بلا سبب
+         * ظاهر. والأسوأ أن العنوان يبقى حاملاً الرمز، والرمز أحادي
+         * الاستعمال، فكل إعادة تحميل تعيد محاولته وترجع 401.
+         *
+         * التبديل الصريح في AuthProvider يجري مرّة واحدة، ويُسجّل سببه
+         * عند الفشل، وينظّف العنوان بعده نجح أو فشل.
          */
-        detectSessionInUrl: Platform.OS === 'web',
+        detectSessionInUrl: false,
         /**
          * PKCE بدل implicit: لا تمرّ الرموز عبر جزء العنوان (fragment)،
          * وهو الأسلوب المطلوب لإعادة التوجيه إلى مخطط روابط التطبيق.
@@ -75,6 +102,21 @@ export const supabase: SupabaseClient | null = isSupabaseConfigured
       global: { fetch: fetchWithTimeout },
     })
   : null;
+
+/**
+ * معاملات العنوان التي يتركها مزوّد OAuth خلفه.
+ *
+ * تُمسح بعد المعالجة: `code` أحادي الاستعمال، و`sb_flow_id` يدلّ على
+ * مُحقّق استُهلك معه، فبقاؤهما يجعل كل إعادة تحميل محاولةَ تبديل فاشلة.
+ */
+export const OAUTH_URL_PARAMS = [
+  'code',
+  'sb_flow_id',
+  'state',
+  'error',
+  'error_code',
+  'error_description',
+] as const;
 
 /** يعيد العميل أو يرمي خطأ واضحاً عند استخدامه بدون إعداد. */
 export function requireSupabase(): SupabaseClient {
