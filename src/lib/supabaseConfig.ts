@@ -125,6 +125,24 @@ export function inspectUrl(raw: string): SupabaseConfigIssue | null {
   return null;
 }
 
+/** قيمتا الاتصال كما تصل من البيئة. */
+export interface SupabaseEnv {
+  url: string;
+  anonKey: string;
+}
+
+/**
+ * يفحص الزوج معاً بترتيب ثابت: العنوان أولاً.
+ *
+ * مفتاحٌ سليم موجَّه إلى عنوان خاطئ يفشل أيضاً، فتسمية العنوان أولاً
+ * تجنّب إرسال المستخدم يطارد مفتاحاً لا عيب فيه.
+ */
+export function inspectSupabaseEnv(
+  env: SupabaseEnv,
+): SupabaseConfigIssue | null {
+  return inspectUrl(env.url) ?? inspectAnonKey(env.anonKey);
+}
+
 /**
  * هل هذا الخطأ رفضٌ للمفتاح لا فشلٌ في بيانات المستخدم؟
  *

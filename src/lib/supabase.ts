@@ -8,8 +8,7 @@ import { Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
 
 import {
-  inspectAnonKey,
-  inspectUrl,
+  inspectSupabaseEnv,
   type SupabaseConfigIssue,
 } from '@/lib/supabaseConfig';
 import { installWebCryptoShim } from '@/lib/webCryptoShim';
@@ -50,7 +49,7 @@ export const isSupabaseUnconfigured =
 /** خلل ثابت يُعرف قبل أي طلب شبكة. */
 const staticIssue: SupabaseConfigIssue | null = isSupabaseUnconfigured
   ? null
-  : (inspectUrl(rawUrl) ?? inspectAnonKey(rawAnonKey));
+  : inspectSupabaseEnv({ url: rawUrl, anonKey: rawAnonKey });
 
 /**
  * خلل انكشف أثناء التشغيل: مفتاح سليم الشكل رفضه الخادم.

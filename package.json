@@ -39,10 +39,11 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
-    "web": "expo start --web",
+    "start": "node scripts/expo.js start",
+    "android": "node scripts/expo.js run:android",
+    "ios": "node scripts/expo.js run:ios",
+    "web": "node scripts/expo.js start --web",
+    "export:web": "node scripts/expo.js export --platform web",
     "typecheck": "tsc --noEmit"
   },
   "private": true
