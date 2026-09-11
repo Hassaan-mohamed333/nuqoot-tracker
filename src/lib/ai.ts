@@ -1,4 +1,4 @@
-import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { isSupabaseReady, supabase } from '@/lib/supabase';
 import type { TransactionDirection } from '@/types';
 import {
   parseTransactionText,
@@ -88,7 +88,9 @@ function toDirection(type: ParseResponse['type']): TransactionDirection | null {
 }
 
 /** هل يمكن أصلاً محاولة استدعاء الذكاء الاصطناعي؟ */
-export const isAiAvailable = isSupabaseConfigured;
+export function isAiAvailable(): boolean {
+  return isSupabaseReady();
+}
 
 export interface SmartParseResult {
   parsed: ParsedTransaction;

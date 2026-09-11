@@ -2,7 +2,13 @@ import { SEED_CONTACTS, SEED_EVENTS, SEED_TRANSACTIONS } from '@/data/seed';
 import { extensionForMime, readLocalFile } from '@/lib/files';
 import { logStepFailure } from '@/lib/supabaseError';
 import { readJson, STORAGE_KEYS, writeJson } from '@/lib/storage';
-import { isSupabaseConfigured, requireSupabase, TABLES } from '@/lib/supabase';
+import {
+  isSupabaseKeyError,
+  isSupabaseReady,
+  markSupabaseKeyRejected,
+  requireSupabase,
+  TABLES,
+} from '@/lib/supabase';
 import type {
   Contact,
   ContactInsert,
@@ -29,6 +35,17 @@ export interface LedgerData {
   transactions: Transaction[];
   /** true عندما تكون البيانات من التخزين المحلي وليس من Supabase. */
   offline: boolean;
+}
+
+/**
+ * يسجّل فشل طلب خادم، ويُسقط الاتصال إن كان سببه رفض المفتاح.
+ *
+ * بدون الإسقاط يعيد كل استدعاء لاحق المحاولة نفسها فيردّ 401 نفسه؛
+ * وبتسجيله مرّة تتحوّل بقية الجلسة إلى الوضع المحلي من تلقائها.
+ */
+function noteServerFailure(step: string, error: unknown): void {
+  logStepFailure(step, error);
+  if (isSupabaseKeyError(error)) markSupabaseKeyRejected();
 }
 
 function createId(prefix: string): string {
@@ -83,7 +100,7 @@ async function loadLocal(seedWhenEmpty: boolean): Promise<LedgerData> {
  * في غير ذلك (أو عند فشل الطلب) حتى يظل التطبيق قابلاً للاستخدام.
  */
 export async function fetchLedgerData(): Promise<LedgerData> {
-  if (!isSupabaseConfigured) {
+  if (!isSupabaseReady()) {
     return loadLocal(true);
   }
 
@@ -119,7 +136,7 @@ export async function fetchLedgerData(): Promise<LedgerData> {
   } catch (error) {
     // تعذّر الوصول للخادم: نعرض آخر نسخة محفوظة لهذا الحساب بلا زرع بيانات.
     // نسجّل السبب أولاً، وإلا صار الرجوع الصامت يخفي أخطاء حقيقية.
-    logStepFailure('تحميل الدفتر', error);
+    noteServerFailure('تحميل الدفتر', error);
     return loadLocal(false);
   }
 }
@@ -180,7 +197,7 @@ export async function getReceiptUrl(
   path: string,
   expiresInSeconds = 3600,
 ): Promise<string | null> {
-  if (!isSupabaseConfigured) return null;
+  if (!isSupabaseReady()) return null;
   const client = requireSupabase();
   const { data, error } = await client.storage
     .from(RECEIPTS_BUCKET)
@@ -241,7 +258,7 @@ async function loadLocalEventLedger(eventId: string): Promise<EventLedger> {
 
 /** يجلب دفتر المناسبة من Supabase، مع رجوع إلى النسخة المحلية عند التعذّر. */
 export async function fetchEventLedger(eventId: string): Promise<EventLedger> {
-  if (!isSupabaseConfigured) return loadLocalEventLedger(eventId);
+  if (!isSupabaseReady()) return loadLocalEventLedger(eventId);
 
   try {
     const client = requireSupabase();
@@ -283,7 +300,7 @@ export async function fetchEventLedger(eventId: string): Promise<EventLedger> {
       offline: false,
     };
   } catch (error) {
-    logStepFailure('تحميل دفتر المناسبة', error);
+    noteServerFailure('تحميل دفتر المناسبة', error);
     return loadLocalEventLedger(eventId);
   }
 }
@@ -307,7 +324,7 @@ export async function setEventParticipants(
 
   const rows = members.map(toRow);
 
-  if (isSupabaseConfigured) {
+  if (isSupabaseReady()) {
     const client = requireSupabase();
 
     // استبدال كامل: أبسط من مقارنة الفروق، والمناسبات صغيرة.
@@ -392,7 +409,7 @@ export async function createSharedExpense(
     share_amount: share.share_amount,
   }));
 
-  if (isSupabaseConfigured) {
+  if (isSupabaseReady()) {
     const client = requireSupabase();
 
     const { data, error } = await client
@@ -490,7 +507,7 @@ async function loadLocalContactLedger(
 export async function fetchContactLedger(
   contactId: string,
 ): Promise<ContactLedger> {
-  if (!isSupabaseConfigured) {
+  if (!isSupabaseReady()) {
     return loadLocalContactLedger(contactId);
   }
 
@@ -546,7 +563,7 @@ export async function fetchContactLedger(
       offline: false,
     };
   } catch (error) {
-    logStepFailure('تحميل دفتر جهة الاتصال', error);
+    noteServerFailure('تحميل دفتر جهة الاتصال', error);
     return loadLocalContactLedger(contactId);
   }
 }
@@ -566,7 +583,7 @@ async function persist<TRow extends { id: string }, TInsert>(
 ): Promise<TRow> {
   let saved = draft;
 
-  if (isSupabaseConfigured) {
+  if (isSupabaseReady()) {
     const client = requireSupabase();
     const { data, error } = await client
       .from(table)
@@ -633,7 +650,7 @@ export async function setContactArchived(
 
   let updated: Contact | null = null;
 
-  if (isSupabaseConfigured) {
+  if (isSupabaseReady()) {
     const client = requireSupabase();
     const { data, error } = await client
       .from(TABLES.contacts)

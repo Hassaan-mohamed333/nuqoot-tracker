@@ -13,9 +13,14 @@ import React, {
 
 import { clearLocalData } from '@/lib/storage';
 import {
-  isSupabaseConfigured,
+  isSupabaseKeyError,
+  isSupabaseUnconfigured,
+  markSupabaseKeyRejected,
   OAUTH_URL_PARAMS,
+  requireSupabase,
   supabase,
+  supabaseConfigIssue,
+  type SupabaseConfigIssue,
 } from '@/lib/supabase';
 import { describeSupabaseError, logStepFailure } from '@/lib/supabaseError';
 
@@ -64,16 +69,23 @@ function clearOAuthParamsFromUrl(): void {
   }
 }
 
+/** نتيجة محاولة إكمال OAuth: رسالة للعرض، وهل كان السبب المفتاح نفسه. */
+interface OAuthFailure {
+  message: string;
+  /** true عندما رفض الخادم المفتاح العام لا بيانات المستخدم. */
+  keyRejected: boolean;
+}
+
 /**
  * يُكمل عودة OAuth على الويب: يُبدّل `code` بجلسة مرّة واحدة.
  *
- * يُرجع رسالة الخطأ عند الفشل بدل ابتلاعه، لأن الصمت هنا يعني شاشة دخول
- * بلا تفسير. ومعرّف التدفّق (`sb_flow_id`) يقرأه supabase-js من العنوان
- * نفسه، فيجب ألا يُنظَّف العنوان قبل التبديل.
+ * يُرجع سبب الفشل بدل ابتلاعه، لأن الصمت هنا يعني شاشة دخول بلا تفسير.
+ * ومعرّف التدفّق (`sb_flow_id`) يقرأه supabase-js من العنوان نفسه، فيجب
+ * ألا يُنظَّف العنوان قبل التبديل.
  */
 async function completeWebOAuth(
   client: NonNullable<typeof supabase>,
-): Promise<string | null> {
+): Promise<OAuthFailure | null> {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
 
   const params = new URL(window.location.href).searchParams;
@@ -86,7 +98,7 @@ async function completeWebOAuth(
   try {
     if (providerError) {
       console.error('[auth] المزوّد أعاد خطأ:', providerError);
-      return providerError;
+      return { message: providerError, keyRejected: false };
     }
     if (!code) return null;
 
@@ -94,14 +106,20 @@ async function completeWebOAuth(
     const { error } = await client.auth.exchangeCodeForSession(code);
     if (error) {
       logStepFailure('تبديل رمز OAuth بجلسة', error);
-      return describeSupabaseError(error);
+      return {
+        message: describeSupabaseError(error),
+        keyRejected: isSupabaseKeyError(error),
+      };
     }
 
     console.log('[auth] تمّ التبديل، الجلسة جاهزة.');
     return null;
   } catch (error) {
     logStepFailure('تبديل رمز OAuth بجلسة', error);
-    return describeSupabaseError(error);
+    return {
+      message: describeSupabaseError(error),
+      keyRejected: isSupabaseKeyError(error),
+    };
   } finally {
     // ينظَّف في الحالتين: الرمز استُهلك على الخادم حتى لو فشلنا بعده.
     clearOAuthParamsFromUrl();
@@ -161,6 +179,15 @@ interface AuthContextValue {
   /** يتخطى انتظار الاستعادة يدوياً (زر «متابعة» في شاشة الإقلاع). */
   continueWithoutSession: () => void;
   /**
+   * خلل في إعداد الاتصال، إن وُجد.
+   *
+   * غير `initError`: هذا عطب دائم في الإعداد لا تعثّر عابر، ولا يُصلحه
+   * تكرار المحاولة. وجودُه يعني أن أزرار الدخول كلها ستفشل.
+   */
+  configIssue: SupabaseConfigIssue | null;
+  /** ينتقل إلى الوضع المحلي التجريبي رغم عطب الإعداد. */
+  continueInDemoMode: () => void;
+  /**
    * true عندما يعمل التطبيق بلا Supabase (وضع محلي)، فلا حاجة لتسجيل الدخول.
    */
   authDisabled: boolean;
@@ -181,10 +208,29 @@ const AuthContext = createContext<AuthContextValue | null>(null);
  */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(isSupabaseConfigured);
+  // بلا عميل لا شيء يُستعاد: نبدأ جاهزين بدل وميض شاشة إقلاع.
+  const [loading, setLoading] = useState(supabase !== null);
   const [initError, setInitError] = useState<string | null>(null);
+  const [configIssue, setConfigIssue] = useState<SupabaseConfigIssue | null>(
+    () => supabaseConfigIssue(),
+  );
+  const [demoMode, setDemoMode] = useState(false);
 
   const continueWithoutSession = useCallback(() => setLoading(false), []);
+  const continueInDemoMode = useCallback(() => setDemoMode(true), []);
+
+  /**
+   * يُسقط الاتصال عندما يكون سبب الفشل المفتاحَ نفسه.
+   *
+   * يُعيد true ليعرف المستدعي أنه لا داعي لرسالة خطأ ثانية: لافتة
+   * الإعداد تشرح العطب وتعرض المخرج.
+   */
+  const registerKeyRejection = useCallback((error: unknown): boolean => {
+    if (!isSupabaseKeyError(error)) return false;
+    markSupabaseKeyRejected();
+    setConfigIssue('rejected-key');
+    return true;
+  }, []);
 
   useEffect(() => {
     if (!supabase) {
@@ -210,17 +256,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         // قبل أي شيء: إن كنّا عائدين للتوّ من المزوّد فالجلسة تُبنى من
         // الرمز، وقراءةُ جلسة قديمة قبله بلا معنى.
-        const oauthError = await withTimeout(
+        const oauthFailure = await withTimeout(
           completeWebOAuth(client),
           OAUTH_EXCHANGE_TIMEOUT_MS,
         );
         if (!active) return;
-        if (oauthError === null && hasPendingOAuthCode()) {
+        if (oauthFailure === null && hasPendingOAuthCode()) {
           // null من withTimeout تعني تجاوز المهلة لا نجاحاً؛ نميّزها ببقاء
           // الرمز في العنوان، إذ ينظّفه completeWebOAuth عند انتهائه.
           setInitError('تأخّر إكمال تسجيل الدخول. حاول مرّة أخرى.');
-        } else if (oauthError) {
-          setInitError(`تعذّر إكمال تسجيل الدخول: ${oauthError}`);
+        } else if (oauthFailure) {
+          if (oauthFailure.keyRejected) {
+            // المفتاح نفسه مرفوض: قراءة الجلسة بعده ستفشل كذلك، واللافتة
+            // تشرح العطب وتعرض المخرج المحلي. لا داعي لرسالة ثانية.
+            markSupabaseKeyRejected();
+            setConfigIssue('rejected-key');
+            return;
+          }
+          setInitError(`تعذّر إكمال تسجيل الدخول: ${oauthFailure.message}`);
         }
 
         const result = await withTimeout(
@@ -239,9 +292,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         if (!active) return;
         logStepFailure('استعادة الجلسة', error);
-        setInitError(
-          `تعذّر استعادة جلستك السابقة: ${describeSupabaseError(error)}`,
-        );
+        if (!registerKeyRejection(error)) {
+          setInitError(
+            `تعذّر استعادة جلستك السابقة: ${describeSupabaseError(error)}`,
+          );
+        }
       } finally {
         // مهما حدث — نجاح أو خطأ أو مهلة — لا تبقى شاشة الإقلاع معلّقة.
         if (active) setLoading(false);
@@ -254,29 +309,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       active = false;
       subscription.subscription.unsubscribe();
     };
-  }, []);
+  }, [registerKeyRejection]);
 
-  const signInWithEmail = useCallback(async (email: string, password: string) => {
-    if (!supabase) return;
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-    if (error) throw error;
-  }, []);
+  /** يرمي الخطأ بعد تسجيل رفض المفتاح، إن كان هذا سببه. */
+  const failAuth = useCallback(
+    (error: unknown): never => {
+      registerKeyRejection(error);
+      throw error instanceof Error ? error : new Error(String(error));
+    },
+    [registerKeyRejection],
+  );
 
-  const signUpWithEmail = useCallback(
+  const signInWithEmail = useCallback(
     async (email: string, password: string) => {
-      if (!supabase) return false;
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await requireSupabase().auth.signInWithPassword({
         email: email.trim(),
         password,
       });
-      if (error) throw error;
+      if (error) failAuth(error);
+    },
+    [failAuth],
+  );
+
+  const signUpWithEmail = useCallback(
+    async (email: string, password: string) => {
+      const { data, error } = await requireSupabase().auth.signUp({
+        email: email.trim(),
+        password,
+      });
+      if (error) failAuth(error);
       // بلا جلسة يعني أن المشروع يطلب تأكيد البريد أولاً.
       return data.session === null;
     },
-    [],
+    [failAuth],
   );
 
   const signInWithGoogle = useCallback(async () => {
@@ -306,7 +371,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (error) {
       console.error('[auth] signInWithOAuth رفض الطلب:', error);
-      throw error;
+      failAuth(error);
     }
 
     console.log('[auth] provider url =', data?.url ?? '(none)');
@@ -354,16 +419,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
     if (exchangeError) {
       logStepFailure('تبديل رمز OAuth بجلسة', exchangeError);
-      throw exchangeError;
+      failAuth(exchangeError);
     }
     // onAuthStateChange يلتقط الجلسة الجديدة ويحدّث الحالة.
-  }, []);
+  }, [failAuth]);
 
   const signInAnonymously = useCallback(async () => {
-    if (!supabase) return;
-    const { error } = await supabase.auth.signInAnonymously();
-    if (error) throw error;
-  }, []);
+    const { error } = await requireSupabase().auth.signInAnonymously();
+    if (error) failAuth(error);
+  }, [failAuth]);
 
   const signOut = useCallback(async () => {
     if (!supabase) return;
@@ -389,7 +453,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       initError,
       continueWithoutSession,
-      authDisabled: !isSupabaseConfigured,
+      configIssue,
+      continueInDemoMode,
+      // الإعداد الغائب تماماً وضعٌ محلي مقصود؛ أما المعطوب فيمرّ على شاشة
+      // الدخول أولاً ليرى المستخدم سبب العطب قبل أن يختار الوضع التجريبي.
+      authDisabled: isSupabaseUnconfigured || demoMode,
       signInWithEmail,
       signUpWithEmail,
       signInAnonymously,
@@ -401,6 +469,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       initError,
       continueWithoutSession,
+      configIssue,
+      continueInDemoMode,
+      demoMode,
       signInWithEmail,
       signUpWithEmail,
       signInAnonymously,

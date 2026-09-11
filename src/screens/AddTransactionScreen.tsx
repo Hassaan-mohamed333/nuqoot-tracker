@@ -23,7 +23,7 @@ import {
 } from '@/components/ui';
 import { reportError } from '@/lib/alerts';
 import { uploadReceipt } from '@/lib/repository';
-import { isSupabaseConfigured } from '@/lib/supabase';
+import { isSupabaseReady } from '@/lib/supabase';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
 import { usePalette } from '@/store/ThemeProvider';
@@ -112,7 +112,7 @@ export function AddTransactionScreen() {
       // الرفع قبل الإدراج: حركة تشير إلى إيصال غير موجود أسوأ من حركة
       // بلا إيصال، لذا يفشل الحفظ كله إن فشل الرفع.
       let receiptPath: string | null = null;
-      if (receiptUri && isSupabaseConfigured) {
+      if (receiptUri && isSupabaseReady()) {
         receiptPath = await uploadReceipt(receiptUri);
       }
 
@@ -320,7 +320,7 @@ export function AddTransactionScreen() {
             <View className="flex-row-reverse items-center p-3">
               <Paperclip size={16} color={palette.primary} />
               <Text className="mr-2 flex-1 text-right text-caption text-ink">
-                {isSupabaseConfigured
+                {isSupabaseReady()
                   ? 'إيصال مرفق — يُرفع عند الحفظ.'
                   : 'إيصال مرفق — يحتاج Supabase ليُرفع.'}
               </Text>

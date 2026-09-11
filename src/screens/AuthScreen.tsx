@@ -20,6 +20,7 @@ import Svg, { Path } from 'react-native-svg';
 
 import { AppLogo } from '@/components/brand/AppLogo';
 import { notify, reportError } from '@/lib/alerts';
+import { SUPABASE_CONFIG_MESSAGES } from '@/lib/supabase';
 import { useAuth } from '@/store/AuthProvider';
 import { usePalette } from '@/store/ThemeProvider';
 
@@ -61,6 +62,8 @@ export function AuthScreen() {
     signInAnonymously,
     signInWithGoogle,
     initError,
+    configIssue,
+    continueInDemoMode,
   } = useAuth();
   const [mode, setMode] = useState<Mode>('signIn');
   const [email, setEmail] = useState('');
@@ -69,7 +72,11 @@ export function AuthScreen() {
   // يُعرض داخل الصفحة: أوثق من حوار المتصفّح الذي قد يُحجب.
   const [formError, setFormError] = useState<string | null>(null);
 
-  const isValid = email.trim().includes('@') && password.length >= 6;
+  // إعدادٌ معطوب يعني أن كل زرّ هنا سيردّ بخطأ من الخادم؛ نعطّلها ونترك
+  // مخرجاً واحداً صالحاً بدل أن نُغري بمحاولات محكومٍ عليها بالفشل.
+  const blocked = configIssue !== null;
+  const isValid =
+    !blocked && email.trim().includes('@') && password.length >= 6;
 
   async function handleEmailSubmit() {
     if (!isValid || busy) return;
@@ -99,7 +106,7 @@ export function AuthScreen() {
   }
 
   async function handleGoogle() {
-    if (busy) return;
+    if (busy || blocked) return;
     setBusy(true);
     try {
       setFormError(null);
@@ -117,7 +124,7 @@ export function AuthScreen() {
   }
 
   async function handleAnonymous() {
-    if (busy) return;
+    if (busy || blocked) return;
     setBusy(true);
     try {
       await signInAnonymously();
@@ -149,6 +156,31 @@ export function AuthScreen() {
               <TriangleAlert size={16} color={palette.danger} />
               <Text className="mr-2 flex-1 text-right text-xs text-danger">
                 {formError}
+              </Text>
+            </View>
+          ) : null}
+
+          {configIssue ? (
+            <View className="mt-6 rounded-card border border-accent/40 bg-accent-soft p-4">
+              <View className="flex-row-reverse items-center">
+                <TriangleAlert size={18} color={palette.warning} />
+                <Text className="mr-2 flex-1 text-right text-sm font-bold text-ink">
+                  {SUPABASE_CONFIG_MESSAGES[configIssue].title}
+                </Text>
+              </View>
+              <Text className="mt-2 text-right text-xs leading-5 text-ink-muted">
+                {SUPABASE_CONFIG_MESSAGES[configIssue].detail}
+              </Text>
+              <Pressable
+                onPress={continueInDemoMode}
+                accessibilityRole="button"
+                className="mt-3 flex-row-reverse items-center justify-center rounded-full bg-primary py-2.5">
+                <Text className="text-sm font-bold text-primary-fg">
+                  المتابعة في الوضع التجريبي
+                </Text>
+              </Pressable>
+              <Text className="mt-2 text-center text-[11px] text-ink-subtle">
+                الوضع التجريبي يحفظ كل شيء على هذا الجهاز فقط، بلا مزامنة.
               </Text>
             </View>
           ) : null}
@@ -246,10 +278,13 @@ export function AuthScreen() {
 
           <Pressable
             onPress={() => void handleGoogle()}
-            disabled={busy}
+            disabled={busy || blocked}
             accessibilityRole="button"
             accessibilityLabel="تسجيل الدخول بحساب Google"
-            className="flex-row-reverse items-center justify-center rounded-full border border-line-strong bg-surface py-3">
+            accessibilityState={{ disabled: blocked }}
+            className={`flex-row-reverse items-center justify-center rounded-full border border-line-strong bg-surface py-3 ${
+              blocked ? 'opacity-40' : ''
+            }`}>
             <GoogleMark />
             <Text className="mr-2 text-base font-bold text-ink">
               المتابعة بحساب Google
@@ -258,9 +293,12 @@ export function AuthScreen() {
 
           <Pressable
             onPress={() => void handleAnonymous()}
-            disabled={busy}
+            disabled={busy || blocked}
             accessibilityRole="button"
-            className="mt-2 flex-row-reverse items-center justify-center rounded-full border border-line bg-surface py-3">
+            accessibilityState={{ disabled: blocked }}
+            className={`mt-2 flex-row-reverse items-center justify-center rounded-full border border-line bg-surface py-3 ${
+              blocked ? 'opacity-40' : ''
+            }`}>
             <UserRound size={18} color={palette.primary} />
             <Text className="mr-2 text-base font-bold text-primary">
               متابعة كضيف
