@@ -203,6 +203,6 @@ export const SUPABASE_CONFIG_MESSAGES: Record<
   'rejected-key': {
     title: 'رفض الخادم مفتاح Supabase',
     detail:
-      'أعاد الخادم «Invalid API key». تأكّد أن EXPO_PUBLIC_SUPABASE_ANON_KEY يخصّ المشروع نفسه المذكور في EXPO_PUBLIC_SUPABASE_URL، ثم أعد تشغيل خادم التطوير.',
+      'المفتاح سليم الشكل لكن الخادم ردّ «Invalid API key»: إمّا أنه يخصّ مشروعاً آخر، أو أن مفاتيح JWT القديمة عُطّلت في المشروع بعد الانتقال إلى مفاتيح sb_publishable_، أو أنه دُوّر بعد نسخه. شغّل npm run check:supabase ليقول لك أيّها.',
   },
 };

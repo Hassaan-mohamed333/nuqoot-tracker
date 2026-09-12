@@ -44,7 +44,8 @@
     "ios": "node scripts/expo.js run:ios",
     "web": "node scripts/expo.js start --web",
     "export:web": "node scripts/expo.js export --platform web",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:supabase": "node scripts/check-supabase.js"
   },
   "private": true
 }
