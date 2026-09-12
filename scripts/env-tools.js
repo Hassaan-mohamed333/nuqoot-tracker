@@ -16,8 +16,19 @@ const CHECKED = [
   { name: 'EXPO_PUBLIC_SUPABASE_ANON_KEY', inspector: 'inspectAnonKey' },
 ];
 
-/** ملفات البيئة بترتيب أسبقية Expo: الأخص أولاً. */
-const ENV_FILES = ['.env.local', '.env'];
+/**
+ * ملفات البيئة بترتيب أسبقية Expo: الأخصّ أولاً، وأوّل ملف يعرّف المتغيّر
+ * يفوز.
+ *
+ * `.env` آخر القائمة لا أوّلها: ملف `.env.local` أو `.env.development`
+ * متروك من تجربة سابقة يحجب تصحيحك في `.env` حجباً تامّاً وصامتاً.
+ *
+ * الوضع يتبع NODE_ENV كما يحدّده أمر Expo نفسه: `expo export` ينتج
+ * production و`expo start` ينتج development، فلكلٍّ سلسلة ملفات مختلفة.
+ */
+function envFileOrder(mode = process.env.NODE_ENV || 'development') {
+  return [`.env.${mode}.local`, '.env.local', `.env.${mode}`, '.env'];
+}
 
 function note(message) {
   console.log(`[env] ${message}`);
@@ -79,15 +90,55 @@ function readEnvFile(file) {
   return values;
 }
 
-/** قيم ملفات البيئة مدموجة بأسبقية Expo. */
-function readEnvFiles() {
+/**
+ * قيم ملفات البيئة مدموجة بأسبقية Expo.
+ *
+ * كل قيمة مقرونة بالمسار المطلق للملف الذي جاءت منه: بدونه يصير السؤال
+ * «من أين جاءت هذه القيمة؟» بلا جواب، وهو أوّل سؤال عند تصحيحٍ لا أثر له.
+ */
+function readEnvFiles(mode) {
   const merged = new Map();
-  for (const file of ENV_FILES) {
+  for (const file of envFileOrder(mode)) {
+    const absolute = path.join(ROOT, file);
     for (const [key, value] of readEnvFile(file)) {
-      if (!merged.has(key)) merged.set(key, value);
+      if (!merged.has(key)) merged.set(key, { value, file, absolute });
     }
   }
   return merged;
+}
+
+/**
+ * كل ملف بيئة موجود في جذر المشروع، لا الداخل في السلسلة وحده.
+ *
+ * ملفٌ خارج السلسلة (مثل `.env.production` أثناء `expo start`) لا يقرأه
+ * Expo الآن لكنه يقرأه في أمر آخر، ورؤيته تمنع مطاردة الوهم في الاتجاهين.
+ */
+function listEnvFiles(names, mode) {
+  const chain = envFileOrder(mode);
+  let present;
+  try {
+    present = fs
+      .readdirSync(ROOT)
+      .filter((entry) => entry === '.env' || entry.startsWith('.env.'));
+  } catch {
+    present = [];
+  }
+
+  const all = [...new Set([...chain, ...present])];
+  return all.map((file) => {
+    const absolute = path.join(ROOT, file);
+    const exists = fs.existsSync(absolute);
+    const values = exists ? readEnvFile(file) : new Map();
+    return {
+      file,
+      absolute,
+      exists,
+      // `.env.example` ليس ملف بيئة يُحمَّل، لكنه يظهر في السرد فلا يُربك.
+      inChain: chain.includes(file),
+      precedence: chain.indexOf(file),
+      defines: names.filter((name) => values.has(name)),
+    };
+  });
 }
 
 /**
@@ -96,8 +147,8 @@ function readEnvFiles() {
  * كل متغيّر يُفحص وحده: الفحص المزدوج يتوقّف عند أوّل عطب، فلا يصلح
  * للحكم على متغيّر بعينه.
  */
-function cleanEnvironment(inspectors) {
-  const fileValues = readEnvFiles();
+function cleanEnvironment(inspectors, mode) {
+  const fileValues = readEnvFiles(mode);
   const dropped = [];
   const kept = [];
 
@@ -114,7 +165,7 @@ function cleanEnvironment(inspectors) {
 
     delete process.env[name];
 
-    const replacement = (fileValues.get(name) ?? '').trim();
+    const replacement = (fileValues.get(name)?.value ?? '').trim();
     const replacementIssue = replacement ? inspect(replacement) : 'missing';
     dropped.push({ name, issue, replacementIssue });
   }
@@ -154,19 +205,51 @@ function reportCleaning({ dropped, kept }) {
 function fingerprint(fileValues) {
   const hash = crypto.createHash('sha256');
   for (const { name } of CHECKED) {
-    const effective = process.env[name] ?? fileValues.get(name) ?? '';
+    const effective = process.env[name] ?? fileValues.get(name)?.value ?? '';
     hash.update(`${name}=${effective}\n`);
   }
   return hash.digest('hex').slice(0, 16);
 }
 
 
+/**
+ * وصفٌ آمن لقيمة سرّية: بادئتها وطولها وبصمتها، لا القيمة.
+ *
+ * البادئة وحدها تميّز نوع المفتاح (`eyJ` قديم، `sb_publishable_` جديد)،
+ * والبصمة تكفي لمطابقة ما في الملف بما دخل الحزمة دون كشف أيّهما.
+ */
+function describeSecret(value, prefixLength = 12) {
+  if (!value) return '(فارغ)';
+
+  // علامة النوع ثابتة لا سرّ فيها، فتُعرض كاملة مع أربعة أحرف تكفي
+  // لمطابقة المفتاح بما في لوحة التحكم. والمفتاح السرّي لا يُعرض منه شيء
+  // بعد علامته: عرضُه هنا خطأ يُصلَح لا يُوثَّق.
+  let prefix;
+  if (value.startsWith('sb_secret_')) {
+    prefix = 'sb_secret_';
+  } else if (value.startsWith('sb_publishable_')) {
+    prefix = value.slice(0, 'sb_publishable_'.length + 4);
+  } else {
+    prefix = value.slice(0, prefixLength);
+  }
+  const digest = crypto
+    .createHash('sha256')
+    .update(value)
+    .digest('hex')
+    .slice(0, 8);
+  return `${prefix}… (الطول ${value.length}، البصمة ${digest})`;
+}
+
 module.exports = {
   CHECKED,
   note,
   loadInspectors,
+  envFileOrder,
+  readEnvFile,
   readEnvFiles,
+  listEnvFiles,
   cleanEnvironment,
   reportCleaning,
   fingerprint,
+  describeSecret,
 };

@@ -15,7 +15,9 @@ const {
   CHECKED,
   loadInspectors,
   readEnvFiles,
+  listEnvFiles,
   cleanEnvironment,
+  describeSecret,
 } = require('./env-tools.js');
 
 const ROOT = path.join(__dirname, '..');
@@ -35,20 +37,95 @@ function jwtClaims(key) {
   }
 }
 
-function resolveEnv() {
+/**
+ * يحلّ القيم كما يحلّها Expo، ويحتفظ بمصدر كلٍّ منها.
+ *
+ * الترتيب هو ترتيب Expo نفسه: بيئة الصدفة أوّلاً (بعد إسقاط ما ثبت
+ * فسادُه)، ثم ملفات البيئة بأسبقيتها. وما يهمّ هنا ليس القيمة بل من أين
+ * جاءت: «حدّثتُ .env ولم يتغيّر شيء» جوابُها دائماً في هذا السطر.
+ */
+function resolveEnv(mode) {
   const inspectors = loadInspectors();
-  if (inspectors) cleanEnvironment(inspectors);
 
-  const fileValues = readEnvFiles();
-  const resolved = {};
+  const shellBefore = new Map();
   for (const { name } of CHECKED) {
-    resolved[name] = (
-      process.env[name] ??
-      fileValues.get(name) ??
-      ''
-    ).trim();
+    shellBefore.set(name, (process.env[name] ?? '').trim());
   }
-  return { resolved, inspectors };
+
+  const cleaning = inspectors
+    ? cleanEnvironment(inspectors)
+    : { dropped: [], kept: [] };
+  const droppedNames = new Set(cleaning.dropped.map((entry) => entry.name));
+
+  const fileValues = readEnvFiles(mode);
+  const resolved = {};
+  const origin = {};
+
+  for (const { name } of CHECKED) {
+    const fromShell = (process.env[name] ?? '').trim();
+    const fromFile = fileValues.get(name);
+
+    if (fromShell) {
+      resolved[name] = fromShell;
+      origin[name] = { kind: 'shell', where: 'بيئة الصدفة (تتقدّم على الملفات)' };
+    } else if (fromFile) {
+      resolved[name] = fromFile.value.trim();
+      origin[name] = { kind: 'file', where: fromFile.absolute };
+    } else {
+      resolved[name] = '';
+      origin[name] = { kind: 'none', where: 'غير معرّف في أي مصدر' };
+    }
+
+    origin[name].shellHadValue = Boolean(shellBefore.get(name));
+    origin[name].shellDropped = droppedNames.has(name);
+  }
+
+  return { resolved, origin, inspectors };
+}
+
+/** نوع المفتاح من بادئته وحدها. */
+function keyKind(key) {
+  if (!key) return '(فارغ)';
+  if (key.startsWith('sb_publishable_')) return 'عام جديد (sb_publishable_)';
+  if (key.startsWith('sb_secret_')) return '>>> سرّي (sb_secret_) — لا يجوز هنا';
+  if (key.startsWith('eyJ')) return 'JWT قديم (eyJ…)';
+  return 'غير معروف';
+}
+
+/** يسرد ملفات البيئة ويشير إلى الملف الذي فاز فعلاً. */
+function reportSources(mode, origin) {
+  const names = CHECKED.map((entry) => entry.name);
+  console.log(`\nمصادر القيم (الوضع: ${mode})`);
+  console.log('  ملفات البيئة بترتيب الأسبقية — أوّل ملف يعرّف المتغيّر يفوز:');
+
+  for (const info of listEnvFiles(names, mode)) {
+    const rank = info.inChain ? `${info.precedence + 1}.` : ' —';
+    const state = info.exists ? 'موجود' : 'غير موجود';
+    const defines = info.defines.length
+      ? `يعرّف: ${info.defines.join('، ')}`
+      : info.exists
+        ? 'لا يعرّف أياً من المتغيّرين'
+        : '';
+    const outside = info.inChain ? '' : '  [خارج السلسلة — لا يُحمَّل في هذا الوضع]';
+    console.log(`  ${rank} ${info.absolute}`);
+    console.log(`       ${state}${defines ? ` — ${defines}` : ''}${outside}`);
+  }
+
+  console.log('\n  القيمة الفعّالة لكل متغيّر:');
+  for (const { name } of CHECKED) {
+    const source = origin[name];
+    console.log(`  ${name}`);
+    console.log(`       المصدر: ${source.where}`);
+    if (source.shellDropped) {
+      console.log(
+        '       (كانت الصدفة تحمل قيمة مرفوضة فحُذفت قبل القراءة — وهذا ما يفعله npm start أيضاً)',
+      );
+    } else if (source.shellHadValue && source.kind === 'shell') {
+      console.log(
+        '       (قيمة الصدفة سليمة فبقيت، وهي تتقدّم على الملف — امسحها إن أردت أن يُقرأ الملف)',
+      );
+    }
+  }
 }
 
 async function ask(url, key, pathname) {
@@ -94,9 +171,20 @@ function diagnose(status, body) {
 }
 
 async function main() {
-  const { resolved, inspectors } = resolveEnv();
+  // `expo start` يعمل على development و`expo export` على production،
+  // ولكلٍّ سلسلة ملفات مختلفة؛ نتبع NODE_ENV إن ضُبط.
+  const mode = process.env.NODE_ENV || 'development';
+
+  const { resolved, origin, inspectors } = resolveEnv(mode);
   const url = resolved.EXPO_PUBLIC_SUPABASE_URL;
   const key = resolved.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+  reportSources(mode, origin);
+
+  console.log('\nالقيم المحمّلة');
+  line('العنوان', url || '(فارغ)');
+  line('نوع المفتاح', keyKind(key));
+  line('المفتاح', describeSecret(key));
 
   console.log('\nفحص محلي');
   if (!url || !key) {
@@ -126,14 +214,12 @@ async function main() {
   line('معرّف المشروع في العنوان', isLoopback ? '(مكدّس محلي)' : urlRef);
 
   if (key.startsWith('sb_publishable_')) {
-    line('نوع المفتاح', 'عام جديد (sb_publishable_)');
     line('مطابقة المشروع', 'لا تُقرأ من هذا النوع — يحكم الخادم وحده.');
   } else {
     const claims = jwtClaims(key);
     if (!claims) {
-      line('نوع المفتاح', 'JWT غير مقروء الحمولة');
+      line('حمولة المفتاح', 'غير مقروءة');
     } else {
-      line('نوع المفتاح', 'JWT قديم');
       line('الدور (role)', String(claims.role ?? '(غائب)'));
       line('معرّف المشروع في المفتاح', String(claims.ref ?? '(غائب)'));
       line(

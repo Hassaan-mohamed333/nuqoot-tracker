@@ -33,12 +33,24 @@ const ROOT = path.join(__dirname, '..');
 /** الأوامر التي تقبل --clear؛ غيرها يُترك كما هو. */
 const CLEARABLE = new Set(['start', 'export']);
 
+/**
+ * الوضع الذي سيعمل به Expo، وهو ما يحدّد أي ملفات بيئة تُقرأ.
+ *
+ * `expo export` ينتج production والبقية development. نستنتجه هنا لأن
+ * NODE_ENV لم يُضبط بعد وقت تشغيلنا، وسلسلة الملفات تختلف بينهما.
+ */
+function expoMode(args) {
+  if (process.env.NODE_ENV) return process.env.NODE_ENV;
+  const command = args.find((arg) => !arg.startsWith('-'));
+  return command === 'export' ? 'production' : 'development';
+}
+
 function needsClear(args) {
   const command = args.find((arg) => !arg.startsWith('-'));
   if (!command || !CLEARABLE.has(command)) return false;
   if (args.includes('--clear') || args.includes('-c')) return false;
 
-  const current = fingerprint(readEnvFiles());
+  const current = fingerprint(readEnvFiles(expoMode(args)));
   const stampFile = path.join(ROOT, 'node_modules', '.cache', 'nuqoot-env');
 
   let previous = null;
@@ -71,7 +83,7 @@ function main() {
   }
 
   const inspectors = loadInspectors();
-  if (inspectors) reportCleaning(cleanEnvironment(inspectors));
+  if (inspectors) reportCleaning(cleanEnvironment(inspectors, expoMode(args)));
 
   const finalArgs = args.slice();
   if (needsClear(finalArgs)) {

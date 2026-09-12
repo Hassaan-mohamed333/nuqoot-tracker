@@ -41,7 +41,10 @@ yarn-error.*
 /android
 
 # local supabase credentials
-.env
+# كل صور .env تُتجاهل، لا `.env` وحده: `.env.development` و`.env.production`
+# داخل سلسلة أسبقية Expo وتحمل المفاتيح نفسها، وغيابهما عن التجاهل كان
+# يعني تسريبها بأوّل `git add -A`.
+.env*
 !.env.example
 
 # Supabase CLI local state
