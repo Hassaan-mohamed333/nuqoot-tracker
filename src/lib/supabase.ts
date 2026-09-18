@@ -84,7 +84,46 @@ export function supabaseConfigIssue(): SupabaseConfigIssue | null {
  */
 export const REQUEST_TIMEOUT_MS = 45000;
 
+/**
+ * يمنع أي طلب يخرج بغير HTTPS.
+ *
+ * حزامٌ ثانٍ فوق فحص الإعداد: العنوان يُفحص مرّة عند الإقلاع، لكن
+ * supabase-js يبني عناوينه بنفسه ويتبع إعادات التوجيه، وطلبٌ واحد يهبط
+ * إلى http يحمل رمز الجلسة نصّاً صريحاً على الشبكة. الاستثناء الوحيد
+ * حلقة الاسترجاع المحلية، حيث لا تغادر البيانات الجهاز أصلاً.
+ */
+function assertSecureRequest(input: RequestInfo | URL): void {
+  const raw =
+    typeof input === 'string'
+      ? input
+      : input instanceof URL
+        ? input.toString()
+        : input.url;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    // عنوان نسبي: لا يغادر أصل الصفحة، فلا شيء نتحقق منه.
+    return;
+  }
+
+  if (parsed.protocol === 'https:') return;
+
+  const isLoopback =
+    parsed.hostname === 'localhost' ||
+    parsed.hostname === '127.0.0.1' ||
+    parsed.hostname === '[::1]';
+  if (isLoopback && parsed.protocol === 'http:') return;
+
+  throw new Error(
+    `طلب غير مشفَّر إلى ${parsed.protocol}//${parsed.host} — أُلغي. استخدم HTTPS.`,
+  );
+}
+
 const fetchWithTimeout: typeof fetch = async (input, init) => {
+  assertSecureRequest(input);
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {

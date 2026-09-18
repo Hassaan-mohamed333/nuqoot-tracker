@@ -1,6 +1,13 @@
 import { SEED_CONTACTS, SEED_EVENTS, SEED_TRANSACTIONS } from '@/data/seed';
 import { extensionForMime, readLocalFile } from '@/lib/files';
 import { logStepFailure } from '@/lib/supabaseError';
+import {
+  validateContactInput,
+  validateEventInput,
+  validateEventMembers,
+  validateSharedExpenseInput,
+  validateTransactionInput,
+} from '@/lib/validateEntities';
 import { readJson, STORAGE_KEYS, writeJson } from '@/lib/storage';
 import {
   isSupabaseKeyError,
@@ -322,7 +329,7 @@ export async function setEventParticipants(
     display_name: member.kind === 'guest' ? member.displayName.trim() : null,
   });
 
-  const rows = members.map(toRow);
+  const rows = validateEventMembers(members).map(toRow);
 
   if (isSupabaseReady()) {
     const client = requireSupabase();
@@ -382,16 +389,17 @@ export async function createSharedExpense(
 ): Promise<SharedExpenseWithShares> {
   const nowIso = new Date().toISOString();
 
+  const clean = validateSharedExpenseInput(input);
   const payload: SharedExpenseInsert = {
-    event_id: input.event_id,
-    payer_participant_id: input.payer_participant_id,
+    event_id: clean.event_id,
+    payer_participant_id: clean.payer_participant_id,
     // العمود القديم يبقى فارغاً؛ الهوية صارت معرّف العضو.
     payer_contact_id: null,
-    description: input.description.trim(),
-    amount: Math.abs(input.amount),
-    currency: input.currency ?? DEFAULT_CURRENCY,
-    occurred_at: input.occurred_at ?? nowIso,
-    receipt_url: input.receipt_url ?? null,
+    description: clean.description,
+    amount: clean.amount,
+    currency: clean.currency ?? DEFAULT_CURRENCY,
+    occurred_at: clean.occurred_at ?? nowIso,
+    receipt_url: clean.receipt_url ?? null,
   };
 
   let expense: SharedExpense = {
@@ -401,7 +409,7 @@ export async function createSharedExpense(
     created_at: nowIso,
   };
 
-  let shares: ExpenseShare[] = input.shares.map((share) => ({
+  let shares: ExpenseShare[] = clean.shares.map((share) => ({
     id: createId('s'),
     expense_id: expense.id,
     participant_id: share.participant_id,
@@ -426,7 +434,7 @@ export async function createSharedExpense(
     const { data: shareData, error: shareError } = await client
       .from(TABLES.expenseShares)
       .insert(
-        input.shares.map((share) => ({
+        clean.shares.map((share) => ({
           expense_id: expense.id,
           participant_id: share.participant_id,
           share_amount: share.share_amount,
@@ -610,11 +618,12 @@ export async function createContact(
 ): Promise<Contact> {
   const nowIso = new Date().toISOString();
 
+  const clean = validateContactInput(input);
   const payload: ContactInsert = {
-    full_name: input.full_name.trim(),
-    phone: input.phone?.trim() || null,
-    relation: input.relation?.trim() || null,
-    notes: input.notes?.trim() || null,
+    full_name: clean.full_name,
+    phone: clean.phone ?? null,
+    relation: clean.relation ?? null,
+    notes: clean.notes ?? null,
   };
 
   const draft: Contact = {
@@ -679,13 +688,14 @@ export async function setContactArchived(
 export async function createEvent(input: NewEventInput): Promise<Event> {
   const nowIso = new Date().toISOString();
 
+  const clean = validateEventInput(input);
   const payload: EventInsert = {
-    title: input.title.trim(),
-    event_type: input.event_type,
-    host_contact_id: input.host_contact_id ?? null,
-    event_date: input.event_date,
-    location: input.location?.trim() || null,
-    notes: input.notes?.trim() || null,
+    title: clean.title,
+    event_type: clean.event_type,
+    host_contact_id: clean.host_contact_id ?? null,
+    event_date: clean.event_date,
+    location: clean.location ?? null,
+    notes: clean.notes ?? null,
   };
 
   const draft: Event = {
@@ -709,16 +719,18 @@ export async function createTransaction(
 ): Promise<Transaction> {
   const nowIso = new Date().toISOString();
 
+  const clean = validateTransactionInput(input);
   const payload: TransactionInsert = {
-    contact_id: input.contact_id,
-    event_id: input.event_id,
-    direction: input.direction,
-    // المبلغ موجب دائماً؛ الاتجاه وحده يحدد الإشارة.
-    amount: Math.abs(input.amount),
-    currency: input.currency ?? DEFAULT_CURRENCY,
-    occurred_at: input.occurred_at ?? nowIso,
-    note: input.note ?? null,
-    receipt_url: input.receipt_url ?? null,
+    contact_id: clean.contact_id,
+    event_id: clean.event_id,
+    direction: clean.direction,
+    // المبلغ موجب دائماً؛ الاتجاه وحده يحدد الإشارة. checkAmount ضمِن
+    // أنه رقم صالح ضمن مدى numeric(12,2) قبل الوصول إلى هنا.
+    amount: clean.amount,
+    currency: clean.currency ?? DEFAULT_CURRENCY,
+    occurred_at: clean.occurred_at ?? nowIso,
+    note: clean.note ?? null,
+    receipt_url: clean.receipt_url ?? null,
   };
 
   const draft: Transaction = {

@@ -261,3 +261,141 @@ create policy "receipts_delete_own" on storage.objects
     bucket_id = 'receipts'
     and (storage.foldername(name))[1] = auth.uid()::text
   );
+
+-- =====================================================================
+-- تشديد أمني (٢٠٢٦-٠٩): إعادة تشغيل هذا القسم آمنة.
+--
+-- الفجوة التي يسدّها: سياسات الدفتر الجماعي كانت تتحقّق من ملكية الصفّ
+-- نفسه (`auth.uid() = user_id`) دون التحقّق من ملكية ما يشير إليه. فحصُ
+-- المفتاح الأجنبي لا يمرّ عبر RLS، فكان بإمكان عميلٍ معدَّل أن يُدرج صفّاً
+-- يملكه هو لكنه يشير إلى مناسبة أو مصروف يملكه غيره. لا يكشف ذلك بيانات
+-- الآخرين (القراءة محكومة بالملكية)، لكنه يربط سجلّاتنا بسجلّاتهم ويفتح
+-- باب إفساد التقارير. الجداول الثلاثة الأخرى تتبع هذا النمط أصلاً، وهذا
+-- توحيدٌ له.
+-- =====================================================================
+
+drop policy if exists "event_participants_owner" on public.event_participants;
+create policy "event_participants_owner" on public.event_participants
+  for all using (auth.uid() = user_id)
+  with check (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.events e
+      where e.id = event_id and e.user_id = auth.uid()
+    )
+    and (
+      contact_id is null
+      or exists (
+        select 1 from public.contacts c
+        where c.id = contact_id and c.user_id = auth.uid()
+      )
+    )
+  );
+
+drop policy if exists "shared_expenses_owner" on public.shared_expenses;
+create policy "shared_expenses_owner" on public.shared_expenses
+  for all using (auth.uid() = user_id)
+  with check (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.events e
+      where e.id = event_id and e.user_id = auth.uid()
+    )
+    and (
+      payer_participant_id is null
+      or exists (
+        select 1 from public.event_participants p
+        where p.id = payer_participant_id and p.user_id = auth.uid()
+      )
+    )
+    and (
+      payer_contact_id is null
+      or exists (
+        select 1 from public.contacts c
+        where c.id = payer_contact_id and c.user_id = auth.uid()
+      )
+    )
+  );
+
+drop policy if exists "expense_shares_owner" on public.expense_shares;
+create policy "expense_shares_owner" on public.expense_shares
+  for all using (auth.uid() = user_id)
+  with check (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.shared_expenses e
+      where e.id = expense_id and e.user_id = auth.uid()
+    )
+    and (
+      participant_id is null
+      or exists (
+        select 1 from public.event_participants p
+        where p.id = participant_id and p.user_id = auth.uid()
+      )
+    )
+    and (
+      contact_id is null
+      or exists (
+        select 1 from public.contacts c
+        where c.id = contact_id and c.user_id = auth.uid()
+      )
+    )
+  );
+
+-- حدود دلو الإيصالات.
+--
+-- بلا سقف حجم يرفع أي حساب ما شاء حتى تنفد الحصة، وبلا قائمة أنواع
+-- مسموحة يُرفع HTML يُفتح لاحقاً برابط موقّع داخل نطاق التخزين — نصٌّ
+-- ينفّذ في أصلٍ يملك ملفات مستخدمين آخرين.
+update storage.buckets
+set
+  file_size_limit = 6 * 1024 * 1024,
+  allowed_mime_types = array[
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'image/heic'
+  ]
+where id = 'receipts';
+
+-- طول الحقول النصّية: حاجز أخير لو أُدرج صفّ من خارج التطبيق.
+-- التحقّق الأساسي في src/lib/validation.ts، وهذا ما لا يمكن الالتفاف عليه.
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'contacts_text_limits') then
+    alter table public.contacts add constraint contacts_text_limits check (
+      length(full_name) between 2 and 120
+      and (phone is null or length(phone) <= 32)
+      and (relation is null or length(relation) <= 60)
+      and (notes is null or length(notes) <= 500)
+    );
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'events_text_limits') then
+    alter table public.events add constraint events_text_limits check (
+      length(title) between 2 and 140
+      and (location is null or length(location) <= 160)
+      and (notes is null or length(notes) <= 500)
+    );
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'transactions_text_limits') then
+    alter table public.transactions add constraint transactions_text_limits check (
+      (note is null or length(note) <= 500)
+      and length(currency) = 3
+    );
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'shared_expenses_text_limits') then
+    alter table public.shared_expenses add constraint shared_expenses_text_limits check (
+      length(description) between 2 and 200
+      and length(currency) = 3
+    );
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'event_participants_name_limit') then
+    alter table public.event_participants add constraint event_participants_name_limit check (
+      display_name is null or length(display_name) between 2 and 120
+    );
+  end if;
+end $$;

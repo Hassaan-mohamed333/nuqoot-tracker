@@ -1,6 +1,7 @@
 import { Alert, Platform } from 'react-native';
 
-import { describeSupabaseError } from '@/lib/supabaseError';
+import { logger } from '@/lib/logger';
+import { userMessage } from '@/lib/supabaseError';
 
 /**
  * تنبيهات تعمل على الويب أيضاً.
@@ -23,20 +24,16 @@ export function notify(title: string, message: string): void {
 }
 
 /**
- * يعرض خطأً للمستخدم ويطبعه في السجل دائماً.
+ * يعرض خطأً للمستخدم ويسجّله.
  *
- * الطباعة مقصودة حتى مع وجود الحوار: رسالة الحوار مختصرة، بينما السجل
- * يحمل الكائن كاملاً بما فيه رمز الخطأ وأثر النداء.
+ * ما يُعرض وما يُسجَّل ليسا الشيء نفسه: الحوار يأخذ رسالة `userMessage`
+ * المفهومة الخالية من بنية الخادم، والسجل يأخذ الكائن بعد تنقيته — وفي
+ * الإنتاج لا يأخذ إلا سطراً بلا حمولة. طباعة أثر النداء للمستخدم أُلغيت:
+ * مساراتُه تكشف بنية الجهاز ولا تفيده في شيء.
  */
 export function reportError(title: string, error: unknown): void {
-  // الكائن كاملاً في السجل: أخطاء Supabase تحمل details و hint و code لا
-  // يظهر أيٌّ منها في error.message وحده.
-  console.error(`[${title}]`, error);
-  if (error instanceof Error && error.stack) console.error(error.stack);
-
-  // describeSupabaseError يقرأ الحقول من الكائن مهما كان شكله، فلا نسقط
-  // إلى "حدث خطأ غير متوقع" لمجرد أن القيمة ليست من نوع Error.
-  notify(title, describeSupabaseError(error));
+  logger.error('alert', title, error);
+  notify(title, userMessage(error));
 }
 
 interface ConfirmOptions {

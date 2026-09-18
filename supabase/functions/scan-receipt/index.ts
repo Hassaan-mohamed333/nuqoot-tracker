@@ -2,8 +2,11 @@ import {
   ApiError,
   errorResponse,
   generateJson,
+  enforceUserRateLimit,
   handleOptions,
   jsonResponse,
+  originOf,
+  requireUser,
   normalizeImagePayload,
   readJsonBody,
   toErrorResponse,
@@ -57,9 +60,11 @@ const SYSTEM_INSTRUCTION = `استخرج بيانات هذا الإيصال.
 - ضع null لأي حقل غير مقروء؛ لا تخمّن ولا تخترع رقماً.`;
 
 Deno.serve(async (request: Request): Promise<Response> => {
+  const origin = originOf(request);
+
   // الـ preflight أولاً: قبل أي تحقق، وإلا حجبه المتصفح.
   if (request.method === 'OPTIONS') {
-    return handleOptions();
+    return handleOptions(origin);
   }
 
   if (request.method !== 'POST') {
@@ -67,10 +72,15 @@ Deno.serve(async (request: Request): Promise<Response> => {
       'METHOD_NOT_ALLOWED',
       `الطريقة ${request.method} غير مدعومة؛ استخدم POST.`,
       405,
+      undefined,
+      origin,
     );
   }
 
   try {
+    const userId = await requireUser(request);
+    enforceUserRateLimit(userId);
+
     const body = await readJsonBody<RequestBody>(request);
 
     // يتحقق من الوجود والحجم وصحة الترميز، ويزيل بادئة data URL إن وُجدت.
@@ -92,18 +102,22 @@ Deno.serve(async (request: Request): Promise<Response> => {
       SYSTEM_INSTRUCTION,
     );
 
-    return jsonResponse({
-      merchant: scan.merchant ?? null,
-      total: typeof scan.total === 'number' ? scan.total : null,
-      currency: scan.currency ?? null,
-      date: scan.date ?? null,
-      summary: scan.summary ?? null,
-    });
+    return jsonResponse(
+      {
+        merchant: scan.merchant ?? null,
+        total: typeof scan.total === 'number' ? scan.total : null,
+        currency: scan.currency ?? null,
+        date: scan.date ?? null,
+        summary: scan.summary ?? null,
+      },
+      200,
+      origin,
+    );
   } catch (error) {
     // ApiError يحمل حالته الصحيحة؛ أي شيء آخر يصبح 500 بجسم JSON.
     if (!(error instanceof ApiError)) {
       console.error('scan-receipt unexpected failure:', error);
     }
-    return toErrorResponse(error);
+    return toErrorResponse(error, origin);
   }
 });

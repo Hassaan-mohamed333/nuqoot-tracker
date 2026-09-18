@@ -9,7 +9,9 @@
     }
   },
   "exclude": [
-    "supabase/functions"
+    "supabase/functions",
+    "tests",
+    "scripts"
   ],
   "include": [
     "**/*.ts",

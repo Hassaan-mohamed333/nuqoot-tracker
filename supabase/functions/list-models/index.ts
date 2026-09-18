@@ -3,8 +3,11 @@ import {
   assertConfigured,
   errorResponse,
   GEMINI_API_KEY_FOR_DISCOVERY,
+  enforceUserRateLimit,
   handleOptions,
   jsonResponse,
+  originOf,
+  requireUser,
   toErrorResponse,
 } from '../_shared/gemini.ts';
 
@@ -23,17 +26,24 @@ interface GeminiModel {
 }
 
 Deno.serve(async (request: Request): Promise<Response> => {
-  if (request.method === 'OPTIONS') return handleOptions();
+  const origin = originOf(request);
+  if (request.method === 'OPTIONS') return handleOptions(origin);
 
   if (request.method !== 'GET' && request.method !== 'POST') {
     return errorResponse(
       'METHOD_NOT_ALLOWED',
       `الطريقة ${request.method} غير مدعومة.`,
       405,
+      undefined,
+      origin,
     );
   }
 
   try {
+    // قائمة الطُرُز تكشف إعداد المشروع، فلا تُعطى لحاملِ المفتاح العام.
+    const userId = await requireUser(request);
+    enforceUserRateLimit(userId);
+
     assertConfigured();
 
     const controller = new AbortController();
@@ -69,12 +79,16 @@ Deno.serve(async (request: Request): Promise<Response> => {
       .filter((name) => name.length > 0)
       .sort();
 
-    return jsonResponse({
-      count: usable.length,
-      models: usable,
-      hint: 'اضبط GEMINI_MODEL و GEMINI_FALLBACK_MODEL و GEMINI_LITE_MODEL بأسماء من هذه القائمة.',
-    });
+    return jsonResponse(
+      {
+        count: usable.length,
+        models: usable,
+        hint: 'اضبط GEMINI_MODEL و GEMINI_FALLBACK_MODEL و GEMINI_LITE_MODEL بأسماء من هذه القائمة.',
+      },
+      200,
+      origin,
+    );
   } catch (error) {
-    return toErrorResponse(error);
+    return toErrorResponse(error, origin);
   }
 });

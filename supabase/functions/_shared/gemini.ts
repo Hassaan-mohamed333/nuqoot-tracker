@@ -91,20 +91,76 @@ const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 export const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
 
 /**
- * ترويسات CORS كاملة.
+ * الأصول المسموح لها بالنداء من متصفّح.
  *
- * معاينة الويب ترسل طلب preflight من أصل مختلف، ولا بد أن تُرد الترويسات
- * على كل استجابة — بما فيها استجابات الخطأ — وإلا رأى المتصفح خطأ CORS
+ *   supabase secrets set ALLOWED_ORIGINS="https://app.example.com,http://localhost:8081"
+ *
+ * غير مضبوط = نعكس أصل الطلب كما كان السلوك السابق (`*`)، حتى لا ينكسر
+ * أي نشر قائم بمجرّد الترقية. اضبطه قبل الإطلاق: CORS لا يمنع نداءً من
+ * خادم إلى خادم، لكنه يمنع صفحةً خبيثة في متصفّح المستخدم من قراءة ردّنا.
+ */
+const ALLOWED_ORIGINS = (Deno.env.get('ALLOWED_ORIGINS') ?? '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+export function isOriginAllowed(origin: string | null): boolean {
+  if (!origin) return true; // تطبيق أصلي: لا أصل ولا حاجة إلى CORS.
+  if (ALLOWED_ORIGINS.length === 0) return true;
+  return ALLOWED_ORIGINS.includes(origin);
+}
+
+/**
+ * ترويسات الأمان على كل استجابة.
+ *
+ * الدالّة تعيد JSON فقط، لكن `nosniff` يمنع المتصفّح من تخمين نوعٍ آخر،
+ * وسياسة محتوى صارمة تجعل أي جسم يُفسَّر كصفحة غيرَ قادر على تشغيل شيء.
+ * HSTS لأن الدوال تُقدَّم على HTTPS حصراً.
+ */
+const SECURITY_HEADERS: Record<string, string> = {
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+  'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'; sandbox",
+  'Strict-Transport-Security': 'max-age=63072000; includeSubDomains',
+  'Cache-Control': 'no-store',
+  'X-Frame-Options': 'DENY',
+};
+
+/**
+ * ترويسات الاستجابة لأصل بعينه.
+ *
+ * معاينة الويب ترسل preflight من أصل مختلف، ولا بد أن تُرد الترويسات على
+ * كل استجابة — بما فيها استجابات الخطأ — وإلا رأى المتصفح خطأ CORS
  * غامضاً بدل رسالتنا.
  */
-export const corsHeaders: Record<string, string> = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type, x-supabase-api-version',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Max-Age': '86400',
-  Vary: 'Origin',
-};
+export function corsHeadersFor(origin: string | null): Record<string, string> {
+  const headers: Record<string, string> = {
+    ...SECURITY_HEADERS,
+    'Access-Control-Allow-Headers':
+      'authorization, x-client-info, apikey, content-type, x-supabase-api-version',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Max-Age': '86400',
+    Vary: 'Origin',
+  };
+  if (origin && isOriginAllowed(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin;
+  } else if (!origin && ALLOWED_ORIGINS.length === 0) {
+    headers['Access-Control-Allow-Origin'] = '*';
+  }
+  return headers;
+}
+
+/**
+ * أصل الطلب يُمرَّر صراحةً إلى كل بانٍ للاستجابة.
+ *
+ * لا حالة على مستوى الوحدة: Deno.serve يخدم الطلبات على التوازي داخل
+ * العزلة الواحدة، فمتغيّرٌ مشترك يحمل «أصل الطلب الجاري» كان سيعكس أصل
+ * طلبٍ آخر في ردّ هذا الطلب — تسريبٌ عابر للطلبات يصعب رصده.
+ */
+export function originOf(request: Request): string | null {
+  return request.headers.get('origin');
+}
 
 /** خطأ يحمل رمزاً وحالة HTTP، ليصل إلى العميل كـ JSON مفهوم. */
 export class ApiError extends Error {
@@ -124,10 +180,14 @@ export class ApiError extends Error {
   }
 }
 
-export function jsonResponse(body: unknown, status = 200): Response {
+export function jsonResponse(
+  body: unknown,
+  status = 200,
+  origin: string | null = null,
+): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeadersFor(origin), 'Content-Type': 'application/json' },
   });
 }
 
@@ -137,23 +197,127 @@ export function errorResponse(
   message: string,
   status: number,
   detail?: string,
+  origin: string | null = null,
 ): Response {
-  return jsonResponse(detail ? { error: message, code, detail } : { error: message, code }, status);
+  return jsonResponse(
+    detail ? { error: message, code, detail } : { error: message, code },
+    status,
+    origin,
+  );
 }
 
-/** يحوّل أي استثناء إلى استجابة JSON، فلا يخرج جسم فارغ أبداً. */
-export function toErrorResponse(error: unknown): Response {
+/**
+ * يحوّل أي استثناء إلى استجابة JSON، فلا يخرج جسم فارغ أبداً.
+ *
+ * الاستثناء غير المتوقّع لا تخرج رسالته: قد تحمل عنوان خدمة داخلية أو
+ * مسار ملف أو نصّ خطأ من المزوّد. `ApiError` وحده يخرج كما هو لأننا
+ * كتبنا رسائله قاصدين عرضها. التفصيل يبقى في سجل الدالّة.
+ */
+export function toErrorResponse(
+  error: unknown,
+  origin: string | null = null,
+): Response {
   if (error instanceof ApiError) {
-    return errorResponse(error.code, error.message, error.status, error.detail);
+    return errorResponse(
+      error.code,
+      error.message,
+      error.status,
+      error.detail,
+      origin,
+    );
   }
-  const message =
-    error instanceof Error ? error.message : 'خطأ غير متوقع في الخادم.';
-  return errorResponse('INTERNAL_ERROR', message, 500);
+  console.error('[edge] استثناء غير متوقّع:', error);
+  return errorResponse('INTERNAL_ERROR', 'خطأ غير متوقع في الخادم.', 500, undefined, origin);
 }
 
 /** رد الـ preflight. 204 بلا جسم هو الرد الصحيح لـ OPTIONS. */
-export function handleOptions(): Response {
-  return new Response(null, { status: 204, headers: corsHeaders });
+export function handleOptions(origin: string | null = null): Response {
+  return new Response(null, { status: 204, headers: corsHeadersFor(origin) });
+}
+
+/**
+ * يتحقّق أن المُنادي مستخدم حقيقي لا حاملُ المفتاح العام وحده.
+ *
+ * هذا هو الحاجز الأهم في هذا الملف. المفتاح العام مُحزَّم داخل التطبيق
+ * ويُستخرج منه بسهولة، وبوّابة Supabase تقبله كأي JWT صالح — فبدون هذا
+ * الفحص يستطيع أي شخص استخراج المفتاح ثم استنزاف رصيد Gemini كاملاً.
+ *
+ * التحقّق بسؤال خادم المصادقة لا بقراءة الادّعاءات محلياً: القراءة
+ * المحلية تصحّ فقط ما دامت البوّابة تتحقّق من التوقيع، وتسقط صامتةً لو
+ * نُشرت الدالّة يوماً بـ --no-verify-jwt.
+ */
+export async function requireUser(request: Request): Promise<string> {
+  const authorization = request.headers.get('Authorization') ?? '';
+  const token = authorization.replace(/^Bearer\s+/i, '').trim();
+
+  if (!token) {
+    throw new ApiError('UNAUTHENTICATED', 'يلزم تسجيل الدخول.', 401);
+  }
+
+  const projectUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+  if (!projectUrl || !anonKey) {
+    throw new ApiError(
+      'SERVER_MISCONFIGURED',
+      'الخادم غير مضبوط بالكامل.',
+      500,
+    );
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`${projectUrl}/auth/v1/user`, {
+      headers: { Authorization: `Bearer ${token}`, apikey: anonKey },
+    });
+  } catch {
+    throw new ApiError('AUTH_UNREACHABLE', 'تعذّر التحقق من الجلسة.', 503);
+  }
+
+  if (!response.ok) {
+    throw new ApiError('UNAUTHENTICATED', 'جلسة غير صالحة أو منتهية.', 401);
+  }
+
+  const user = (await response.json()) as { id?: unknown; aud?: unknown };
+  if (typeof user.id !== 'string' || !user.id) {
+    throw new ApiError('UNAUTHENTICATED', 'جلسة غير صالحة.', 401);
+  }
+  return user.id;
+}
+
+/**
+ * تحديد معدّل لكل مستخدم، في ذاكرة العزلة (isolate).
+ *
+ * حدوده معروفة ومقصودة: العزلات متعدّدة وقصيرة العمر، فما يوقفه هو
+ * الفيضان المتّصل من مصدر واحد لا التوزيع البطيء. حاجزٌ رخيص فوق
+ * `requireUser`، لا بديل عن حصص Gemini ولا عن حدود المشروع.
+ */
+const RATE_WINDOW_MS = 60_000;
+const RATE_MAX = 12;
+const hits = new Map<string, number[]>();
+
+export function enforceUserRateLimit(userId: string): void {
+  const now = Date.now();
+  const recent = (hits.get(userId) ?? []).filter(
+    (time) => now - time < RATE_WINDOW_MS,
+  );
+
+  if (recent.length >= RATE_MAX) {
+    throw new ApiError(
+      'RATE_LIMITED',
+      'طلبات كثيرة في وقت قصير. انتظر دقيقة ثم أعد المحاولة.',
+      429,
+    );
+  }
+
+  recent.push(now);
+  hits.set(userId, recent);
+
+  // تنظيف كسول: بلا حدّ تنمو الخريطة مع كل مستخدم رآه هذا العزل.
+  if (hits.size > 500) {
+    for (const [key, times] of hits) {
+      if (times.every((time) => now - time >= RATE_WINDOW_MS)) hits.delete(key);
+    }
+  }
 }
 
 export function isConfigured(): boolean {
@@ -185,12 +349,26 @@ export function assertConfigured(): void {
  * request.json() على جسم فارغ يرمي "Unexpected end of JSON input"، وهي
  * رسالة لا تدل المستخدم على شيء؛ نحوّلها إلى 400 مفهوم.
  */
+/** سقف جسم الطلب: أوسع من أكبر صورة مسموح بها بعد ترميز base64. */
+export const MAX_BODY_BYTES = 9 * 1024 * 1024;
+
 export async function readJsonBody<T>(request: Request): Promise<T> {
+  // الرفض من الترويسة قبل القراءة: جسمٌ ضخم يُستهلك في الذاكرة قبل أن
+  // نراه، وهو أرخص هجوم على دالّة حافة.
+  const declared = Number(request.headers.get('content-length') ?? '0');
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+    throw new ApiError('PAYLOAD_TOO_LARGE', 'حجم الطلب يتجاوز الحد.', 413);
+  }
+
   let raw: string;
   try {
     raw = await request.text();
   } catch {
     throw new ApiError('INVALID_BODY', 'تعذّرت قراءة جسم الطلب.', 400);
+  }
+
+  if (raw.length > MAX_BODY_BYTES) {
+    throw new ApiError('PAYLOAD_TOO_LARGE', 'حجم الطلب يتجاوز الحد.', 413);
   }
 
   if (!raw.trim()) {

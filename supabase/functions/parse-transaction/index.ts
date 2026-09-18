@@ -2,8 +2,11 @@ import {
   ApiError,
   errorResponse,
   generateJson,
+  enforceUserRateLimit,
   handleOptions,
   jsonResponse,
+  originOf,
+  requireUser,
   MAX_IMAGE_BYTES,
   readJsonBody,
   toErrorResponse,
@@ -86,8 +89,10 @@ function normalizeAudio(input: string, mimeType: string) {
 }
 
 Deno.serve(async (request: Request): Promise<Response> => {
+  const origin = originOf(request);
+
   if (request.method === 'OPTIONS') {
-    return handleOptions();
+    return handleOptions(origin);
   }
 
   if (request.method !== 'POST') {
@@ -95,15 +100,38 @@ Deno.serve(async (request: Request): Promise<Response> => {
       'METHOD_NOT_ALLOWED',
       `الطريقة ${request.method} غير مدعومة؛ استخدم POST.`,
       405,
+      undefined,
+      origin,
     );
   }
 
   try {
+    // الحاجز قبل أي عمل: بدونه يستنزف حاملُ المفتاح العام رصيد Gemini.
+    const userId = await requireUser(request);
+    enforceUserRateLimit(userId);
+
     const body = await readJsonBody<RequestBody>(request);
 
-    const knownContacts = Array.isArray(body.knownContacts)
-      ? body.knownContacts.filter((name): name is string => typeof name === 'string')
-      : [];
+    /**
+     * حدود المدخلات.
+     *
+     * الطول يُترجم مباشرة إلى رموز (tokens) وإلى تكلفة، وقائمة الأسماء
+     * تدخل في المُوجّه نفسه: بلا سقفٍ يصير الحقلان قناةً رخيصة لإغراق
+     * الحساب، وسطحاً أوسع لمحاولة توجيه النموذج بنصّ مدسوس.
+     */
+    const MAX_TEXT_CHARS = 2000;
+    const MAX_CONTACTS = 200;
+    const MAX_CONTACT_CHARS = 120;
+
+    const knownContacts = (
+      Array.isArray(body.knownContacts)
+        ? body.knownContacts.filter(
+            (name): name is string => typeof name === 'string',
+          )
+        : []
+    )
+      .slice(0, MAX_CONTACTS)
+      .map((name) => name.slice(0, MAX_CONTACT_CHARS));
 
     const parts: GeminiPart[] = [];
 
@@ -119,12 +147,24 @@ Deno.serve(async (request: Request): Promise<Response> => {
       });
       parts.push({ text: 'فرّغ هذا التسجيل ثم استخرج حقول الحركة منه.' });
     } else if (typeof body.text === 'string' && body.text.trim()) {
-      parts.push({ text: body.text.trim() });
+      const text = body.text.trim();
+      if (text.length > MAX_TEXT_CHARS) {
+        return errorResponse(
+          'TEXT_TOO_LONG',
+          `النصّ أطول من ${MAX_TEXT_CHARS} حرفاً.`,
+          413,
+          undefined,
+          origin,
+        );
+      }
+      parts.push({ text });
     } else {
       return errorResponse(
         'EMPTY_INPUT',
         'أرسل نصاً في الحقل text أو تسجيلاً في الحقل audioBase64.',
         400,
+        undefined,
+        origin,
       );
     }
 
@@ -140,18 +180,22 @@ Deno.serve(async (request: Request): Promise<Response> => {
       SYSTEM_INSTRUCTION,
     );
 
-    return jsonResponse({
-      contact_name: parsed.contact_name ?? null,
-      amount: typeof parsed.amount === 'number' ? parsed.amount : null,
-      type: parsed.type ?? null,
-      note: parsed.note ?? null,
-      currency: parsed.currency ?? null,
-      confidence: 'high',
-    });
+    return jsonResponse(
+      {
+        contact_name: parsed.contact_name ?? null,
+        amount: typeof parsed.amount === 'number' ? parsed.amount : null,
+        type: parsed.type ?? null,
+        note: parsed.note ?? null,
+        currency: parsed.currency ?? null,
+        confidence: 'high',
+      },
+      200,
+      origin,
+    );
   } catch (error) {
     if (!(error instanceof ApiError)) {
       console.error('parse-transaction unexpected failure:', error);
     }
-    return toErrorResponse(error);
+    return toErrorResponse(error, origin);
   }
 });

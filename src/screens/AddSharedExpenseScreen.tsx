@@ -23,7 +23,7 @@ import {
 import { reportError } from '@/lib/alerts';
 import type { EventLedger } from '@/lib/repository';
 import { createSharedExpense, fetchEventLedger } from '@/lib/repository';
-import { describeSupabaseError, logStepFailure } from '@/lib/supabaseError';
+import { logStepFailure, userMessage } from '@/lib/supabaseError';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
 import { usePalette } from '@/store/ThemeProvider';
@@ -119,7 +119,7 @@ export function AddSharedExpenseScreen() {
         } catch (error) {
           // لا نترك الرفض بلا معالجة: الشاشة تبقى قابلة للاستخدام والسبب يظهر.
           logStepFailure('تحميل مشاركي المناسبة', error);
-          if (active) setLoadError(describeSupabaseError(error));
+          if (active) setLoadError(userMessage(error));
         } finally {
           if (active) setLoading(false);
         }

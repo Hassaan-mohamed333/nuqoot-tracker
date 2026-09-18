@@ -14,7 +14,7 @@ import {
 
 import { reportError } from '@/lib/alerts';
 import { fetchEventLedger, setEventParticipants } from '@/lib/repository';
-import { describeSupabaseError, logStepFailure } from '@/lib/supabaseError';
+import { logStepFailure, userMessage } from '@/lib/supabaseError';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
 import type { NewEventMember } from '@/types';
@@ -76,7 +76,7 @@ export function EventParticipantsScreen() {
       .catch((error: unknown) => {
         // بلا هذا المعالج يبقى الرفض صامتاً وتظهر الشاشة فارغة بلا سبب.
         logStepFailure('تحميل مشاركي المناسبة', error);
-        if (active) setLoadError(describeSupabaseError(error));
+        if (active) setLoadError(userMessage(error));
       })
       .finally(() => {
         if (active) setLoading(false);

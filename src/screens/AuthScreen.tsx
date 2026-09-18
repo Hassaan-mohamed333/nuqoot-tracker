@@ -4,7 +4,7 @@ import {
   TriangleAlert,
   UserRound,
 } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -21,6 +21,8 @@ import Svg, { Path } from 'react-native-svg';
 import { AppLogo } from '@/components/brand/AppLogo';
 import { notify, reportError } from '@/lib/alerts';
 import { SUPABASE_CONFIG_MESSAGES } from '@/lib/supabase';
+import { userMessage } from '@/lib/supabaseError';
+import { checkPassword, LIMITS } from '@/lib/validation';
 import { useAuth } from '@/store/AuthProvider';
 import { usePalette } from '@/store/ThemeProvider';
 
@@ -75,8 +77,24 @@ export function AuthScreen() {
   // إعدادٌ معطوب يعني أن كل زرّ هنا سيردّ بخطأ من الخادم؛ نعطّلها ونترك
   // مخرجاً واحداً صالحاً بدل أن نُغري بمحاولات محكومٍ عليها بالفشل.
   const blocked = configIssue !== null;
+
+  /**
+   * قوّة كلمة المرور تُقاس في وضع الحساب الجديد فقط.
+   *
+   * فرضُها على تسجيل الدخول أيضاً كان سيقفل الباب في وجه حسابات أُنشئت
+   * قبل رفع السياسة: كلمةُ مرورها القديمة صحيحة على الخادم، ومنعُها هنا
+   * يمنع صاحبها من الدخول ليغيّرها.
+   */
+  const strength = useMemo(
+    () => checkPassword(password, { email }),
+    [password, email],
+  );
+
+  const emailLooksValid = /^[^\s@]+@[^\s@.]+\.[^\s@]+$/.test(email.trim());
   const isValid =
-    !blocked && email.trim().includes('@') && password.length >= 6;
+    !blocked &&
+    emailLooksValid &&
+    (mode === 'signUp' ? strength.ok : password.length > 0);
 
   async function handleEmailSubmit() {
     if (!isValid || busy) return;
@@ -96,9 +114,9 @@ export function AuthScreen() {
         }
       }
     } catch (error) {
-      setFormError(
-        error instanceof Error ? error.message : 'حدث خطأ غير متوقع.',
-      );
+      // `userMessage` لا `error.message`: الثانية تحمل نصّ الخادم كما هو
+      // (إنجليزياً وأحياناً بتفصيل داخلي)، والأولى ترجمة مقصودة للعرض.
+      setFormError(userMessage(error));
       reportError('تعذّر تسجيل الدخول', error);
     } finally {
       setBusy(false);
@@ -113,9 +131,9 @@ export function AuthScreen() {
       await signInWithGoogle();
     } catch (error) {
       // الإلغاء تصرّف طبيعي من المستخدم ولا يستحق تنبيهاً.
-      const message = error instanceof Error ? error.message : '';
-      if (!message.includes('أُلغي')) {
-        setFormError(message || 'تعذّر بدء تسجيل الدخول بحساب Google.');
+      const raw = error instanceof Error ? error.message : '';
+      if (!raw.includes('أُلغي')) {
+        setFormError(userMessage(error));
         reportError('تعذّر تسجيل الدخول بحساب Google', error);
       }
     } finally {
@@ -246,10 +264,41 @@ export function AuthScreen() {
             onChangeText={setPassword}
             secureTextEntry
             autoCapitalize="none"
-            placeholder="٦ أحرف على الأقل"
+            autoComplete={mode === 'signUp' ? 'new-password' : 'current-password'}
+            placeholder={
+              mode === 'signUp'
+                ? `${LIMITS.passwordMin} محارف على الأقل`
+                : 'كلمة المرور'
+            }
             placeholderTextColor={palette.muted}
             className="rounded-xl border border-line bg-surface px-4 py-3 text-right text-sm text-ink"
           />
+
+          {mode === 'signUp' ? (
+            <View className="mt-2">
+              <View className="flex-row-reverse" accessibilityRole="progressbar">
+                {[0, 1, 2, 3].map((step) => (
+                  <View
+                    key={step}
+                    className={`ml-1 h-1 flex-1 rounded-full ${
+                      password.length === 0
+                        ? 'bg-line'
+                        : step < strength.score
+                          ? 'bg-success'
+                          : 'bg-line'
+                    }`}
+                  />
+                ))}
+              </View>
+              <Text className="mt-1.5 text-right text-[11px] leading-4 text-ink-muted">
+                {password.length === 0
+                  ? `${LIMITS.passwordMin} محارف على الأقل، وثلاثة أنواع من: حروف صغيرة، كبيرة، أرقام، رموز.`
+                  : strength.ok
+                    ? 'كلمة مرور مقبولة.'
+                    : strength.issues[0].message}
+              </Text>
+            </View>
+          ) : null}
 
           <Pressable
             onPress={() => void handleEmailSubmit()}

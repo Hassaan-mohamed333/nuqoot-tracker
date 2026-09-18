@@ -11,6 +11,10 @@ import React, {
   useState,
 } from 'react';
 
+import { authThrottle } from '@/lib/authThrottle';
+import { captchaToken } from '@/lib/captcha';
+import { logger } from '@/lib/logger';
+import type { RateLimitAction } from '@/lib/rateLimit';
 import { clearLocalData } from '@/lib/storage';
 import {
   isSupabaseKeyError,
@@ -22,7 +26,8 @@ import {
   supabaseConfigIssue,
   type SupabaseConfigIssue,
 } from '@/lib/supabase';
-import { describeSupabaseError, logStepFailure } from '@/lib/supabaseError';
+import { logStepFailure, userMessage } from '@/lib/supabaseError';
+import { checkEmail, checkPassword, ValidationError } from '@/lib/validation';
 
 // يُغلق نافذة المصادقة المنبثقة على الويب عند العودة.
 WebBrowser.maybeCompleteAuthSession();
@@ -97,27 +102,27 @@ async function completeWebOAuth(
 
   try {
     if (providerError) {
-      console.error('[auth] المزوّد أعاد خطأ:', providerError);
+      logger.warn('auth', 'المزوّد أعاد خطأ أثناء العودة.');
       return { message: providerError, keyRejected: false };
     }
     if (!code) return null;
 
-    console.log('[auth] تبديل رمز OAuth بجلسة…');
+    logger.debug('auth', 'تبديل رمز OAuth بجلسة…');
     const { error } = await client.auth.exchangeCodeForSession(code);
     if (error) {
       logStepFailure('تبديل رمز OAuth بجلسة', error);
       return {
-        message: describeSupabaseError(error),
+        message: userMessage(error),
         keyRejected: isSupabaseKeyError(error),
       };
     }
 
-    console.log('[auth] تمّ التبديل، الجلسة جاهزة.');
+    logger.debug('auth', 'تمّ التبديل، الجلسة جاهزة.');
     return null;
   } catch (error) {
     logStepFailure('تبديل رمز OAuth بجلسة', error);
     return {
-      message: describeSupabaseError(error),
+      message: userMessage(error),
       keyRejected: isSupabaseKeyError(error),
     };
   } finally {
@@ -294,7 +299,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logStepFailure('استعادة الجلسة', error);
         if (!registerKeyRejection(error)) {
           setInitError(
-            `تعذّر استعادة جلستك السابقة: ${describeSupabaseError(error)}`,
+            `تعذّر استعادة جلستك السابقة: ${userMessage(error)}`,
           );
         }
       } finally {
@@ -320,28 +325,84 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [registerKeyRejection],
   );
 
+  /**
+   * يمرّر المحاولة على حاجز المعدّل.
+   *
+   * الفشل يُسجَّل والنجاح يمسح السجل، فلا يُعاقَب من أخطأ مرّة ثم دخل.
+   * الرمي بـ ValidationError لأن رسالته موجَّهة للمستخدم أصلاً وتمرّ من
+   * userMessage كما هي.
+   */
+  const guarded = useCallback(
+    async <T,>(
+      action: RateLimitAction,
+      identity: string | undefined,
+      run: () => Promise<T>,
+    ): Promise<T> => {
+      const verdict = await authThrottle.check(action, identity);
+      if (!verdict.allowed) {
+        throw new ValidationError([
+          {
+            field: 'rate_limit',
+            code: 'too_many_attempts',
+            message: verdict.message ?? 'محاولات كثيرة. انتظر قليلاً.',
+          },
+        ]);
+      }
+
+      try {
+        const result = await run();
+        await authThrottle.recordSuccess(action, identity);
+        return result;
+      } catch (error) {
+        const next = await authThrottle.recordFailure(action, identity);
+        if (!next.allowed) logger.warn('auth', `تجاوز حدّ المحاولات: ${action}`);
+        throw error;
+      }
+    },
+    [],
+  );
+
   const signInWithEmail = useCallback(
     async (email: string, password: string) => {
-      const { error } = await requireSupabase().auth.signInWithPassword({
-        email: email.trim(),
-        password,
+      // التحقّق قبل الشبكة: صيغة بريد خاطئة لا تستحق طلباً، ورسالتها
+      // المحلية أوضح من ردّ الخادم العام.
+      const address = checkEmail(email);
+      if (!address.ok) throw new ValidationError(address.issues);
+
+      await guarded('signIn', address.value, async () => {
+        const { error } = await requireSupabase().auth.signInWithPassword({
+          email: address.value,
+          password,
+          options: { captchaToken: await captchaToken() },
+        });
+        if (error) failAuth(error);
       });
-      if (error) failAuth(error);
     },
-    [failAuth],
+    [failAuth, guarded],
   );
 
   const signUpWithEmail = useCallback(
     async (email: string, password: string) => {
-      const { data, error } = await requireSupabase().auth.signUp({
-        email: email.trim(),
-        password,
+      const address = checkEmail(email);
+      if (!address.ok) throw new ValidationError(address.issues);
+
+      // سياسة كلمة المرور تُفرض هنا لا في الشاشة وحدها: الشاشة بابٌ واحد،
+      // وهذا هو الممرّ الذي تمرّ منه كل الأبواب.
+      const strength = checkPassword(password, { email: address.value });
+      if (!strength.ok) throw new ValidationError(strength.issues);
+
+      return guarded('signUp', address.value, async () => {
+        const { data, error } = await requireSupabase().auth.signUp({
+          email: address.value,
+          password,
+          options: { captchaToken: await captchaToken() },
+        });
+        if (error) failAuth(error);
+        // بلا جلسة يعني أن المشروع يطلب تأكيد البريد أولاً.
+        return data.session === null;
       });
-      if (error) failAuth(error);
-      // بلا جلسة يعني أن المشروع يطلب تأكيد البريد أولاً.
-      return data.session === null;
     },
-    [failAuth],
+    [failAuth, guarded],
   );
 
   const signInWithGoogle = useCallback(async () => {
@@ -350,9 +411,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Supabase غير مُعدّ، فلا يمكن تسجيل الدخول بحساب Google.');
     }
 
+    const gate = await authThrottle.check('oauth');
+    if (!gate.allowed) {
+      throw new ValidationError([
+        {
+          field: 'rate_limit',
+          code: 'too_many_attempts',
+          message: gate.message ?? 'محاولات كثيرة. انتظر قليلاً.',
+        },
+      ]);
+    }
+
     const redirectTo = oauthRedirectTo();
-    // يظهر في سجل المتصفّح: أول ما يجب مطابقته مع قائمة Redirect URLs.
-    console.log('[auth] google sign-in, redirectTo =', redirectTo);
+    // وجهة العودة وحدها في السجل: هي أول ما يجب مطابقته مع قائمة
+    // Redirect URLs، وهي عنوانٌ عامّ لا سرّ فيه.
+    logger.debug('auth', `google sign-in, redirectTo = ${redirectTo}`);
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -370,11 +443,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (error) {
-      console.error('[auth] signInWithOAuth رفض الطلب:', error);
+      logger.error('auth', 'signInWithOAuth رفض الطلب', error);
+      await authThrottle.recordFailure('oauth');
       failAuth(error);
     }
 
-    console.log('[auth] provider url =', data?.url ?? '(none)');
+    // الأصل وحده لا العنوان كاملاً: عنوان المزوّد يحمل تحدّي PKCE وحالة
+    // الطلب، ولا داعي لبقائهما في سجلّ المتصفّح.
+    logger.debug(
+      'auth',
+      `provider = ${data?.url ? new URL(data.url).origin : '(none)'}`,
+    );
 
     if (Platform.OS === 'web') {
       if (!data?.url) {
@@ -425,9 +504,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [failAuth]);
 
   const signInAnonymously = useCallback(async () => {
-    const { error } = await requireSupabase().auth.signInAnonymously();
-    if (error) failAuth(error);
-  }, [failAuth]);
+    await guarded('anonymous', undefined, async () => {
+      const { error } = await requireSupabase().auth.signInAnonymously({
+        options: { captchaToken: await captchaToken() },
+      });
+      if (error) failAuth(error);
+    });
+  }, [failAuth, guarded]);
 
   const signOut = useCallback(async () => {
     if (!supabase) return;

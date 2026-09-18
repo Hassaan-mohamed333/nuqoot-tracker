@@ -45,7 +45,9 @@
     "web": "node scripts/expo.js start --web",
     "export:web": "node scripts/expo.js export --platform web",
     "typecheck": "tsc --noEmit",
-    "check:supabase": "node scripts/check-supabase.js"
+    "check:supabase": "node scripts/check-supabase.js",
+    "test": "node scripts/check-secrets.js && node --test \"tests/*.test.ts\"",
+    "check:secrets": "node scripts/check-secrets.js"
   },
   "private": true
 }

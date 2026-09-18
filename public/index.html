@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+
+    <!--
+      سياسة أمن المحتوى لبناء الويب.
+
+      ما يمكن ضبطه هنا وما لا يمكن: وسم <meta> يسري على التوجيهات التي
+      تُقيّم أثناء تحليل الصفحة، ولا يسري على `frame-ancestors` ولا على
+      HSTS ولا على `X-Content-Type-Options` — تلك ترويسات HTTP حقيقية
+      يضبطها المستضيف. انظر SECURITY.md لنصّها الجاهز.
+
+      'unsafe-inline' في style-src ضرورة لا تهاون: react-native-web يبني
+      الأنماط وقت التشغيل ويحقنها عناصرَ <style>، و NativeWind يكتب
+      متغيّرات CSS بالطريقة نفسها. بدونها لا تُرسم الصفحة إطلاقاً. ولا
+      تُقابلها ثغرة XSS هنا: لا يوجد في التطبيق أي مسار يُدرج HTML من
+      مدخلات المستخدم (لا dangerouslySetInnerHTML ولا innerHTML).
+
+      script-src بلا 'unsafe-inline': التصدير لا يُنتج سكربتات مضمَّنة،
+      وهذا هو التوجيه الذي يهمّ فعلاً ضد حقن السكربتات.
+
+      connect-src: عدّل النطاق إن كنت تستعمل نطاقاً مخصّصاً لـ Supabase.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="
+        default-src 'self';
+        script-src 'self';
+        style-src 'self' 'unsafe-inline';
+        img-src 'self' data: blob:;
+        media-src 'self' data: blob:;
+        font-src 'self' data:;
+        connect-src 'self' https://*.supabase.co wss://*.supabase.co;
+        worker-src 'self' blob:;
+        object-src 'none';
+        base-uri 'self';
+        form-action 'self';
+        frame-src 'none';
+        upgrade-insecure-requests;
+      "
+    />
+
+    <!-- لا يُرسل المسار الكامل إلى أي أصل آخر. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+
+    <title>نقوط</title>
+
+    <style id="root-reset">
+      html,
+      body,
+      #root {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      #root {
+        display: flex;
+        flex: 1 1 auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
