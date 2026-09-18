@@ -2,8 +2,8 @@ import React from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
 import { PressableScale } from '@/components/motion';
+import { palette, type Palette } from '@/lib/palette';
 import { sv } from '@/lib/variants';
-import { usePalette } from '@/store/ThemeProvider';
 
 const button = sv({
   // حبّة كاملة الاستدارة: كل أزرار المرجع كذلك، بلا استثناء.
@@ -89,7 +89,6 @@ export function Button({
   className,
   accessibilityLabel,
 }: ButtonProps) {
-  const palette = usePalette();
   const inactive = disabled || loading;
 
   // لون المؤشّر يتبع لون النص، وإلا اختفى فوق التعبئة.
@@ -115,8 +114,6 @@ export function Button({
     </PressableScale>
   );
 }
-
-type Palette = ReturnType<typeof usePalette>;
 
 /** لون مؤشّر التحميل لكل نغمة، مطابقاً للون النص في `label` أعلاه. */
 const SPINNER_TONE: Record<ButtonVariant, (palette: Palette) => string> = {

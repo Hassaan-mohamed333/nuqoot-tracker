@@ -13,20 +13,19 @@ import {
 } from 'react-native';
 
 import { reportError } from '@/lib/alerts';
+import { palette } from '@/lib/palette';
 import { fetchEventLedger, setEventParticipants } from '@/lib/repository';
 import { logStepFailure, userMessage } from '@/lib/supabaseError';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
 import type { NewEventMember } from '@/types';
 import { ME_LABEL } from '@/utils/split';
-import { usePalette } from '@/store/ThemeProvider';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 type ParticipantsRoute = RouteProp<RootStackParamList, 'EventParticipants'>;
 
 /** اختيار من يشارك في المناسبة (بمن فيهم المستخدم نفسه). */
 export function EventParticipantsScreen() {
-  const palette = usePalette();
   const navigation = useNavigation<Navigation>();
   const { params } = useRoute<ParticipantsRoute>();
   const { contacts } = useLedger();

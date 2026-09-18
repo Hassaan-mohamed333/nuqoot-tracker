@@ -1,6 +1,5 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import {
-  DarkTheme,
   DefaultTheme,
   NavigationContainer,
 } from '@react-navigation/native';
@@ -21,7 +20,7 @@ import { EventLedgerScreen } from '@/screens/EventLedgerScreen';
 import { EventParticipantsScreen } from '@/screens/EventParticipantsScreen';
 import { EventsScreen } from '@/screens/EventsScreen';
 import { HomeScreen } from '@/screens/HomeScreen';
-import { usePalette, useTheme } from '@/store/ThemeProvider';
+import { palette } from '@/lib/palette';
 
 /**
  * هذه الشاشات وحدها تلمس وحدات أصلية (منتقي التاريخ، الكاميرا،
@@ -63,7 +62,6 @@ function TabIcon({
 }
 
 function TabsNavigator() {
-  const palette = usePalette();
   const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
@@ -152,18 +150,15 @@ function TabsNavigator() {
 }
 
 export function RootNavigator() {
-  const palette = usePalette();
-  const { scheme } = useTheme();
-
   /**
    * سمة التنقّل تُضبط هنا أيضاً، لا في أصناف الشاشات وحدها: الخلفية بين
-   * الشاشات أثناء الانتقال يرسمها المتنقّل نفسه، فتظهر وميضاً أبيض في
-   * الوضع الليلي إن بقيت على القيمة الافتراضية.
+   * الشاشات أثناء الانتقال يرسمها المتنقّل نفسه، فتبقى على رماديّ
+   * افتراضي لا يشبه أرضيّتنا إن لم تُضبط.
    */
   const navigationTheme = {
-    ...(scheme === 'dark' ? DarkTheme : DefaultTheme),
+    ...DefaultTheme,
     colors: {
-      ...(scheme === 'dark' ? DarkTheme : DefaultTheme).colors,
+      ...DefaultTheme.colors,
       primary: palette.primary,
       background: palette.base,
       card: palette.surface,

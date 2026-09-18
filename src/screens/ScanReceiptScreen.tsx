@@ -14,9 +14,9 @@ import {
 
 import { notify } from '@/lib/alerts';
 import { scanReceipt, type ReceiptScan } from '@/lib/ai';
+import { palette } from '@/lib/palette';
 import type { RootStackParamList } from '@/navigation/types';
 import { formatAmount, formatDate } from '@/utils/ledger';
-import { usePalette } from '@/store/ThemeProvider';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 
@@ -25,7 +25,6 @@ type Navigation = NativeStackNavigationProp<RootStackParamList>;
  * ثم متابعة في نموذج الحركة. الصورة تُرفع عند الحفظ لا قبله.
  */
 export function ScanReceiptScreen() {
-  const palette = usePalette();
   const navigation = useNavigation<Navigation>();
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [scan, setScan] = useState<ReceiptScan | null>(null);

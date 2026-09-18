@@ -4,11 +4,9 @@ import {
   CalendarPlus,
   CloudOff,
   LogOut,
-  Moon,
   Plus,
   ScanLine,
   Sparkles,
-  Sun,
   UserPlus,
 } from 'lucide-react-native';
 import React, { useMemo } from 'react';
@@ -31,7 +29,7 @@ import { TransactionCard } from '@/components/TransactionCard';
 import type { RootStackParamList } from '@/navigation/types';
 import { useAuth } from '@/store/AuthProvider';
 import { useLedger } from '@/store/LedgerProvider';
-import { usePalette, useTheme } from '@/store/ThemeProvider';
+import { palette } from '@/lib/palette';
 import { formatAmount } from '@/utils/ledger';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
@@ -40,8 +38,6 @@ type Navigation = NativeStackNavigationProp<RootStackParamList>;
 export function HomeScreen() {
   const navigation = useNavigation<Navigation>();
   const { authDisabled, user, signOut } = useAuth();
-  const { scheme, toggle } = useTheme();
-  const palette = usePalette();
   const {
     totals,
     transactions,
@@ -125,23 +121,6 @@ export function HomeScreen() {
               activeScale={0.9}
               className="h-11 w-11 items-center justify-center rounded-full bg-primary">
               <Plus size={22} color={palette.onPrimary} />
-            </PressableScale>
-
-            {/* تبديل الوضع الليلي: بلا هذا الزرّ لا يمكن الوصول إليه إلا
-                من إعدادات النظام. */}
-            <PressableScale
-              onPress={toggle}
-              accessibilityRole="button"
-              accessibilityLabel={
-                scheme === 'dark' ? 'التبديل للوضع الفاتح' : 'التبديل للوضع الليلي'
-              }
-              activeScale={0.9}
-              className="mr-2 h-11 w-11 items-center justify-center rounded-full border border-line bg-surface">
-              {scheme === 'dark' ? (
-                <Sun size={20} color={palette.muted} />
-              ) : (
-                <Moon size={20} color={palette.muted} />
-              )}
             </PressableScale>
 
             {authDisabled ? null : (

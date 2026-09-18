@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
+import { palette } from '@/lib/palette';
 import { RootNavigator } from '@/navigation/RootNavigator';
 import { AuthScreen } from '@/screens/AuthScreen';
 import { useAuth } from '@/store/AuthProvider';
 import { LedgerProvider } from '@/store/LedgerProvider';
-import { usePalette } from '@/store/ThemeProvider';
 
 /** بعد هذه المدة نعرض للمستخدم مخرجاً يدوياً بدل انتظار صامت. */
 const SLOW_BOOT_HINT_MS = 4000;
@@ -17,7 +17,6 @@ const SLOW_BOOT_HINT_MS = 4000;
  * - غير ذلك (جلسة قائمة أو وضع محلي): التطبيق كاملاً.
  */
 export function AppGate() {
-  const palette = usePalette();
   const { loading, session, authDisabled, continueWithoutSession } = useAuth();
 
   if (loading) {
@@ -40,7 +39,6 @@ export function AppGate() {
  * وهذا الزر خط دفاع ثانٍ حتى لا يعلق المستخدم إن تأخر شيء غير متوقع.
  */
 function BootScreen({ onSkip }: { onSkip: () => void }) {
-  const palette = usePalette();
   const [showSkip, setShowSkip] = useState(false);
 
   useEffect(() => {

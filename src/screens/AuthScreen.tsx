@@ -20,11 +20,11 @@ import Svg, { Path } from 'react-native-svg';
 
 import { AppLogo } from '@/components/brand/AppLogo';
 import { notify, reportError } from '@/lib/alerts';
+import { palette } from '@/lib/palette';
 import { SUPABASE_CONFIG_MESSAGES } from '@/lib/supabase';
 import { userMessage } from '@/lib/supabaseError';
 import { checkPassword, LIMITS } from '@/lib/validation';
 import { useAuth } from '@/store/AuthProvider';
-import { usePalette } from '@/store/ThemeProvider';
 
 type Mode = 'signIn' | 'signUp';
 
@@ -57,7 +57,6 @@ function GoogleMark() {
  * فلا تُقرأ أو تُكتب أي بيانات قبل وجود جلسة.
  */
 export function AuthScreen() {
-  const palette = usePalette();
   const {
     signInWithEmail,
     signUpWithEmail,

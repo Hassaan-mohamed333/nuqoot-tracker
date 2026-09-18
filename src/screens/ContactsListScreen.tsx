@@ -17,9 +17,9 @@ import { ContactRow } from '@/components/ContactRow';
 import { LedgerSummaryBar } from '@/components/LedgerSummaryBar';
 import { PressableScale } from '@/components/motion';
 import { Button, IconButton } from '@/components/ui';
+import { palette } from '@/lib/palette';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
-import { usePalette } from '@/store/ThemeProvider';
 import type { ContactWithSummary } from '@/types';
 import { buildContactSections, INDEX_ALPHABET, summarize } from '@/utils/ledger';
 
@@ -35,7 +35,6 @@ type ContactFilter = 'all' | 'credit' | 'debit' | 'archived';
 
 /** قائمة جهات الاتصال: بحث، مرشّحات رصيد، فهرس أبجدي، وملخّص ثابت. */
 export function ContactsListScreen() {
-  const palette = usePalette();
   const navigation = useNavigation<Navigation>();
   const { contactsWithSummary, archivedContacts, transactions, loading, refresh } =
     useLedger();

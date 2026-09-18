@@ -22,11 +22,11 @@ import {
   SectionTitle,
 } from '@/components/ui';
 import { reportError } from '@/lib/alerts';
+import { palette } from '@/lib/palette';
 import { uploadReceipt } from '@/lib/repository';
 import { isSupabaseReady } from '@/lib/supabase';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
-import { usePalette } from '@/store/ThemeProvider';
 import type { TransactionDirection } from '@/types';
 import { DEFAULT_CURRENCY, formatDate, getNetTheme } from '@/utils/ledger';
 
@@ -38,7 +38,6 @@ export function AddTransactionScreen() {
   const navigation = useNavigation<Navigation>();
   const { params } = useRoute<AddRoute>();
   const { contacts, events, addTransaction } = useLedger();
-  const palette = usePalette();
 
   const [direction, setDirection] = useState<TransactionDirection>('OUT');
   const [contactId, setContactId] = useState<string | null>(

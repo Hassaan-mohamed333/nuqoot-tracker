@@ -9,23 +9,15 @@ import './global.css';
 import '@/components/motion/animated';
 import { AppGate } from '@/navigation/AppGate';
 import { AuthProvider } from '@/store/AuthProvider';
-import { ThemeProvider, useTheme } from '@/store/ThemeProvider';
 
 export default function App() {
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <AuthProvider>
-          <ThemedStatusBar />
-          <AppGate />
-        </AuthProvider>
-      </ThemeProvider>
+      <AuthProvider>
+        {/* أرضية فاتحة دائماً، فأيقونات الشريط داكنة دائماً. */}
+        <StatusBar style="dark" />
+        <AppGate />
+      </AuthProvider>
     </SafeAreaProvider>
   );
-}
-
-/** شريط الحالة يتبع الوضع: أيقونات فاتحة فوق الخلفية الداكنة. */
-function ThemedStatusBar() {
-  const { scheme } = useTheme();
-  return <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />;
 }

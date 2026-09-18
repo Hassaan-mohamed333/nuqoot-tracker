@@ -16,11 +16,11 @@ import {
 } from 'react-native';
 
 import { reportError } from '@/lib/alerts';
+import { palette } from '@/lib/palette';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
 import type { EventType } from '@/types';
 import { formatDate } from '@/utils/ledger';
-import { usePalette } from '@/store/ThemeProvider';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 type AddEventRoute = RouteProp<RootStackParamList, 'AddEvent'>;
@@ -36,7 +36,6 @@ const EVENT_TYPES: { key: EventType; label: string }[] = [
 
 /** شاشة إضافة مناسبة جديدة. */
 export function AddEventScreen() {
-  const palette = usePalette();
   const navigation = useNavigation<Navigation>();
   const { params } = useRoute<AddEventRoute>();
   const { contacts, addEvent } = useLedger();

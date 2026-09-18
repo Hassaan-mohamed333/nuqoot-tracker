@@ -6,17 +6,16 @@ import { FlatList, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EventCard } from '@/components/EventCard';
+import { palette } from '@/lib/palette';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
 import type { Event } from '@/types';
-import { usePalette } from '@/store/ThemeProvider';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 type Tab = 'upcoming' | 'past';
 
 /** قائمة المناسبات مقسّمة إلى قادمة وسابقة، مع إجمالي النقوط لكل مناسبة. */
 export function EventsScreen() {
-  const palette = usePalette();
   const navigation = useNavigation<Navigation>();
   const { events, transactions, contacts, loading, refresh } = useLedger();
   const [tab, setTab] = useState<Tab>('upcoming');

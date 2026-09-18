@@ -19,7 +19,7 @@ import Svg, {
   Stop,
 } from 'react-native-svg';
 
-import { PALETTE, usePalette } from '@/store/ThemeProvider';
+import { BRAND, palette } from '@/lib/palette';
 
 export type LogoVariant = 'mark' | 'badge' | 'full';
 export type LogoTone = 'brand' | 'mono' | 'inverse';
@@ -47,20 +47,18 @@ export function AppLogo({
   animated = false,
   className,
 }: AppLogoProps) {
-  const palette = usePalette();
-
   const isBadge = variant === 'badge' || variant === 'full';
 
   /*
-   * الشارة لوح داكن ثابت في الوضعين، والرسم عليه أبيض.
+   * الشارة لوح كحلي داكن ثابت، والرسم عليه ذهبي أو أبيض.
    *
-   * الثبات مقصود: أيقونة التطبيق لا تتبدّل مع سمة الجهاز، وهي في المرجع
-   * رسمٌ أبيض بسيط فوق لوح مصمت.
+   * الثبات هوية لا سمة: أيقونة التطبيق على الجهاز لا تتبدّل، فلا يصحّ أن
+   * يتبدّل مقابلها داخل الشاشة. قيمُها في BRAND لا في اللوحة.
    */
   const glyphColor = isBadge
     ? tone === 'mono'
       ? '#FFFFFF'
-      : PALETTE.dark.primary
+      : BRAND.badgeMark
     : tone === 'mono'
       ? palette.text
       : tone === 'inverse'
@@ -81,8 +79,8 @@ export function AppLogo({
         <>
           <Defs>
             <LinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-              <Stop offset="0" stopColor={PALETTE.dark.surfaceRaised} />
-              <Stop offset="1" stopColor={PALETTE.dark.base} />
+              <Stop offset="0" stopColor={BRAND.badgeFrom} />
+              <Stop offset="1" stopColor={BRAND.badgeTo} />
             </LinearGradient>
           </Defs>
           <Rect

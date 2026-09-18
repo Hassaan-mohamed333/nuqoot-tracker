@@ -10,7 +10,7 @@ import Animated, {
 import { MOTION } from '@/components/motion';
 // يسجّل مكوّنات Reanimated لدى NativeWind (أثر جانبي مقصود).
 import '@/components/motion/animated';
-import { usePalette } from '@/store/ThemeProvider';
+import { palette } from '@/lib/palette';
 
 interface FieldProps extends Omit<TextInputProps, 'className' | 'style'> {
   label?: string;
@@ -50,7 +50,6 @@ export function Field({
   onBlur,
   ...rest
 }: FieldProps) {
-  const palette = usePalette();
   const focus = useSharedValue(0);
 
   const ringStyle = useAnimatedStyle(() => ({

@@ -16,9 +16,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BalanceBar, FadeSlideIn, staggerDelay } from '@/components/motion';
 import { Button, Card, SectionTitle } from '@/components/ui';
 import { useEventLedger } from '@/hooks/useEventLedger';
+import { palette } from '@/lib/palette';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
-import { usePalette } from '@/store/ThemeProvider';
 import { formatAmount, formatDate } from '@/utils/ledger';
 import {
   computeEventBalances,
@@ -36,7 +36,6 @@ export function EventLedgerScreen() {
   const { params } = useRoute<LedgerRoute>();
   const { contacts, getEventById } = useLedger();
   const { data, loading, error, refresh } = useEventLedger(params.eventId);
-  const palette = usePalette();
 
   const event = data?.event ?? getEventById(params.eventId) ?? null;
   const participants = useMemo(() => data?.participants ?? [], [data]);

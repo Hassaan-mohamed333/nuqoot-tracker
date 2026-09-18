@@ -14,9 +14,9 @@ import {
 } from 'react-native';
 
 import { reportError } from '@/lib/alerts';
+import { palette } from '@/lib/palette';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
-import { usePalette } from '@/store/ThemeProvider';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 type AddContactRoute = RouteProp<RootStackParamList, 'AddContact'>;
@@ -32,7 +32,6 @@ const RELATION_SUGGESTIONS = [
 
 /** شاشة إضافة جهة اتصال جديدة. */
 export function AddContactScreen() {
-  const palette = usePalette();
   const navigation = useNavigation<Navigation>();
   const { params } = useRoute<AddContactRoute>();
   const { addContact } = useLedger();

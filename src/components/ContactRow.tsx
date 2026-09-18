@@ -4,7 +4,7 @@ import { Text, View } from 'react-native';
 
 import { PressableScale } from '@/components/motion';
 import { NetBalanceBadge } from '@/components/NetBalanceBadge';
-import { usePalette } from '@/store/ThemeProvider';
+import { palette } from '@/lib/palette';
 import type { ContactWithSummary } from '@/types';
 
 interface ContactRowProps {
@@ -14,7 +14,6 @@ interface ContactRowProps {
 
 /** صف جهة اتصال داخل القائمة الأبجدية. */
 export function ContactRow({ contact, onPress }: ContactRowProps) {
-  const palette = usePalette();
   const initial = contact.full_name.trim().charAt(0) || '؟';
   const count = contact.summary.transactionCount;
 

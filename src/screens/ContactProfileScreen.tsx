@@ -26,11 +26,11 @@ import { LedgerSummaryBar } from '@/components/LedgerSummaryBar';
 import { NetBalanceBadge } from '@/components/NetBalanceBadge';
 import { TransactionCard } from '@/components/TransactionCard';
 import { useContactLedger } from '@/hooks/useContactLedger';
+import { palette } from '@/lib/palette';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
 import type { TransactionDirection } from '@/types';
 import { formatAmount, summarize } from '@/utils/ledger';
-import { usePalette } from '@/store/ThemeProvider';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 type ProfileRoute = RouteProp<RootStackParamList, 'ContactProfile'>;
@@ -45,7 +45,6 @@ const FILTERS: { key: Filter; label: string }[] = [
 
 /** ملف جهة الاتصال: الرصيد، سجل الحركات (وارد/صادر)، والمناسبات المرتبطة. */
 export function ContactProfileScreen() {
-  const palette = usePalette();
   const navigation = useNavigation<Navigation>();
   const { params } = useRoute<ProfileRoute>();
   const [filter, setFilter] = useState<Filter>('ALL');

@@ -2,7 +2,7 @@ import { ArrowDownLeft, ArrowUpRight, CalendarDays } from 'lucide-react-native';
 import React from 'react';
 import { Text, View } from 'react-native';
 
-import { usePalette } from '@/store/ThemeProvider';
+import { palette } from '@/lib/palette';
 import type { Transaction } from '@/types';
 import { formatAmount, formatDate } from '@/utils/ledger';
 
@@ -24,7 +24,6 @@ export function TransactionCard({
   contactName,
   eventTitle,
 }: TransactionCardProps) {
-  const palette = usePalette();
   const isIncoming = transaction.direction === 'IN';
   const Icon = isIncoming ? ArrowDownLeft : ArrowUpRight;
   const accent = isIncoming ? 'text-danger' : 'text-primary';

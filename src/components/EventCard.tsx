@@ -2,7 +2,7 @@ import { CalendarDays, MapPin, Users } from 'lucide-react-native';
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import { usePalette } from '@/store/ThemeProvider';
+import { palette } from '@/lib/palette';
 import type { Event, EventType } from '@/types';
 import { formatAmount, formatDate } from '@/utils/ledger';
 
@@ -50,7 +50,6 @@ export function EventCard({
   currency = 'EGP',
   onPress,
 }: EventCardProps) {
-  const palette = usePalette();
   const isUpcoming = new Date(event.event_date).getTime() > Date.now();
 
   return (

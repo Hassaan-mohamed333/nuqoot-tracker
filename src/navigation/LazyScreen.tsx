@@ -1,7 +1,8 @@
 import React, { Suspense } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
-import { usePalette } from '@/store/ThemeProvider';
+import { palette } from '@/lib/palette';
+
 
 /**
  * تحميل كسول لشاشة، مع عزل أخطائها.
@@ -31,7 +32,6 @@ export function lazyScreen(
 }
 
 function ScreenFallback() {
-  const palette = usePalette();
   return (
     <View className="flex-1 items-center justify-center bg-base">
       <ActivityIndicator color={palette.primary} />

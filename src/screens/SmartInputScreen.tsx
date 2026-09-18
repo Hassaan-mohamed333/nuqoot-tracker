@@ -22,11 +22,11 @@ import {
 import { notify, reportError } from '@/lib/alerts';
 import { smartParse } from '@/lib/ai';
 import { readLocalFile } from '@/lib/files';
+import { palette } from '@/lib/palette';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
 import { formatAmount } from '@/utils/ledger';
 import { isUsableParse, type ParsedTransaction } from '@/utils/parseTransactionText';
-import { usePalette } from '@/store/ThemeProvider';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 
@@ -40,7 +40,6 @@ const EXAMPLES = [
  * تُراجَع في نموذج الإضافة قبل الحفظ. لا يُحفظ شيء من هنا مباشرة.
  */
 export function SmartInputScreen() {
-  const palette = usePalette();
   const navigation = useNavigation<Navigation>();
   const { contacts } = useLedger();
 

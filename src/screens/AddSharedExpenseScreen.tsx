@@ -21,12 +21,12 @@ import {
   SegmentedControl,
 } from '@/components/ui';
 import { reportError } from '@/lib/alerts';
+import { palette } from '@/lib/palette';
 import type { EventLedger } from '@/lib/repository';
 import { createSharedExpense, fetchEventLedger } from '@/lib/repository';
 import { logStepFailure, userMessage } from '@/lib/supabaseError';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
-import { usePalette } from '@/store/ThemeProvider';
 import type { EventParticipant, SplitMode } from '@/types';
 import { DEFAULT_CURRENCY, formatAmount } from '@/utils/ledger';
 import { participantName, sharesMatchAmount, splitEqually } from '@/utils/split';
@@ -44,7 +44,6 @@ export function AddSharedExpenseScreen() {
   const navigation = useNavigation<Navigation>();
   const { params } = useRoute<ExpenseRoute>();
   const { contacts } = useLedger();
-  const palette = usePalette();
 
   const [participants, setParticipants] = useState<EventParticipant[]>([]);
   const [loading, setLoading] = useState(true);

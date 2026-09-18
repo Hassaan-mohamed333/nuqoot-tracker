@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MOTION } from '@/components/motion';
 import '@/components/motion/animated';
-import { usePalette } from '@/store/ThemeProvider';
+import { palette } from '@/lib/palette';
 
 interface SheetProps {
   visible: boolean;
@@ -31,7 +31,6 @@ export function Sheet({
   dismissable = true,
 }: SheetProps) {
   const insets = useSafeAreaInsets();
-  const palette = usePalette();
 
   return (
     <Modal

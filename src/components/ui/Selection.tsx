@@ -2,7 +2,7 @@ import React from 'react';
 import { Text, View } from 'react-native';
 
 import { AnimatedCheck, PressableScale } from '@/components/motion';
-import { usePalette } from '@/store/ThemeProvider';
+import { palette } from '@/lib/palette';
 
 interface CheckRowProps {
   label: string;
@@ -24,7 +24,6 @@ export function CheckRow({
   caption,
   disabled = false,
 }: CheckRowProps) {
-  const palette = usePalette();
 
   return (
     <PressableScale
