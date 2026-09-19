@@ -37,6 +37,9 @@
           "microphonePermission": "نستخدم الميكروفون لإدخال الحركات بالصوت."
         }
       ]
-    ]
+    ],
+    "experiments": {
+      "baseUrl": "/nuqoot-tracker"
+    }
   }
 }
