@@ -23,7 +23,6 @@ export function AssistantLauncher() {
   const close = useCallback(() => setOpen(false), []);
   const assistant = useAppAssistant(close);
 
-  // بلا خادم لا مساعد: المفتاح على الحافة، والوضع المحلي لا يبلغها.
   if (!isAssistantAvailable()) return null;
 
   return (

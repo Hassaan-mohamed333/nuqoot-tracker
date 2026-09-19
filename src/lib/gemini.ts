@@ -17,9 +17,12 @@
  * ---------------------------------------------------------------------
  */
 
+import { describeFunctionError } from '@/lib/assistantErrors';
 import { logger } from '@/lib/logger';
 import { isSupabaseReady, supabase } from '@/lib/supabase';
 import { userMessage } from '@/lib/supabaseError';
+
+export { describeFunctionError } from '@/lib/assistantErrors';
 
 export {
   describeAction,
@@ -70,34 +73,6 @@ interface AssistantResponse {
 }
 
 /**
- * يستخرج رسالة الخطأ الحقيقية من فشل دالّة الحافة.
- *
- * supabase-js يضع نصّاً عامّاً في `error.message` ("non-2xx status")،
- * والسبب الفعلي في `error.context` كاستجابة. بلا قراءتها يرى المستخدم
- * رسالة واحدة لكل الأعطال.
- */
-async function describeFunctionError(error: unknown): Promise<string> {
-  const context = (error as { context?: unknown } | null)?.context as
-    | { status?: number; json?: () => Promise<unknown> }
-    | undefined;
-
-  if (context && typeof context.json === 'function') {
-    try {
-      const body = (await context.json()) as { error?: string; code?: string };
-      if (body?.error) return body.error;
-    } catch {
-      // الجسم ليس JSON — نسقط إلى الحالة أدناه.
-    }
-  }
-
-  if (context?.status === 401) return 'انتهت جلستك. سجّل الدخول من جديد.';
-  if (context?.status === 429) {
-    return 'طلبات كثيرة في وقت قصير. انتظر قليلاً ثم أعد المحاولة.';
-  }
-  return userMessage(error);
-}
-
-/**
  * يرسل دورة إلى المساعد ويعيد قراره.
  *
  * لا يرمي: كل مسارات الفشل تعود بـ `kind: 'error'` برسالة صالحة للعرض.
@@ -109,9 +84,13 @@ export async function processUserCommand(
   context?: AssistantContext,
 ): Promise<CommandResult> {
   if (!isSupabaseReady() || !supabase) {
+    // الأوامر الشائعة تُفهم على الجهاز قبل بلوغ هذه الدالّة، فما يصل
+    // إلى هنا في الوضع المحلي هو ما يحتاج فهماً حقيقياً فعلاً.
     return {
       kind: 'error',
-      message: 'المساعد يحتاج اتصالاً بالخادم. تحقّق من إعداد Supabase.',
+      message:
+        'أفهم أوامر التسجيل والتنقّل بلا خادم — مثل «سجّل ٥٠٠ لسامي». ' +
+        'أمّا الأسئلة المفتوحة فتحتاج إعداد Supabase.',
     };
   }
 
@@ -144,7 +123,18 @@ export async function processUserCommand(
   }
 }
 
-/** هل المساعد متاح أصلاً في هذه النسخة؟ (الوضع المحلي بلا خادم). */
+/**
+ * هل المساعد متاح؟ نعم دائماً.
+ *
+ * كان يعيد `isSupabaseReady()`، فيختفي الزرّ كلّه في الوضع المحلي. وقد
+ * صار المفسّر المحلي يغطّي أوامر التسجيل والتنقّل بلا خادم ولا مفتاح،
+ * فإخفاء المدخل يمنع ما يعمل من أجل ما لا يعمل.
+ */
 export function isAssistantAvailable(): boolean {
+  return true;
+}
+
+/** هل يبلغ المساعد الطراز، أم يعمل بالمفسّر المحلي وحده؟ */
+export function isModelReachable(): boolean {
   return isSupabaseReady();
 }

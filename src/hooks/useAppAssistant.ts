@@ -9,7 +9,9 @@ import {
   type AssistantTurn,
   type RawToolCall,
 } from '@/lib/gemini';
+import { parseLocalCommand } from '@/lib/localIntent';
 import { logger } from '@/lib/logger';
+import { userMessage } from '@/lib/supabaseError';
 import { sanitizeLine } from '@/lib/validation';
 import { navigationRef } from '@/navigation/navigationRef';
 import { useLedger } from '@/store/LedgerProvider';
@@ -78,7 +80,7 @@ function nextId(prefix: string): string {
 }
 
 const GREETING =
-  'اطلب ما تريد: «افتح جهات الاتصال»، «سجّل ٥٠٠ دفعتها لسامي»، أو اسأل عن رصيدك.';
+  'اطلب ما تريد: «سجّل ٥٠٠ لسامي»، «استلمت ٣٠٠ من سارة»، أو «افتح جهات الاتصال».';
 
 export interface AppAssistant {
   messages: AssistantMessage[];
@@ -99,7 +101,7 @@ export interface AppAssistant {
  * موافقة. لا مسار ثالث يصل إلى `addTransaction` من هنا.
  */
 export function useAppAssistant(onRequestClose?: () => void): AppAssistant {
-  const { contacts, events, addTransaction } = useLedger();
+  const { contacts, events, addTransaction, addContact } = useLedger();
 
   const [messages, setMessages] = useState<AssistantMessage[]>([
     { id: 'greeting', role: 'assistant', text: GREETING },
@@ -185,14 +187,22 @@ export function useAppAssistant(onRequestClose?: () => void): AppAssistant {
         }
 
         case 'createTransaction': {
-          const contact = matchByName(
+          /*
+           * الاسم المجهول يُنشأ لا يُرفض.
+           *
+           * كان الردّ «لا توجد جهة اتصال باسم … أضفها أولاً»، فيُلغى
+           * الأمر كلّه ويُطالَب المستخدم بفتح شاشة أخرى ثم إعادة كتابة
+           * ما كتبه للتوّ. والإنشاء هنا ليس صامتاً: بطاقة التأكيد التي
+           * وافق عليها قبل قليل تقول صراحةً إن جهة الاتصال جديدة.
+           */
+          const existing = matchByName(
             contacts,
             (item) => item.full_name,
             action.contactName,
           );
-          if (!contact) {
-            return `لا توجد جهة اتصال باسم «${action.contactName}». أضفها أولاً.`;
-          }
+
+          const contact =
+            existing ?? (await addContact({ full_name: action.contactName }));
 
           // التحقّق النهائي في المستودع: هذا المسار يمرّ على
           // validateTransactionInput مثل أي نموذج في التطبيق.
@@ -212,7 +222,7 @@ export function useAppAssistant(onRequestClose?: () => void): AppAssistant {
         }
       }
     },
-    [addTransaction, contacts, events, onRequestClose],
+    [addContact, addTransaction, contacts, events, onRequestClose],
   );
 
   /** يعالج نداءات الأدوات: تحقّق، ثم بوّابة موافقة، ثم تنفيذ. */
@@ -246,7 +256,16 @@ export function useAppAssistant(onRequestClose?: () => void): AppAssistant {
         }
 
         const { action } = parsed;
-        const description = describeAction(action);
+        let description = describeAction(action);
+
+        // الإنشاء التلقائي لجهة الاتصال يُذكر في البطاقة، فالموافقة
+        // تشمله: مستخدمٌ يوافق على حركة لا يوافق ضمناً على صفّ جديد.
+        if (
+          action.tool === 'createTransaction' &&
+          !matchByName(contacts, (item) => item.full_name, action.contactName)
+        ) {
+          description += ' (جهة اتصال جديدة)';
+        }
 
         if (requiresConfirmation(action)) {
           setPending({ id: nextId('pend'), action, description });
@@ -275,14 +294,16 @@ export function useAppAssistant(onRequestClose?: () => void): AppAssistant {
             setStatus(id, 'done');
           }
         } catch (error) {
+          // السبب المباشر لا رسالة عامّة: أخطاء التحقّق مكتوبة للمستخدم
+          // أصلاً، و`userMessage` يمرّرها كما هي ويترجم ما عداها.
           logger.error('assistant', 'فشل تنفيذ الأداة', error);
-          setStatus(id, 'failed', 'تعذّر تنفيذ الإجراء.');
+          setStatus(id, 'failed', userMessage(error));
         }
       }
 
       return feedback;
     },
-    [execute, push, setStatus],
+    [contacts, execute, push, setStatus],
   );
 
   const runTurn = useCallback(
@@ -328,12 +349,32 @@ export function useAppAssistant(onRequestClose?: () => void): AppAssistant {
       push({ id: nextId('msg'), role: 'user', text: clean });
       setLoading(true);
       try {
+        /*
+         * المحلّي أوّلاً.
+         *
+         * «سجل ٥٠ لأحمد» لا يحتاج نموذجاً لغوياً: بنيته فعلٌ ورقمٌ واسم.
+         * وكان يحتاج — فكان يفشل كلّما لم تكن دالّة الحافة منشورة أو
+         * انقطعت الشبكة أو كان التطبيق في الوضع المحلي. الآن يُفهم على
+         * الجهاز فوراً، ولا يذهب إلى الخادم إلا ما يحتاج فهماً حقيقياً.
+         *
+         * والمسار بعدها هو نفسه: تحقّق من الوسائط ثم بوّابة تأكيد. لا
+         * طريق أقصر إلى الدفتر لأن الأمر فُهم محلياً.
+         */
+        const local = parseLocalCommand(clean);
+        if (local) {
+          // السجلّ يعرف بما جرى، فلا يقترحه الطراز ثانيةً لو تلا الأمرَ
+          // سؤالٌ عنه في الدورة التالية.
+          history.current.push({ role: 'user', text: clean });
+          await handleCalls([{ name: local.name, args: local.args }]);
+          return;
+        }
+
         await runTurn([{ role: 'user', text: clean }]);
       } finally {
         setLoading(false);
       }
     },
-    [loading, push, runTurn],
+    [handleCalls, loading, push, runTurn],
   );
 
   const confirmPending = useCallback(async () => {
@@ -350,7 +391,7 @@ export function useAppAssistant(onRequestClose?: () => void): AppAssistant {
       else setStatus(id, 'done', `تمّ: ${pending.description}`);
     } catch (error) {
       logger.error('assistant', 'فشل تنفيذ إجراء مؤكَّد', error);
-      setStatus(id, 'failed', 'تعذّر تنفيذ الإجراء.');
+      setStatus(id, 'failed', userMessage(error));
     } finally {
       setLoading(false);
     }

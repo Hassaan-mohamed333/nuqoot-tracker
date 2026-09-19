@@ -243,15 +243,40 @@ describe('العقد بين الجهاز ودالّة الحافة', () => {
   });
 
   test('لا مفتاح Gemini في شيفرة العميل', () => {
-    // الانحدار الذي يُخشى: نقل نداء Gemini إلى التطبيق «للسرعة».
+    /*
+     * الانحدار الذي يُخشى: نقل نداء Gemini إلى التطبيق «للسرعة».
+     *
+     * المرصود هو **الوصول** لا ذكر الاسم: قراءة متغيّر بيئة، أو إنشاء
+     * عميل، أو نداء واجهة Gemini. أمّا ذكر `GEMINI_API_KEY` داخل رسالة
+     * عربية تقول للمستخدم ما ينقص خادمه فليس تسريباً — ومنعُه كان
+     * يدفع الرسائل إلى الغموض، وهو العطب الذي نصلحه هنا أصلاً.
+     */
+    const FORBIDDEN = [
+      /process\.env\s*\.\s*GEMINI/,
+      /process\.env\s*\[\s*['"`]GEMINI/,
+      /Deno\.env/,
+      /GoogleGenerativeAI\s*\(/,
+      /generativelanguage\.googleapis/,
+      /@google\/generative-ai/,
+    ];
+
     for (const file of ['src/lib/gemini.ts', 'src/hooks/useAppAssistant.ts']) {
       const source = readFileSync(path.join(ROOT, file), 'utf8');
-      assert.ok(
-        !/GEMINI_API_KEY|GoogleGenerativeAI\s*\(|generativelanguage\.googleapis/.test(
-          source,
-        ),
-        `${file} يلمس مفتاح Gemini أو واجهته مباشرة`,
-      );
+      for (const pattern of FORBIDDEN) {
+        assert.ok(
+          !pattern.test(source),
+          `${file} يلمس مفتاح Gemini أو واجهته مباشرة (${pattern})`,
+        );
+      }
     }
+  });
+
+  test('المفتاح لا يُقرأ إلا في دالّة الحافة', () => {
+    // الحدّ الحقيقي: المفتاح يُقرأ في مكان واحد، على الخادم.
+    const shared = readFileSync(
+      path.join(ROOT, 'supabase', 'functions', '_shared', 'gemini.ts'),
+      'utf8',
+    );
+    assert.match(shared, /Deno\.env\.get\(\s*['"]GEMINI_API_KEY['"]\s*\)/);
   });
 });
