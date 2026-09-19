@@ -473,10 +473,26 @@ function parseRetryAfter(response: Response): number | undefined {
   return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : undefined;
 }
 
-interface RequestPayload {
-  parts: GeminiPart[];
-  responseSchema: Record<string, unknown>;
-  systemInstruction: string;
+/**
+ * جسم الطلب وقارئ الرد، محقونان.
+ *
+ * سلسلة الطُرُز والتراجع والميزانية الزمنية أدناه لا علاقة لها بشكل
+ * الطلب، فبدل نسخها لوضع الأدوات (function calling) يُمرَّر البناء
+ * والقراءة من الخارج ويبقى منطق الصمود واحداً لا نسختين تتباعدان.
+ */
+interface RequestSpec<T> {
+  buildBody: () => Record<string, unknown>;
+  parse: (candidate: GeminiCandidate) => T;
+}
+
+interface GeminiCandidate {
+  content?: { parts?: GeminiResponsePart[] };
+  finishReason?: string;
+}
+
+interface GeminiResponsePart {
+  text?: string;
+  functionCall?: { name?: string; args?: Record<string, unknown> };
 }
 
 /**
@@ -488,7 +504,7 @@ interface RequestPayload {
  */
 async function requestOnce<T>(
   model: string,
-  { parts, responseSchema, systemInstruction }: RequestPayload,
+  spec: RequestSpec<T>,
   timeoutMs: number,
 ): Promise<T> {
   const controller = new AbortController();
@@ -500,15 +516,7 @@ async function requestOnce<T>(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts }],
-        systemInstruction: { parts: [{ text: systemInstruction }] },
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema,
-          temperature: 0,
-        },
-      }),
+      body: JSON.stringify(spec.buildBody()),
     });
   } catch (caught) {
     const aborted = caught instanceof DOMException && caught.name === 'AbortError';
@@ -563,10 +571,7 @@ async function requestOnce<T>(
   }
 
   let payload: {
-    candidates?: {
-      content?: { parts?: { text?: string }[] };
-      finishReason?: string;
-    }[];
+    candidates?: GeminiCandidate[];
     promptFeedback?: { blockReason?: string };
   };
   try {
@@ -587,7 +592,18 @@ async function requestOnce<T>(
   const candidate = payload.candidates?.[0];
   const finishReason = candidate?.finishReason;
 
-  if (finishReason && finishReason !== 'STOP') {
+  // STOP هو الإنهاء الطبيعي، وفي وضع الأدوات يصل أحياناً باسم
+  // TOOL_CALLS أو MALFORMED_FUNCTION_CALL — الأول ناجح والثاني يستحق
+  // إعادة المحاولة على طراز آخر.
+  if (finishReason === 'MALFORMED_FUNCTION_CALL') {
+    throw new ApiError(
+      'GEMINI_BAD_TOOL_CALL',
+      'أعاد الطراز نداء أداة غير صالح.',
+      502,
+      true,
+    );
+  }
+  if (finishReason && finishReason !== 'STOP' && finishReason !== 'TOOL_CALLS') {
     const hint =
       finishReason === 'MAX_TOKENS'
         ? 'تجاوز الرد الحد الأقصى للطول.'
@@ -595,24 +611,11 @@ async function requestOnce<T>(
     throw new ApiError('GEMINI_INCOMPLETE', `لم يكتمل رد Gemini. ${hint}`, 502);
   }
 
-  const text = candidate?.content?.parts?.[0]?.text;
-  if (typeof text !== 'string' || text.trim().length === 0) {
-    throw new ApiError(
-      'GEMINI_EMPTY',
-      'رد Gemini بلا محتوى نصي قابل للقراءة.',
-      502,
-    );
+  if (!candidate) {
+    throw new ApiError('GEMINI_EMPTY', 'رد Gemini بلا مرشّحات.', 502);
   }
 
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    throw new ApiError(
-      'GEMINI_BAD_JSON',
-      `رد Gemini ليس JSON صالحاً: ${text.slice(0, 200)}`,
-      502,
-    );
-  }
+  return spec.parse(candidate);
 }
 
 /**
@@ -632,9 +635,136 @@ export async function generateJson<T>(
   responseSchema: Record<string, unknown>,
   systemInstruction: string,
 ): Promise<T> {
+  return runWithFallback<T>({
+    buildBody: () => ({
+      contents: [{ role: 'user', parts }],
+      systemInstruction: { parts: [{ text: systemInstruction }] },
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema,
+        temperature: 0,
+      },
+    }),
+    parse: (candidate) => {
+      const text = candidate.content?.parts?.[0]?.text;
+      if (typeof text !== 'string' || text.trim().length === 0) {
+        throw new ApiError(
+          'GEMINI_EMPTY',
+          'رد Gemini بلا محتوى نصي قابل للقراءة.',
+          502,
+        );
+      }
+      try {
+        return JSON.parse(text) as T;
+      } catch {
+        throw new ApiError(
+          'GEMINI_BAD_JSON',
+          `رد Gemini ليس JSON صالحاً: ${text.slice(0, 200)}`,
+          502,
+        );
+      }
+    },
+  });
+}
+
+/** إعلان أداة كما تتوقّعه واجهة Gemini. */
+export interface FunctionDeclaration {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+}
+
+/** دور المتحدّث في سجل المحادثة. */
+export type TurnRole = 'user' | 'model';
+
+/**
+ * دورة واحدة في المحادثة.
+ *
+ * `functionResponse` هو ما يعيده الجهاز بعد تنفيذ الأداة: التنفيذ يحدث
+ * على الجهاز (تنقّل، حالة، قاعدة بيانات) لا على الخادم، فالخادم يقترح
+ * النداء ثم يتلقّى نتيجته في الدورة التالية.
+ */
+export interface Turn {
+  role: TurnRole;
+  text?: string;
+  functionCall?: { name: string; args: Record<string, unknown> };
+  functionResponse?: { name: string; response: Record<string, unknown> };
+}
+
+/** ما أعاده الطراز: نصّ، أو نداءات أدوات، أو الاثنان. */
+export interface ToolTurn {
+  text: string | null;
+  calls: Array<{ name: string; args: Record<string, unknown> }>;
+}
+
+function toGeminiContent(turn: Turn): Record<string, unknown> {
+  const parts: Record<string, unknown>[] = [];
+  if (turn.functionCall) {
+    parts.push({ functionCall: turn.functionCall });
+  }
+  if (turn.functionResponse) {
+    parts.push({ functionResponse: turn.functionResponse });
+  }
+  if (typeof turn.text === 'string' && turn.text.length > 0) {
+    parts.push({ text: turn.text });
+  }
+  if (parts.length === 0) parts.push({ text: '' });
+
+  // نتيجة الأداة تُرسل بدور "user" كما تتوقّع الواجهة، لا بدور "function".
+  const role = turn.functionResponse ? 'user' : turn.role;
+  return { role, parts };
+}
+
+/**
+ * ينادي Gemini في وضع الأدوات ويعيد ما قرّره: كلاماً أو نداء أداة.
+ *
+ * `temperature: 0` هنا كما في وضع JSON: المطلوب قرارٌ ثابت لا تنويع، وأي
+ * تذبذب يعني أن الأمر نفسه يُنفَّذ مرّة ويُهمل مرّة.
+ *
+ * `mode: 'AUTO'` لا `'ANY'`: بعض الرسائل سؤالٌ لا أمر ("كم عليّ لسامي؟")،
+ * وإجبار الطراز على نداء أداة في كل دورة يحوّل السؤال إلى فعل.
+ */
+export async function generateToolCall(
+  history: Turn[],
+  tools: FunctionDeclaration[],
+  systemInstruction: string,
+): Promise<ToolTurn> {
+  return runWithFallback<ToolTurn>({
+    buildBody: () => ({
+      contents: history.map(toGeminiContent),
+      systemInstruction: { parts: [{ text: systemInstruction }] },
+      tools: [{ functionDeclarations: tools }],
+      toolConfig: { functionCallingConfig: { mode: 'AUTO' } },
+      generationConfig: { temperature: 0 },
+    }),
+    parse: (candidate) => {
+      const parts = candidate.content?.parts ?? [];
+      const calls = parts
+        .map((part) => part.functionCall)
+        .filter(
+          (call): call is { name: string; args: Record<string, unknown> } =>
+            Boolean(call && typeof call.name === 'string' && call.name),
+        )
+        .map((call) => ({ name: call.name, args: call.args ?? {} }));
+
+      const text = parts
+        .map((part) => part.text)
+        .filter((value): value is string => typeof value === 'string')
+        .join('')
+        .trim();
+
+      if (calls.length === 0 && !text) {
+        throw new ApiError('GEMINI_EMPTY', 'رد Gemini بلا محتوى.', 502);
+      }
+      return { text: text || null, calls };
+    },
+  });
+}
+
+/** سلسلة الطُرُز والتراجع، مشتركة بين وضع JSON ووضع الأدوات. */
+async function runWithFallback<T>(spec: RequestSpec<T>): Promise<T> {
   assertConfigured();
 
-  const payload: RequestPayload = { parts, responseSchema, systemInstruction };
   const deadline = Date.now() + TOTAL_BUDGET_MS;
   let lastError: ApiError | null = null;
   // حصيلة كل طبقة، لتمييز "مزدحم فعلاً" عن "اسم طراز غير موجود".
@@ -657,7 +787,7 @@ export async function generateJson<T>(
       try {
         return await requestOnce<T>(
           model,
-          payload,
+          spec,
           Math.min(ATTEMPT_TIMEOUT_MS, remaining),
         );
       } catch (caught) {

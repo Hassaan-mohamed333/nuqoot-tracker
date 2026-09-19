@@ -9,7 +9,9 @@ import React from 'react';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AssistantLauncher } from '@/components/Assistant';
 import { lazyScreen } from '@/navigation/LazyScreen';
+import { navigationRef } from '@/navigation/navigationRef';
 import type { RootStackParamList, TabParamList } from '@/navigation/types';
 import { AddContactScreen } from '@/screens/AddContactScreen';
 import { AddSharedExpenseScreen } from '@/screens/AddSharedExpenseScreen';
@@ -168,7 +170,7 @@ export function RootNavigator() {
   };
 
   return (
-    <NavigationContainer theme={navigationTheme}>
+    <NavigationContainer ref={navigationRef} theme={navigationTheme}>
       <Stack.Navigator
         screenOptions={{
           headerTitleAlign: 'center',
@@ -227,6 +229,13 @@ export function RootNavigator() {
           options={{ title: 'مصروف جماعي', presentation: 'modal' }}
         />
       </Stack.Navigator>
+
+      {/*
+        بجوار المتنقّل لا داخل شاشة: الزرّ يظهر فوق كل الشاشات، وسجلّ
+        المحادثة ينجو من الانتقال بينها. التنقّل من هنا يمرّ على
+        navigationRef لأن سياق `useNavigation` لا يصل إلى هذا الموضع.
+      */}
+      <AssistantLauncher />
     </NavigationContainer>
   );
 }
