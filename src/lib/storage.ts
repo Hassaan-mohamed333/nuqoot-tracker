@@ -8,6 +8,7 @@ export const STORAGE_KEYS = {
   participants: 'nuqoot:event-participants',
   sharedExpenses: 'nuqoot:shared-expenses',
   expenseShares: 'nuqoot:expense-shares',
+  profile: 'nuqoot:profile',
 } as const;
 
 /** يقرأ قيمة JSON من التخزين المحلي، ويعيد fallback عند الفشل. */

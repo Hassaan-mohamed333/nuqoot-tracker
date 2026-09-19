@@ -1,8 +1,7 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
 import type { RouteProp } from '@react-navigation/native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { CalendarDays, Check } from 'lucide-react-native';
+import { Check } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,12 +14,12 @@ import {
   View,
 } from 'react-native';
 
+import { DateField } from '@/components/ui';
 import { reportError } from '@/lib/alerts';
 import { palette } from '@/lib/palette';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
 import type { EventType } from '@/types';
-import { formatDate } from '@/utils/ledger';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 type AddEventRoute = RouteProp<RootStackParamList, 'AddEvent'>;
@@ -46,7 +45,6 @@ export function AddEventScreen() {
     params?.hostContactId ?? null,
   );
   const [eventDate, setEventDate] = useState(new Date());
-  const [showPicker, setShowPicker] = useState(false);
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
@@ -125,31 +123,13 @@ export function AddEventScreen() {
           })}
         </View>
 
-        <Text className="mb-2 mt-4 text-right text-sm font-bold text-ink">
-          التاريخ
-        </Text>
-        <Pressable
-          onPress={() => setShowPicker(true)}
-          accessibilityRole="button"
-          className="flex-row-reverse items-center justify-between rounded-xl border border-line bg-surface px-4 py-3">
-          <Text className="text-right text-base text-ink">
-            {formatDate(eventDate.toISOString())}
-          </Text>
-          <CalendarDays size={18} color={palette.muted} />
-        </Pressable>
-
-        {showPicker ? (
-          <DateTimePicker
-            value={eventDate}
-            mode="date"
-            display={Platform.OS === 'ios' ? 'inline' : 'default'}
-            onChange={(_event, selected) => {
-              // أندرويد يغلق النافذة بنفسه بعد كل اختيار أو إلغاء.
-              if (Platform.OS !== 'ios') setShowPicker(false);
-              if (selected) setEventDate(selected);
-            }}
-          />
-        ) : null}
+        <DateField
+          label="التاريخ"
+          value={eventDate}
+          onChange={setEventDate}
+          accessibilityLabel="اختيار تاريخ المناسبة"
+          className="mt-4"
+        />
 
         <Text className="mb-2 mt-6 text-right text-sm font-bold text-ink">
           صاحب المناسبة (اختياري)

@@ -7,11 +7,13 @@ import {
   Plus,
   ScanLine,
   Sparkles,
+  User,
   UserPlus,
 } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -27,6 +29,7 @@ import { EventCard } from '@/components/EventCard';
 import { LedgerSummaryBar } from '@/components/LedgerSummaryBar';
 import { TransactionCard } from '@/components/TransactionCard';
 import { TransactionEditSheet } from '@/components/TransactionEditSheet';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import type { RootStackParamList } from '@/navigation/types';
 import { useAuth } from '@/store/AuthProvider';
 import { useLedger } from '@/store/LedgerProvider';
@@ -54,6 +57,7 @@ export function HomeScreen() {
   } = useLedger();
 
   const [editing, setEditing] = useState<Transaction | null>(null);
+  const { profile } = useUserProfile();
 
   const contactNames = useMemo(
     () => new Map(contacts.map((contact) => [contact.id, contact.full_name])),
@@ -139,6 +143,24 @@ export function HomeScreen() {
             </View>
           </View>
           <View className="flex-row-reverse items-center">
+            <PressableScale
+              onPress={() => navigation.navigate('Profile')}
+              accessibilityRole="button"
+              accessibilityLabel="الملف الشخصي"
+              activeScale={0.9}
+              className="ml-2 h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-line bg-surface">
+              {profile?.avatar_url ? (
+                <Image
+                  source={{ uri: profile.avatar_url }}
+                  style={{ width: 44, height: 44 }}
+                  resizeMode="cover"
+                  accessibilityLabel="صورتك الشخصية"
+                />
+              ) : (
+                <User size={20} color={palette.muted} />
+              )}
+            </PressableScale>
+
             <PressableScale
               onPress={() => navigation.navigate('AddTransaction')}
               accessibilityRole="button"

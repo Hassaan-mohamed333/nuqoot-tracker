@@ -265,6 +265,114 @@ export function checkIsoDate(
   return { ok: true, value: new Date(time).toISOString() };
 }
 
+/**
+ * تاريخ ميلاد بصيغة `YYYY-MM-DD`.
+ *
+ * منفصل عن `checkIsoDate` عمداً: ذاك يعيد طابعاً زمنياً بـ UTC، وتاريخ
+ * الميلاد يوم لا لحظة. من يسكن غرب غرينتش ويختار ١ يناير يراه يعود ٣١
+ * ديسمبر بعد رحلة إلى UTC وعودة — إزاحةُ يومٍ صامتة في حقل لا يتغيّر.
+ * فنبقيه نصّاً مجرّداً من المنطقة الزمنية من طرف إلى طرف.
+ */
+export function checkBirthDate(
+  field: string,
+  raw: unknown,
+  label: string,
+): ValidationResult<string | null> {
+  const text = normalizeDigits(sanitizeLine(raw));
+  if (!text) return { ok: true, value: null };
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  if (!match) {
+    return {
+      ok: false,
+      issues: [issue(field, 'invalid', `${label} يجب أن يكون بصيغة سنة-شهر-يوم.`)],
+    };
+  }
+
+  const [, year, month, day] = match.map(Number) as unknown as number[];
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+
+  // إعادة البناء تكشف ما يقبله Date ضمناً: 2025-02-30 يصير 2 مارس.
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    return {
+      ok: false,
+      issues: [issue(field, 'invalid', `${label} ليس تاريخاً موجوداً.`)],
+    };
+  }
+
+  if (year < 1900) {
+    return {
+      ok: false,
+      issues: [issue(field, 'out_of_range', `${label} خارج النطاق المعقول.`)],
+    };
+  }
+
+  // المقارنة باليوم لا باللحظة: من يختار اليوم في منطقة شرق غرينتش كان
+  // سيُرفض تاريخه لأنه "في المستقبل" بتوقيت UTC.
+  const now = new Date();
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  if (parsed.getTime() > today) {
+    return {
+      ok: false,
+      issues: [issue(field, 'future', `${label} لا يكون في المستقبل.`)],
+    };
+  }
+
+  return { ok: true, value: text };
+}
+
+/**
+ * مخطّطات الروابط المقبولة لصورة.
+ *
+ * `https:` هو ما يخرج من خدمة التخزين، و`file:`/`blob:` ما يخرج من
+ * منتقي الصور على الجهاز وعلى الويب في الوضع المحلي — وكلاهما لا يغادر
+ * الجهاز أصلاً. المرفوض هو الخطر: `javascript:` يُنفَّذ إن وصل إلى عنصر
+ * قابل للنقر، و`data:` يحشو صورة كاملة داخل عمود نصّي، و`http:` يُرسل
+ * الطلب بلا تشفير.
+ */
+const IMAGE_SCHEMES: ReadonlySet<string> = new Set([
+  'https:',
+  'file:',
+  'blob:',
+]);
+
+/** رابط صورة: من خدمة التخزين، أو من منتقي الصور محلياً. */
+export function checkImageUrl(
+  field: string,
+  raw: unknown,
+  label: string,
+): ValidationResult<string | null> {
+  const text = sanitizeLine(raw);
+  if (!text) return { ok: true, value: null };
+
+  if (textLength(text) > 500) {
+    return {
+      ok: false,
+      issues: [issue(field, 'too_long', `${label} أطول من المسموح.`)],
+    };
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(text);
+  } catch {
+    return { ok: false, issues: [issue(field, 'invalid', `${label} غير صالح.`)] };
+  }
+
+  if (!IMAGE_SCHEMES.has(parsed.protocol)) {
+    return {
+      ok: false,
+      issues: [issue(field, 'insecure', `${label} يجب أن يكون رابط https.`)],
+    };
+  }
+
+  return { ok: true, value: parsed.toString() };
+}
+
 /** بريد إلكتروني. تحقّق بنيوي؛ التأكيد الحقيقي يبقى برسالة التفعيل. */
 export function checkEmail(raw: unknown): ValidationResult<string> {
   const value = sanitizeLine(raw).toLowerCase();

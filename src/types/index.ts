@@ -245,3 +245,27 @@ export type SharedExpenseInsert = Omit<
   SharedExpense,
   'id' | 'created_at' | 'user_id'
 >;
+
+/**
+ * الملف الشخصي لصاحب الحساب.
+ *
+ * صفّ واحد لكل مستخدم، ومفتاحه هو معرّفه في auth.users — لا عمود
+ * user_id منفصل، فلا يمكن أن يوجد ملفّان لشخص واحد.
+ */
+export interface UserProfile {
+  id: string;
+  full_name: string | null;
+  /** `YYYY-MM-DD` لا طابع زمني: لتاريخ الميلاد يوم لا لحظة. */
+  date_of_birth: string | null;
+  /** رابط عام ثابت داخل دلو avatars. */
+  avatar_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** ما يمكن للمستخدم تغييره في ملفه. */
+export interface UserProfileInput {
+  full_name?: string | null;
+  date_of_birth?: string | null;
+  avatar_url?: string | null;
+}

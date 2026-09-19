@@ -1,14 +1,10 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { CalendarDays } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Platform, Pressable, Text, View } from 'react-native';
+import { View } from 'react-native';
 
-import { Button, Field, Sheet, SegmentedControl } from '@/components/ui';
+import { Button, DateField, Field, Sheet, SegmentedControl } from '@/components/ui';
 import { reportError } from '@/lib/alerts';
-import { palette } from '@/lib/palette';
 import type { TransactionPatch } from '@/lib/validateEntities';
 import type { Transaction, TransactionDirection } from '@/types';
-import { formatDate } from '@/utils/ledger';
 
 interface TransactionEditSheetProps {
   /** الحركة المطلوب تعديلها؛ `null` يُبقي الورقة مغلقة. */
@@ -44,7 +40,6 @@ export function TransactionEditSheet({
   const [direction, setDirection] = useState<TransactionDirection>('OUT');
   const [note, setNote] = useState('');
   const [occurredAt, setOccurredAt] = useState(() => new Date());
-  const [showPicker, setShowPicker] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // الحقول تُملأ من الحركة عند كل فتح: الورقة تبقى مركّبة بين الفتحات،
@@ -55,7 +50,6 @@ export function TransactionEditSheet({
     setDirection(transaction.direction);
     setNote(transaction.note ?? '');
     setOccurredAt(new Date(transaction.occurred_at));
-    setShowPicker(false);
   }, [transaction]);
 
   const parsedAmount = Number(amount.replace(',', '.'));
@@ -114,32 +108,13 @@ export function TransactionEditSheet({
         error={amount.length > 0 && !amountValid ? 'أدخل مبلغاً أكبر من صفر.' : null}
       />
 
-      <Text className="mb-2 mt-4 text-right text-sm font-bold text-ink">
-        التاريخ
-      </Text>
-      <Pressable
-        onPress={() => setShowPicker(true)}
-        accessibilityRole="button"
+      <DateField
+        label="التاريخ"
+        value={occurredAt}
+        onChange={setOccurredAt}
         accessibilityLabel="تغيير تاريخ الحركة"
-        className="flex-row-reverse items-center justify-between rounded-xl border border-line bg-surface px-4 py-3">
-        <Text className="text-right text-base text-ink">
-          {formatDate(occurredAt.toISOString())}
-        </Text>
-        <CalendarDays size={18} color={palette.muted} />
-      </Pressable>
-
-      {showPicker ? (
-        <DateTimePicker
-          value={occurredAt}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'inline' : 'default'}
-          onChange={(_event, selected) => {
-            // أندرويد يغلق النافذة بنفسه بعد كل اختيار أو إلغاء.
-            if (Platform.OS !== 'ios') setShowPicker(false);
-            if (selected) setOccurredAt(selected);
-          }}
-        />
-      ) : null}
+        className="mt-4"
+      />
 
       <Field
         label="الوصف"

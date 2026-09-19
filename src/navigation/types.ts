@@ -39,6 +39,8 @@ export type RootStackParamList = {
   EventParticipants: { eventId: string };
   SmartInput: undefined;
   ScanReceipt: undefined;
+  /** الملف الشخصي لصاحب الحساب. */
+  Profile: undefined;
 };
 
 declare global {

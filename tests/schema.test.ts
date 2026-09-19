@@ -54,10 +54,20 @@ describe('أمن الصفوف في المخطط', () => {
     }
   });
 
+  /**
+   * عمود المالك في كل جدول.
+   *
+   * `profiles` صفّ واحد لكل مستخدم ومفتاحه هو معرّفه في auth.users، فلا
+   * عمود user_id فيه — الملكية تُقارن بالمفتاح الأساسي نفسه، وهو قيد
+   * أقوى لا أضعف: يستحيل وجود صفّين لشخص واحد أصلاً.
+   */
+  const OWNER_COLUMN: Record<string, string> = { profiles_owner: 'id' };
+
   test('كل سياسة تقيّد القراءة والكتابة بالمالك', () => {
     for (const [name, body] of policyBodies()) {
+      const column = OWNER_COLUMN[name] ?? 'user_id';
       assert.ok(
-        body.includes('using (auth.uid() = user_id)'),
+        body.includes(`using (auth.uid() = ${column})`),
         `السياسة ${name} لا تقيّد القراءة بالمالك`,
       );
       assert.ok(
@@ -68,8 +78,8 @@ describe('أمن الصفوف في المخطط', () => {
       // قبل المطابقة بدل تثبيت شكل التنسيق في الاختبار.
       const flat = body.replace(/\s+/g, ' ');
       assert.ok(
-        flat.includes('with check ( auth.uid() = user_id') ||
-          flat.includes('with check (auth.uid() = user_id'),
+        flat.includes(`with check ( auth.uid() = ${column}`) ||
+          flat.includes(`with check (auth.uid() = ${column}`),
         `السياسة ${name} لا تتحقّق من المالك عند الكتابة`,
       );
     }

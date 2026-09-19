@@ -399,3 +399,108 @@ begin
     );
   end if;
 end $$;
+
+-- =====================================================================
+-- الملف الشخصي للمستخدم + دلو الصور الرمزية
+-- =====================================================================
+-- الصفّ واحد لكل مستخدم ومفتاحه هو معرّفه في auth.users، لا عمود user_id
+-- منفصل: بهذا يستحيل وجود ملفّين لشخص واحد، وشرط الملكية يصير مقارنةً
+-- بالمفتاح الأساسي نفسه.
+
+create table if not exists public.profiles (
+  id uuid primary key references auth.users (id) on delete cascade,
+  full_name text,
+  -- تاريخ لا طابع زمني: تاريخ الميلاد لا وقت له، وتخزينه timestamptz
+  -- يزيحه يوماً كاملاً لكل من يسكن غرب غرينتش.
+  date_of_birth date,
+  avatar_url text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.profiles enable row level security;
+
+drop policy if exists "profiles_owner" on public.profiles;
+create policy "profiles_owner" on public.profiles
+  for all using (auth.uid() = id) with check (auth.uid() = id);
+
+-- حاجز أخير لو أُدرج صفّ من خارج التطبيق. التحقّق الأساسي في
+-- src/lib/validation.ts، وهذا ما لا يمكن الالتفاف عليه.
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'profiles_limits') then
+    alter table public.profiles add constraint profiles_limits check (
+      (full_name is null or length(full_name) between 2 and 120)
+      and (avatar_url is null or length(avatar_url) <= 500)
+      -- تاريخ ميلاد في المستقبل خطأ إدخال لا نيّة.
+      and (date_of_birth is null or date_of_birth <= current_date)
+      and (date_of_birth is null or date_of_birth >= date '1900-01-01')
+    );
+  end if;
+end $$;
+
+-- تحديث updated_at من قاعدة البيانات لا من العميل: قيمةٌ يرسلها العميل
+-- يستطيع العميل تزويرها، وهذه يُقاس عليها آخر تعديل.
+create or replace function public.touch_updated_at()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_touch_updated_at on public.profiles;
+create trigger profiles_touch_updated_at
+  before update on public.profiles
+  for each row execute function public.touch_updated_at();
+
+-- ---------------------------------------------------------------------
+-- دلو الصور الرمزية.
+--
+-- عامّ، بخلاف دلو الإيصالات: الصورة تُعرض برابط ثابت في الواجهة، والرابط
+-- الموقّت ينتهي فيظهر مربّع مكسور. والمقايضة مفهومة: من يعرف الرابط يرى
+-- الصورة. لذا لا يوضع هنا إلا ما يقصد صاحبه عرضه.
+--
+-- والكتابة تبقى مقصورة على مجلد صاحبها: المسار يبدأ بمعرّف المستخدم،
+-- والسياسات تمنع تجاوزه. بلا ذلك يستبدل أيّ حساب صورة أيّ حساب آخر.
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do update set public = true;
+
+update storage.buckets
+set
+  -- سقف أصغر من الإيصالات: الصورة الرمزية تُعرض في دائرة صغيرة.
+  file_size_limit = 2 * 1024 * 1024,
+  -- بلا قائمة أنواع يُرفع HTML يُفتح لاحقاً داخل نطاق التخزين — نصٌّ
+  -- ينفّذ في أصلٍ يملك ملفات مستخدمين آخرين.
+  allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp']
+where id = 'avatars';
+
+drop policy if exists "avatars_read_all" on storage.objects;
+create policy "avatars_read_all" on storage.objects
+  for select using (bucket_id = 'avatars');
+
+drop policy if exists "avatars_insert_own" on storage.objects;
+create policy "avatars_insert_own" on storage.objects
+  for insert with check (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "avatars_update_own" on storage.objects;
+create policy "avatars_update_own" on storage.objects
+  for update using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "avatars_delete_own" on storage.objects;
+create policy "avatars_delete_own" on storage.objects
+  for delete using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );

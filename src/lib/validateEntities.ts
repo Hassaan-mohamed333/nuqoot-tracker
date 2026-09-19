@@ -14,7 +14,9 @@
 import {
   LIMITS,
   checkAmount,
+  checkBirthDate,
   checkCurrency,
+  checkImageUrl,
   checkIsoDate,
   checkRowId,
   checkText,
@@ -25,6 +27,7 @@ import {
 } from '@/lib/validation';
 import type {
   EventType,
+  UserProfileInput,
   NewContactInput,
   NewEventInput,
   NewEventMember,
@@ -430,6 +433,52 @@ export function validateContactPatch(patch: ContactPatch): ContactPatch {
     });
     if (notes.ok) clean.notes = notes.value;
     else issues.push(...notes.issues);
+  }
+
+  if (issues.length) throw new ValidationError(issues);
+  if (Object.keys(clean).length === 0) {
+    throw new ValidationError([
+      { field: 'patch', code: 'empty', message: 'لا يوجد ما يُعدَّل.' },
+    ]);
+  }
+  return clean;
+}
+
+/**
+ * تعديل الملف الشخصي.
+ *
+ * بالقاعدة نفسها: الحقل الغائب لا يُمَسّ، و`null` مسحٌ مقصود. الفرق
+ * الوحيد أنه لا حقل مطلوباً هنا — ملفٌّ بلا اسم ولا صورة حالة صالحة،
+ * وهي حالة كل مستخدم قبل أن يفتح الشاشة أوّل مرّة.
+ */
+export function validateProfilePatch(patch: UserProfileInput): UserProfileInput {
+  const issues: ValidationIssue[] = [];
+  const clean: UserProfileInput = {};
+
+  if (patch.full_name !== undefined) {
+    const name = checkText('full_name', patch.full_name, {
+      label: 'الاسم الكامل',
+      max: LIMITS.name,
+      min: 2,
+    });
+    if (name.ok) clean.full_name = name.value;
+    else issues.push(...name.issues);
+  }
+
+  if (patch.date_of_birth !== undefined) {
+    const birth = checkBirthDate(
+      'date_of_birth',
+      patch.date_of_birth,
+      'تاريخ الميلاد',
+    );
+    if (birth.ok) clean.date_of_birth = birth.value;
+    else issues.push(...birth.issues);
+  }
+
+  if (patch.avatar_url !== undefined) {
+    const avatar = checkImageUrl('avatar_url', patch.avatar_url, 'رابط الصورة');
+    if (avatar.ok) clean.avatar_url = avatar.value;
+    else issues.push(...avatar.issues);
   }
 
   if (issues.length) throw new ValidationError(issues);

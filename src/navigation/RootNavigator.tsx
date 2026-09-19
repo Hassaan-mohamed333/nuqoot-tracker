@@ -41,6 +41,9 @@ const ScanReceiptScreen = lazyScreen(() =>
     default: m.ScanReceiptScreen,
   })),
 );
+const ProfileScreen = lazyScreen(() =>
+  import('@/screens/ProfileScreen').then((m) => ({ default: m.ProfileScreen })),
+);
 
 const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -182,6 +185,11 @@ export function RootNavigator() {
           name="Tabs"
           component={TabsNavigator}
           options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Profile"
+          component={ProfileScreen}
+          options={{ title: 'الملف الشخصي' }}
         />
         <Stack.Screen
           name="ContactProfile"

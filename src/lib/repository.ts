@@ -6,6 +6,7 @@ import {
   validateContactPatch,
   validateEventInput,
   validateEventMembers,
+  validateProfilePatch,
   validateSharedExpenseInput,
   validateTransactionInput,
   validateTransactionPatch,
@@ -37,6 +38,8 @@ import type {
   NewTransactionInput,
   Transaction,
   TransactionInsert,
+  UserProfile,
+  UserProfileInput,
 } from '@/types';
 import { DEFAULT_CURRENCY } from '@/utils/ledger';
 
@@ -963,4 +966,169 @@ export async function deleteContact(
   ]);
 
   return { removedTransactions };
+}
+
+/** اسم دلو التخزين الذي تُرفع إليه الصور الرمزية. */
+export const AVATARS_BUCKET = 'avatars';
+
+/**
+ * يرفع صورة رمزية ويعيد رابطها العام.
+ *
+ * بخلاف الإيصالات نعيد رابطاً عامّاً لا مساراً: الصورة تُعرض في كل
+ * تصيير للشاشة، والرابط الموقّت ينتهي فيتحوّل إلى مربّع مكسور بعد ساعة.
+ * والمقايضة مقبولة هنا وحدها — من يعرف الرابط يرى صورةً وضعها صاحبها
+ * ليراها الناس، لا إيصالاً يكشف ما اشترى ومتى.
+ *
+ * اسم الملف يحمل طابعاً زمنياً لا اسماً ثابتاً: الكتابة فوق مسارٍ واحد
+ * تُبقي الصورة القديمة في ذاكرة المتصفّح والـ CDN، فيرى المستخدم صورته
+ * السابقة بعد تغييرها ويظنّ أن الحفظ فشل.
+ */
+export async function uploadAvatar(localUri: string): Promise<string> {
+  const client = requireSupabase();
+
+  const { data: userData, error: userError } = await client.auth.getUser();
+  if (userError) {
+    logStepFailure('قراءة المستخدم الحالي', userError);
+    throw userError;
+  }
+  const user = userData?.user;
+  if (!user) throw new Error('يلزم تسجيل الدخول لرفع الصورة.');
+
+  let file;
+  try {
+    file = await readLocalFile(localUri);
+  } catch (error) {
+    logStepFailure('قراءة ملف الصورة', error);
+    throw error;
+  }
+
+  // الامتداد من نوع المحتوى لا من العنوان: على الويب يكون العنوان
+  // "blob:http://..." فينتج عن اشتقاقه مفتاحٌ يحوي ':' و'/' ترفضه الخدمة.
+  const extension = extensionForMime(file.mimeType);
+  const path = `${user.id}/${Date.now()}.${extension}`;
+
+  const { error } = await client.storage
+    .from(AVATARS_BUCKET)
+    .upload(path, file.bytes, { contentType: file.mimeType, upsert: false });
+
+  if (error) {
+    logStepFailure(`رفع الصورة إلى ${AVATARS_BUCKET}/${path}`, error);
+    throw error;
+  }
+
+  const { data } = client.storage.from(AVATARS_BUCKET).getPublicUrl(path);
+  if (!data?.publicUrl) {
+    throw new Error('تعذّر الحصول على رابط الصورة بعد الرفع.');
+  }
+  return data.publicUrl;
+}
+
+/**
+ * هوية الملف الشخصي في الوضع المحلي.
+ *
+ * التطبيق كلّه يعمل بلا خادم — جهات الاتصال والحركات والمناسبات — وكان
+ * الملف الشخصي وحده يطلب تسجيل دخول لا وجود له أصلاً في ذلك الوضع.
+ * فهوية ثابتة على الجهاز تجعل الشاشة تعمل كبقيّتها.
+ */
+export const LOCAL_PROFILE_ID = 'local';
+
+/**
+ * أيّ ملفّ نقرأ ونكتب؟
+ *
+ * `null` تعني «لا شيء بعد»: خادمٌ مُعدّ وجلسة لم تبدأ، وهي الحالة
+ * الوحيدة التي يصحّ فيها طلب تسجيل الدخول.
+ */
+export function resolveProfileId(
+  userId: string | null,
+  authDisabled: boolean,
+): string | null {
+  if (userId) return userId;
+  return authDisabled ? LOCAL_PROFILE_ID : null;
+}
+
+/** ملفّ فارغ، لمستخدم لم يفتح الشاشة بعد. */
+function emptyProfile(userId: string): UserProfile {
+  const nowIso = new Date().toISOString();
+  return {
+    id: userId,
+    full_name: null,
+    date_of_birth: null,
+    avatar_url: null,
+    created_at: nowIso,
+    updated_at: nowIso,
+  };
+}
+
+/**
+ * يقرأ الملف الشخصي.
+ *
+ * لا يرمي عند غياب الصفّ: المستخدم الجديد لا صفَّ له حتى أوّل حفظ،
+ * وهي الحالة الطبيعية لا خطأ. `maybeSingle` تميّز «غير موجود» عن «فشل».
+ */
+export async function fetchUserProfile(userId: string): Promise<UserProfile> {
+  if (isSupabaseReady()) {
+    try {
+      const client = requireSupabase();
+      const { data, error } = await client
+        .from(TABLES.profiles)
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data) {
+        const profile = data as UserProfile;
+        await writeJson(STORAGE_KEYS.profile, profile);
+        return profile;
+      }
+      return emptyProfile(userId);
+    } catch (error) {
+      noteServerFailure('تحميل الملف الشخصي', error);
+      // نسقط إلى النسخة المحلية بدل شاشة فارغة.
+    }
+  }
+
+  const cached = await readJson<UserProfile | null>(STORAGE_KEYS.profile, null);
+  return cached?.id === userId ? cached : emptyProfile(userId);
+}
+
+/**
+ * يحفظ تعديلات الملف الشخصي.
+ *
+ * `upsert` لا `update`: الصفّ لا يوجد قبل أوّل حفظ، و`update` على صفّ
+ * غير موجود تنجح بصمت وتعيد لا شيء — فيرى المستخدم «تم الحفظ» ولا يُحفظ
+ * شيء. ومفتاح الصفّ هو معرّف المستخدم نفسه، و RLS تمنع كتابته لغيره.
+ */
+export async function updateUserProfile(
+  userId: string,
+  data: UserProfileInput,
+): Promise<UserProfile> {
+  const patch = validateProfilePatch(data);
+
+  let saved: UserProfile | null = null;
+
+  if (isSupabaseReady()) {
+    try {
+      const client = requireSupabase();
+      const { data: row, error } = await client
+        .from(TABLES.profiles)
+        .upsert({ id: userId, ...patch }, { onConflict: 'id' })
+        .select()
+        .single();
+
+      if (error) throw error;
+      saved = row as UserProfile;
+    } catch (error) {
+      noteServerFailure('حفظ الملف الشخصي', error);
+      throw error;
+    }
+  }
+
+  const cached = await readJson<UserProfile | null>(STORAGE_KEYS.profile, null);
+  const base = cached?.id === userId ? cached : emptyProfile(userId);
+  const next: UserProfile =
+    saved ?? { ...base, ...patch, updated_at: new Date().toISOString() };
+
+  await writeJson(STORAGE_KEYS.profile, next);
+  return next;
 }

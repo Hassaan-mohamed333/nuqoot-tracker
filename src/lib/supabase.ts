@@ -228,4 +228,5 @@ export const TABLES = {
   eventParticipants: 'event_participants',
   sharedExpenses: 'shared_expenses',
   expenseShares: 'expense_shares',
+  profiles: 'profiles',
 } as const;
