@@ -320,3 +320,123 @@ export function validateEventMembers(
   if (issues.length) throw new ValidationError(issues);
   return clean;
 }
+
+/**
+ * تعديل جزئي لحركة.
+ *
+ * الحقول كلها اختيارية، ويُتحقَّق من الموجود منها فقط — لا من الغائب.
+ * الفرق عن `validateTransactionInput` جوهري: هناك الحقل الناقص خطأ،
+ * وهنا الحقل الناقص يعني «لا تمسّه».
+ */
+export type TransactionPatch = Partial<
+  Pick<
+    NewTransactionInput,
+    'amount' | 'direction' | 'note' | 'occurred_at' | 'event_id'
+  >
+>;
+
+export function validateTransactionPatch(patch: TransactionPatch): TransactionPatch {
+  const issues: ValidationIssue[] = [];
+  const clean: TransactionPatch = {};
+
+  if (patch.direction !== undefined) {
+    clean.direction = requireEnum<TransactionDirection>(
+      patch.direction,
+      DIRECTIONS,
+      'direction',
+      'اتجاه الحركة',
+    );
+  }
+
+  if (patch.amount !== undefined) {
+    const amount = checkAmount(patch.amount);
+    if (amount.ok) clean.amount = amount.value;
+    else issues.push(...amount.issues);
+  }
+
+  if (patch.occurred_at !== undefined) {
+    const date = checkIsoDate('occurred_at', patch.occurred_at, 'تاريخ الحركة');
+    if (date.ok) clean.occurred_at = date.value;
+    else issues.push(...date.issues);
+  }
+
+  if (patch.note !== undefined) {
+    const note = checkText('note', patch.note, {
+      label: 'الملاحظة',
+      max: LIMITS.note,
+      multiline: true,
+    });
+    if (note.ok) clean.note = note.value;
+    else issues.push(...note.issues);
+  }
+
+  if (patch.event_id !== undefined) {
+    if (patch.event_id === null) {
+      clean.event_id = null;
+    } else {
+      const event = checkRowId('event_id', patch.event_id, 'المناسبة');
+      if (event.ok) clean.event_id = event.value;
+      else issues.push(...event.issues);
+    }
+  }
+
+  if (issues.length) throw new ValidationError(issues);
+  if (Object.keys(clean).length === 0) {
+    throw new ValidationError([
+      { field: 'patch', code: 'empty', message: 'لا يوجد ما يُعدَّل.' },
+    ]);
+  }
+  return clean;
+}
+
+/** تعديل جزئي لجهة اتصال، بالقاعدة نفسها. */
+export type ContactPatch = Partial<NewContactInput>;
+
+export function validateContactPatch(patch: ContactPatch): ContactPatch {
+  const issues: ValidationIssue[] = [];
+  const clean: ContactPatch = {};
+
+  if (patch.full_name !== undefined) {
+    const name = checkText('full_name', patch.full_name, {
+      label: 'الاسم',
+      max: LIMITS.name,
+      min: 2,
+      required: true,
+    });
+    if (name.ok) clean.full_name = name.value as string;
+    else issues.push(...name.issues);
+  }
+
+  if (patch.phone !== undefined) {
+    const phone = checkPhone(patch.phone);
+    if (phone.ok) clean.phone = phone.value;
+    else issues.push(...phone.issues);
+  }
+
+  if (patch.relation !== undefined) {
+    const relation = checkText('relation', patch.relation, {
+      label: 'صلة القرابة',
+      max: LIMITS.relation,
+    });
+    if (relation.ok) clean.relation = relation.value;
+    else issues.push(...relation.issues);
+  }
+
+  if (patch.notes !== undefined) {
+    const notes = checkText('notes', patch.notes, {
+      label: 'الملاحظات',
+      max: LIMITS.note,
+      multiline: true,
+    });
+    if (notes.ok) clean.notes = notes.value;
+    else issues.push(...notes.issues);
+  }
+
+  if (issues.length) throw new ValidationError(issues);
+  if (Object.keys(clean).length === 0) {
+    throw new ValidationError([
+      { field: 'patch', code: 'empty', message: 'لا يوجد ما يُعدَّل.' },
+    ]);
+  }
+  return clean;
+}

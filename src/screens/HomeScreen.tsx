@@ -9,7 +9,7 @@ import {
   Sparkles,
   UserPlus,
 } from 'lucide-react-native';
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -26,10 +26,12 @@ import { confirmAction, reportError } from '@/lib/alerts';
 import { EventCard } from '@/components/EventCard';
 import { LedgerSummaryBar } from '@/components/LedgerSummaryBar';
 import { TransactionCard } from '@/components/TransactionCard';
+import { TransactionEditSheet } from '@/components/TransactionEditSheet';
 import type { RootStackParamList } from '@/navigation/types';
 import { useAuth } from '@/store/AuthProvider';
 import { useLedger } from '@/store/LedgerProvider';
 import { palette } from '@/lib/palette';
+import type { Transaction } from '@/types';
 import { formatAmount } from '@/utils/ledger';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
@@ -47,7 +49,11 @@ export function HomeScreen() {
     offline,
     refresh,
     getEventById,
+    editTransaction,
+    removeTransaction,
   } = useLedger();
+
+  const [editing, setEditing] = useState<Transaction | null>(null);
 
   const contactNames = useMemo(
     () => new Map(contacts.map((contact) => [contact.id, contact.full_name])),
@@ -61,6 +67,25 @@ export function HomeScreen() {
         .slice(0, 5),
     [transactions],
   );
+
+  async function confirmDeleteTransaction(transaction: Transaction) {
+    const approved = await confirmAction({
+      title: 'حذف الحركة',
+      message: `سيتم حذف حركة بمبلغ ${formatAmount(
+        transaction.amount,
+        transaction.currency,
+      )} نهائياً. لا يمكن التراجع.`,
+      confirmLabel: 'حذف',
+      destructive: true,
+    });
+    if (!approved) return;
+
+    try {
+      await removeTransaction(transaction.id);
+    } catch (error) {
+      reportError('تعذّر الحذف', error);
+    }
+  }
 
   async function confirmSignOut() {
     const approved = await confirmAction({
@@ -254,12 +279,20 @@ export function HomeScreen() {
                   ? (getEventById(transaction.event_id)?.title ?? null)
                   : null
               }
+              onEdit={() => setEditing(transaction)}
+              onDelete={() => void confirmDeleteTransaction(transaction)}
             />
           ))
         )}
       </ScrollView>
 
       <LedgerSummaryBar summary={totals} aboveTabBar />
+
+      <TransactionEditSheet
+        transaction={editing}
+        onClose={() => setEditing(null)}
+        onSave={editTransaction}
+      />
     </SafeAreaView>
   );
 }

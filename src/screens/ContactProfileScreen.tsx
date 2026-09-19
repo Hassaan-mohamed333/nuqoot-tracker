@@ -5,8 +5,10 @@ import {
   Archive,
   ArchiveRestore,
   CloudOff,
+  Pencil,
   Phone,
   Plus,
+  Trash2,
   TriangleAlert,
 } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
@@ -21,15 +23,17 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { confirmAction, reportError } from '@/lib/alerts';
+import { ContactEditSheet } from '@/components/ContactEditSheet';
 import { EventCard } from '@/components/EventCard';
 import { LedgerSummaryBar } from '@/components/LedgerSummaryBar';
 import { NetBalanceBadge } from '@/components/NetBalanceBadge';
 import { TransactionCard } from '@/components/TransactionCard';
+import { TransactionEditSheet } from '@/components/TransactionEditSheet';
 import { useContactLedger } from '@/hooks/useContactLedger';
 import { palette } from '@/lib/palette';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
-import type { TransactionDirection } from '@/types';
+import type { Transaction, TransactionDirection } from '@/types';
 import { formatAmount, summarize } from '@/utils/ledger';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
@@ -49,12 +53,30 @@ export function ContactProfileScreen() {
   const { params } = useRoute<ProfileRoute>();
   const [filter, setFilter] = useState<Filter>('ALL');
 
+  const [editing, setEditing] = useState<Transaction | null>(null);
+  const [editingContact, setEditingContact] = useState(false);
+
   // استعلام مباشر مُرشَّح على الخادم بـ contact_id.
-  const { data, loading, error, refresh } = useContactLedger(params.contactId);
+  const {
+    data,
+    loading,
+    error,
+    refresh,
+    applyTransaction,
+    dropTransaction,
+    applyContact,
+  } = useContactLedger(params.contactId);
 
   // النسخة المحمّلة مسبقاً في المزوّد تُستخدم كعنوان مؤقت ريثما يصل الطلب،
   // فلا تظهر الشاشة فارغة عند الدخول إليها.
-  const { getContactById, setArchived } = useLedger();
+  const {
+    getContactById,
+    setArchived,
+    editTransaction,
+    removeTransaction,
+    editContact,
+    removeContact,
+  } = useLedger();
   const cachedContact = getContactById(params.contactId);
 
   const contact = data?.contact ?? cachedContact ?? null;
@@ -95,6 +117,77 @@ export function ContactProfileScreen() {
       navigation.goBack();
     } catch (error) {
       reportError('تعذّر الأرشفة', error);
+    }
+  }
+
+  /*
+   * كل تعديل يُكتب مرّتين في الذاكرة: في المزوّد (لتُحدَّث الإجماليات في
+   * الرئيسية وقائمة الأشخاص) وفي نسخة هذه الشاشة (لتُحدَّث أرصدة الدفتر).
+   * المصدران حقيقيان معاً، وترك أحدهما يعني رقمين متناقضين على شاشتين.
+   */
+
+  async function saveTransaction(
+    transactionId: string,
+    updates: Parameters<typeof editTransaction>[1],
+  ) {
+    const saved = await editTransaction(transactionId, updates);
+    applyTransaction(saved);
+    return saved;
+  }
+
+  async function confirmDeleteTransaction(transaction: Transaction) {
+    const approved = await confirmAction({
+      title: 'حذف الحركة',
+      message: `سيتم حذف حركة بمبلغ ${formatAmount(
+        transaction.amount,
+        transaction.currency,
+      )} نهائياً. لا يمكن التراجع.`,
+      confirmLabel: 'حذف',
+      destructive: true,
+    });
+    if (!approved) return;
+
+    try {
+      await removeTransaction(transaction.id);
+      dropTransaction(transaction.id);
+    } catch (error) {
+      reportError('تعذّر الحذف', error);
+    }
+  }
+
+  async function saveContact(
+    contactId: string,
+    updates: Parameters<typeof editContact>[1],
+  ) {
+    const saved = await editContact(contactId, updates);
+    applyContact(saved);
+    return saved;
+  }
+
+  async function confirmDeleteContact() {
+    if (!contact) return;
+
+    // العدد في نصّ التحذير لا في شرحٍ عام: «ستُحذف المعاملات المرتبطة»
+    // لا تخبر المستخدم بحجم ما سيخسره، و«٧ حركات» تخبره.
+    const count = transactions.length;
+    const message =
+      count > 0
+        ? `سيتم حذف ${contact.full_name} نهائياً، ومعه ${count} حركة مسجّلة في دفتره. لا يمكن التراجع عن هذا الإجراء.`
+        : `سيتم حذف ${contact.full_name} نهائياً. لا يمكن التراجع عن هذا الإجراء.`;
+
+    const approved = await confirmAction({
+      title: 'حذف الحساب',
+      message,
+      confirmLabel: 'حذف نهائياً',
+      destructive: true,
+    });
+    if (!approved) return;
+
+    try {
+      await removeContact(contact.id);
+      navigation.goBack();
+    } catch (error) {
+      reportError('تعذّر حذف الحساب', error);
     }
   }
 
@@ -213,6 +306,28 @@ export function ContactProfileScreen() {
             ) : null}
           </View>
 
+          <View className="mt-3 flex-row-reverse items-center">
+            <Pressable
+              onPress={() => setEditingContact(true)}
+              accessibilityRole="button"
+              accessibilityLabel="تعديل بيانات جهة الاتصال"
+              className="flex-row-reverse items-center rounded-xl border border-line-strong bg-surface px-4 py-2">
+              <Pencil size={15} color={palette.text} />
+              <Text className="mr-1 text-sm font-semibold text-ink">تعديل</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => void confirmDeleteContact()}
+              accessibilityRole="button"
+              accessibilityLabel="حذف جهة الاتصال"
+              className="mr-2 flex-row-reverse items-center rounded-xl bg-danger-soft px-4 py-2">
+              <Trash2 size={15} color={palette.danger} />
+              <Text className="mr-1 text-sm font-semibold text-danger">
+                حذف الحساب
+              </Text>
+            </Pressable>
+          </View>
+
           {isArchived ? (
             <View className="mt-3 rounded-full bg-line/60 px-3 py-1">
               <Text className="text-[11px] font-semibold text-ink-muted">
@@ -308,6 +423,8 @@ export function ContactProfileScreen() {
                   ? (eventTitles.get(transaction.event_id) ?? null)
                   : null
               }
+              onEdit={() => setEditing(transaction)}
+              onDelete={() => void confirmDeleteTransaction(transaction)}
             />
           ))
         )}
@@ -327,6 +444,18 @@ export function ContactProfileScreen() {
       </ScrollView>
 
       <LedgerSummaryBar summary={summary} />
+
+      <TransactionEditSheet
+        transaction={editing}
+        onClose={() => setEditing(null)}
+        onSave={saveTransaction}
+      />
+
+      <ContactEditSheet
+        contact={editingContact ? contact : null}
+        onClose={() => setEditingContact(false)}
+        onSave={saveContact}
+      />
     </SafeAreaView>
   );
 }

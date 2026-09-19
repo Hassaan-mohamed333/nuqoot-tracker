@@ -11,9 +11,17 @@ import {
   createContact,
   createEvent,
   createTransaction,
+  deleteContact,
+  deleteTransaction,
   fetchLedgerData,
   setContactArchived,
+  updateContact,
+  updateTransaction,
 } from '@/lib/repository';
+import type {
+  ContactPatch,
+  TransactionPatch,
+} from '@/lib/validateEntities';
 import { useAuth } from '@/store/AuthProvider';
 import type {
   Contact,
@@ -51,6 +59,17 @@ interface LedgerContextValue {
   addContact: (input: NewContactInput) => Promise<Contact>;
   addEvent: (input: NewEventInput) => Promise<Event>;
   addTransaction: (input: NewTransactionInput) => Promise<Transaction>;
+  /** يعدّل حركة قائمة؛ الحقول الغائبة تبقى كما هي. */
+  editTransaction: (
+    transactionId: string,
+    updates: TransactionPatch,
+  ) => Promise<Transaction>;
+  /** يحذف حركة نهائياً. */
+  removeTransaction: (transactionId: string) => Promise<void>;
+  /** يعدّل بيانات جهة اتصال؛ الحقول الغائبة تبقى كما هي. */
+  editContact: (contactId: string, updates: ContactPatch) => Promise<Contact>;
+  /** يحذف جهة اتصال ومعها حركاتها. يعيد عدد الحركات المحذوفة. */
+  removeContact: (contactId: string) => Promise<number>;
   /** يؤرشف جهة اتصال أو يستعيدها. */
   setArchived: (contactId: string, archived: boolean) => Promise<void>;
   getContactById: (contactId: string) => ContactWithSummary | undefined;
@@ -103,6 +122,61 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
     const saved = await createTransaction(input);
     setTransactions((current) => [saved, ...current]);
     return saved;
+  }, []);
+
+  const editTransaction = useCallback(
+    async (transactionId: string, updates: TransactionPatch) => {
+      const saved = await updateTransaction(transactionId, updates);
+      // استبدال الصف في المصفوفة يكفي: `allWithSummary` و`totals` مشتقّان
+      // منها عبر useMemo، فالأرصدة تُحسب من جديد في نفس التصيير بلا تحديث
+      // يدوي ولا إعادة جلب.
+      setTransactions((current) =>
+        current.map((row) => (row.id === transactionId ? saved : row)),
+      );
+      return saved;
+    },
+    [],
+  );
+
+  const removeTransaction = useCallback(async (transactionId: string) => {
+    await deleteTransaction(transactionId);
+    setTransactions((current) =>
+      current.filter((row) => row.id !== transactionId),
+    );
+  }, []);
+
+  const editContact = useCallback(
+    async (contactId: string, updates: ContactPatch) => {
+      const saved = await updateContact(contactId, updates);
+      setContacts((current) =>
+        current.map((contact) => (contact.id === contactId ? saved : contact)),
+      );
+      return saved;
+    },
+    [],
+  );
+
+  const removeContact = useCallback(async (contactId: string) => {
+    const { removedTransactions } = await deleteContact(contactId);
+
+    // نُسقط الحركات والمناسبات محلياً بنفس دلالة المفاتيح الأجنبية في
+    // المخطّط: cascade على الحركات، set null على مضيف المناسبة. بدونها
+    // تبقى في الذاكرة حركةٌ بلا صاحب حتى أول إعادة جلب.
+    setContacts((current) =>
+      current.filter((contact) => contact.id !== contactId),
+    );
+    setTransactions((current) =>
+      current.filter((row) => row.contact_id !== contactId),
+    );
+    setEvents((current) =>
+      current.map((event) =>
+        event.host_contact_id === contactId
+          ? { ...event, host_contact_id: null }
+          : event,
+      ),
+    );
+
+    return removedTransactions;
   }, []);
 
   const setArchived = useCallback(
@@ -168,6 +242,10 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       addContact,
       addEvent,
       addTransaction,
+      editTransaction,
+      removeTransaction,
+      editContact,
+      removeContact,
       setArchived,
       getContactById: (contactId) =>
         allWithSummary.find((contact) => contact.id === contactId),
@@ -203,6 +281,10 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       addContact,
       addEvent,
       addTransaction,
+      editTransaction,
+      removeTransaction,
+      editContact,
+      removeContact,
       setArchived,
     ],
   );

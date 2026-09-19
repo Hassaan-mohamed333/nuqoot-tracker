@@ -1,6 +1,12 @@
-import { ArrowDownLeft, ArrowUpRight, CalendarDays } from 'lucide-react-native';
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  CalendarDays,
+  Pencil,
+  Trash2,
+} from 'lucide-react-native';
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { palette } from '@/lib/palette';
 import type { Transaction } from '@/types';
@@ -12,6 +18,10 @@ interface TransactionCardProps {
   contactName?: string;
   /** عنوان المناسبة المرتبطة إن وُجدت. */
   eventTitle?: string | null;
+  /** يُظهر زرّ التعديل. غيابه يعني بطاقة للعرض فقط. */
+  onEdit?: () => void;
+  /** يُظهر زرّ الحذف. التأكيد مسؤولية المستدعي لا البطاقة. */
+  onDelete?: () => void;
 }
 
 /**
@@ -23,6 +33,8 @@ export function TransactionCard({
   transaction,
   contactName,
   eventTitle,
+  onEdit,
+  onDelete,
 }: TransactionCardProps) {
   const isIncoming = transaction.direction === 'IN';
   const Icon = isIncoming ? ArrowDownLeft : ArrowUpRight;
@@ -64,6 +76,31 @@ export function TransactionCard({
           {isIncoming ? 'استلمت' : 'دفعت'}
         </Text>
       </View>
+
+      {onEdit || onDelete ? (
+        <View className="mr-2 flex-row-reverse items-center">
+          {onEdit ? (
+            <Pressable
+              onPress={onEdit}
+              accessibilityRole="button"
+              accessibilityLabel="تعديل الحركة"
+              hitSlop={8}
+              className="h-8 w-8 items-center justify-center rounded-full bg-surface-raised">
+              <Pencil size={15} color={palette.muted} />
+            </Pressable>
+          ) : null}
+          {onDelete ? (
+            <Pressable
+              onPress={onDelete}
+              accessibilityRole="button"
+              accessibilityLabel="حذف الحركة"
+              hitSlop={8}
+              className="mr-1 h-8 w-8 items-center justify-center rounded-full bg-danger-soft">
+              <Trash2 size={15} color={palette.danger} />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }

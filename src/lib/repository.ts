@@ -3,10 +3,14 @@ import { extensionForMime, readLocalFile } from '@/lib/files';
 import { logStepFailure } from '@/lib/supabaseError';
 import {
   validateContactInput,
+  validateContactPatch,
   validateEventInput,
   validateEventMembers,
   validateSharedExpenseInput,
   validateTransactionInput,
+  validateTransactionPatch,
+  type ContactPatch,
+  type TransactionPatch,
 } from '@/lib/validateEntities';
 import { readJson, STORAGE_KEYS, writeJson } from '@/lib/storage';
 import {
@@ -746,4 +750,217 @@ export async function createTransaction(
     draft,
     payload,
   );
+}
+
+/**
+ * يعدّل حركة قائمة.
+ *
+ * التحقّق يمرّ على `validateTransactionPatch` لا على مُتحقّق الإنشاء:
+ * الحقل الغائب هنا يعني «لا تمسّه» لا «ناقص»، والخلط بينهما كان سيجبر
+ * الواجهة على إرسال الصف كاملاً في كل تعديل.
+ */
+export async function updateTransaction(
+  transactionId: string,
+  updates: TransactionPatch,
+): Promise<Transaction> {
+  const patch = validateTransactionPatch(updates);
+
+  let updated: Transaction | null = null;
+
+  if (isSupabaseReady()) {
+    try {
+      const client = requireSupabase();
+      const { data, error } = await client
+        .from(TABLES.transactions)
+        .update(patch)
+        .eq('id', transactionId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      updated = data as Transaction;
+    } catch (error) {
+      noteServerFailure('تعديل الحركة', error);
+      throw error;
+    }
+  }
+
+  const cached = await readJson<Transaction[]>(STORAGE_KEYS.transactions, []);
+  const next = cached.map((row) =>
+    row.id === transactionId ? { ...row, ...patch } : row,
+  );
+  await writeJson(STORAGE_KEYS.transactions, next);
+
+  const result = updated ?? next.find((row) => row.id === transactionId);
+  if (!result) throw new Error('الحركة غير موجودة.');
+  return result;
+}
+
+/** يحذف حركة واحدة من الخادم ومن النسخة المحلية. */
+export async function deleteTransaction(transactionId: string): Promise<void> {
+  if (isSupabaseReady()) {
+    try {
+      const client = requireSupabase();
+      const { error } = await client
+        .from(TABLES.transactions)
+        .delete()
+        .eq('id', transactionId);
+
+      if (error) throw error;
+    } catch (error) {
+      noteServerFailure('حذف الحركة', error);
+      throw error;
+    }
+  }
+
+  const cached = await readJson<Transaction[]>(STORAGE_KEYS.transactions, []);
+  await writeJson(
+    STORAGE_KEYS.transactions,
+    cached.filter((row) => row.id !== transactionId),
+  );
+}
+
+/** يعدّل بيانات جهة اتصال (الاسم، الهاتف، الصلة، الملاحظات). */
+export async function updateContact(
+  contactId: string,
+  updates: ContactPatch,
+): Promise<Contact> {
+  const patch = validateContactPatch(updates);
+
+  let updated: Contact | null = null;
+
+  if (isSupabaseReady()) {
+    try {
+      const client = requireSupabase();
+      const { data, error } = await client
+        .from(TABLES.contacts)
+        .update(patch)
+        .eq('id', contactId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      updated = data as Contact;
+    } catch (error) {
+      noteServerFailure('تعديل جهة الاتصال', error);
+      throw error;
+    }
+  }
+
+  const cached = await readJson<Contact[]>(STORAGE_KEYS.contacts, []);
+  const next = cached.map((contact) =>
+    contact.id === contactId ? { ...contact, ...patch } : contact,
+  );
+  await writeJson(STORAGE_KEYS.contacts, next);
+
+  const result = updated ?? next.find((contact) => contact.id === contactId);
+  if (!result) throw new Error('جهة الاتصال غير موجودة.');
+  return result;
+}
+
+/** ما أزاله حذف جهة الاتصال، ليصف للمستخدم أثر ما فعله. */
+export interface ContactDeletionResult {
+  /** عدد الحركات التي رحلت مع جهة الاتصال. */
+  removedTransactions: number;
+}
+
+/**
+ * يحذف جهة اتصال ومعها كل ما يتفرّع عنها.
+ *
+ * على الخادم يكفي حذف الصف: المخطّط يعلن `on delete cascade` على
+ * `transactions.contact_id` و`event_participants.contact_id`
+ * و`expense_shares.contact_id`، و`on delete set null` على
+ * `events.host_contact_id` و`shared_expenses.payer_contact_id`.
+ *
+ * أمّا التخزين المحلي فلا يعرف مفاتيح أجنبية، فنكرّر الدلالة نفسها هنا
+ * يدوياً. لولا ذلك لبقيت في الوضع المحلي حركاتٌ تشير إلى جهة اتصال
+ * محذوفة: تُحسب في الإجماليات ولا يظهر لها صاحب.
+ */
+export async function deleteContact(
+  contactId: string,
+): Promise<ContactDeletionResult> {
+  if (isSupabaseReady()) {
+    try {
+      const client = requireSupabase();
+      const { error } = await client
+        .from(TABLES.contacts)
+        .delete()
+        .eq('id', contactId);
+
+      if (error) throw error;
+    } catch (error) {
+      noteServerFailure('حذف جهة الاتصال', error);
+      throw error;
+    }
+  }
+
+  const [contacts, transactions, events, participants, expenses, shares] =
+    await Promise.all([
+      readJson<Contact[]>(STORAGE_KEYS.contacts, []),
+      readJson<Transaction[]>(STORAGE_KEYS.transactions, []),
+      readJson<Event[]>(STORAGE_KEYS.events, []),
+      readJson<EventParticipant[]>(STORAGE_KEYS.participants, []),
+      readJson<SharedExpense[]>(STORAGE_KEYS.sharedExpenses, []),
+      readJson<ExpenseShare[]>(STORAGE_KEYS.expenseShares, []),
+    ]);
+
+  const keptTransactions = transactions.filter(
+    (row) => row.contact_id !== contactId,
+  );
+  const removedTransactions = transactions.length - keptTransactions.length;
+
+  // الحصص تتبع عضويّة المناسبة أيضاً: العضو يُحذف، فحصصه تُحذف معه حتى
+  // لو كان الصف يحمل participant_id لا contact_id.
+  const droppedParticipants = new Set(
+    participants
+      .filter((row) => row.contact_id === contactId)
+      .map((row) => row.id),
+  );
+
+  await Promise.all([
+    writeJson(
+      STORAGE_KEYS.contacts,
+      contacts.filter((contact) => contact.id !== contactId),
+    ),
+    writeJson(STORAGE_KEYS.transactions, keptTransactions),
+    writeJson(
+      STORAGE_KEYS.events,
+      events.map((event) =>
+        event.host_contact_id === contactId
+          ? { ...event, host_contact_id: null }
+          : event,
+      ),
+    ),
+    writeJson(
+      STORAGE_KEYS.participants,
+      participants.filter((row) => row.contact_id !== contactId),
+    ),
+    writeJson(
+      STORAGE_KEYS.sharedExpenses,
+      expenses.map((expense) => {
+        const byContact = expense.payer_contact_id === contactId;
+        const byParticipant =
+          expense.payer_participant_id !== null &&
+          droppedParticipants.has(expense.payer_participant_id);
+        if (!byContact && !byParticipant) return expense;
+        return {
+          ...expense,
+          payer_contact_id: byContact ? null : expense.payer_contact_id,
+          payer_participant_id: byParticipant
+            ? null
+            : expense.payer_participant_id,
+        };
+      }),
+    ),
+    writeJson(
+      STORAGE_KEYS.expenseShares,
+      shares.filter(
+        (share) =>
+          share.contact_id !== contactId &&
+          !(share.participant_id && droppedParticipants.has(share.participant_id)),
+      ),
+    ),
+  ]);
+
+  return { removedTransactions };
 }
