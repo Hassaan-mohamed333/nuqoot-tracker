@@ -17,6 +17,7 @@ import {
   errorResponse,
   generateToolCall,
   handleOptions,
+  isOriginAllowed,
   jsonResponse,
   originOf,
   readJsonBody,
@@ -68,6 +69,7 @@ const TOOLS: FunctionDeclaration[] = [
             'addTransaction',
             'addContact',
             'addEvent',
+            'archive',
             'smartInput',
             'scanReceipt',
           ],
@@ -114,6 +116,30 @@ const TOOLS: FunctionDeclaration[] = [
         note: { type: 'STRING', description: 'ملاحظة قصيرة اختيارية.' },
       },
       required: ['amount', 'type', 'contactName'],
+    },
+  },
+  {
+    name: 'archiveItem',
+    description:
+      'ينقل حركة أو حساباً إلى الأرشيف. استعمله لكل طلب حذف أو مسح أو أرشفة: ' +
+      'الحذف في هذا التطبيق نقلٌ إلى الأرشيف، والمستخدم يستعيد منه أو يحذف ' +
+      'نهائياً بنفسه. لا توجد أداة حذف نهائي، فلا تبحث عنها.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        target: {
+          type: 'STRING',
+          enum: ['transaction', 'contact'],
+          description:
+            'transaction لحركة أو فاتورة أو عملية بعينها (تُؤخذ آخر حركة ' +
+            'للشخص)، و contact للحساب كلّه بحركاته.',
+        },
+        contactName: {
+          type: 'STRING',
+          description: 'اسم صاحب الحركة أو الحساب.',
+        },
+      },
+      required: ['target', 'contactName'],
     },
   },
   {
@@ -225,6 +251,14 @@ function buildSystemInstruction(context: RequestBody['context']): string {
     '- «سجل 500 لسامي» ⇦ createTransaction(amount=500, type=expense, contactName=سامي)',
     '- «استلمت ١٢٠٠ من سارة» ⇦ createTransaction(amount=1200, type=income, contactName=سارة)',
     '',
+    'الحذف والأرشفة:',
+    '- «احذف/امسح/شيل/ألغِ/ارشف» كلّها ⇦ archiveItem. لا حذف نهائي من هنا.',
+    '- «فاتورة/عملية/حركة/معاملة/نقطة فلان» ⇦ target=transaction.',
+    '- «حساب/جهة اتصال/الشخص فلان» ⇦ target=contact.',
+    '- «حذف فاتورة احمد» ⇦ archiveItem(target=transaction, contactName=أحمد)',
+    '- «ارشف حساب احمد» ⇦ archiveItem(target=contact, contactName=أحمد)',
+    '- قل للمستخدم إنها نُقلت إلى الأرشيف ويمكن استعادتها، لا إنها حُذفت.',
+    '',
     'الاسم غير الموجود في القائمة:',
     '- سجّل الحركة به كما نطقه المستخدم. التطبيق يُنشئ جهة الاتصال تلقائياً',
     '  ويُعلم المستخدم بذلك في بطاقة التأكيد. لا ترفض الأمر ولا تطلب إضافتها أولاً.',
@@ -260,6 +294,18 @@ Deno.serve(async (request: Request): Promise<Response> => {
   }
 
   try {
+    // الأصل المرفوض يُردّ عليه بجسم مقروء لا بصمت: ترويسات CORS حاضرة
+    // على هذا الردّ أيضاً، فيرى المستخدم السبب بدل «CORS error».
+    if (!isOriginAllowed(origin)) {
+      return errorResponse(
+        'ORIGIN_NOT_ALLOWED',
+        'هذا النطاق غير مسموح في ALLOWED_ORIGINS لهذه الدالّة.',
+        403,
+        undefined,
+        origin,
+      );
+    }
+
     // الحاجز قبل أي عمل: بدونه يستنزف حاملُ المفتاح العام رصيد Gemini.
     const userId = await requireUser(request);
     enforceUserRateLimit(userId);

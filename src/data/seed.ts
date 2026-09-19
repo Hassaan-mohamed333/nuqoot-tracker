@@ -178,6 +178,8 @@ export const SEED_TRANSACTIONS: Transaction[] = [
     occurred_at: daysAgo(120),
     note: 'نقوط الفرح',
     receipt_url: null,
+    is_archived: false,
+    archived_at: null,
     created_at: daysAgo(120),
   },
   {
@@ -191,6 +193,8 @@ export const SEED_TRANSACTIONS: Transaction[] = [
     occurred_at: daysAgo(365),
     note: 'نقوط فرحي',
     receipt_url: null,
+    is_archived: false,
+    archived_at: null,
     created_at: daysAgo(365),
   },
   {
@@ -204,6 +208,8 @@ export const SEED_TRANSACTIONS: Transaction[] = [
     occurred_at: daysAgo(300),
     note: 'نقوط فرحي',
     receipt_url: null,
+    is_archived: false,
+    archived_at: null,
     created_at: daysAgo(300),
   },
   {
@@ -217,6 +223,8 @@ export const SEED_TRANSACTIONS: Transaction[] = [
     occurred_at: daysAgo(45),
     note: 'نقوط الخطوبة',
     receipt_url: null,
+    is_archived: false,
+    archived_at: null,
     created_at: daysAgo(45),
   },
   {
@@ -230,6 +238,8 @@ export const SEED_TRANSACTIONS: Transaction[] = [
     occurred_at: daysAgo(200),
     note: null,
     receipt_url: null,
+    is_archived: false,
+    archived_at: null,
     created_at: daysAgo(200),
   },
   {
@@ -243,6 +253,8 @@ export const SEED_TRANSACTIONS: Transaction[] = [
     occurred_at: daysAgo(20),
     note: 'واجب عزاء',
     receipt_url: null,
+    is_archived: false,
+    archived_at: null,
     created_at: daysAgo(20),
   },
   {
@@ -256,6 +268,8 @@ export const SEED_TRANSACTIONS: Transaction[] = [
     occurred_at: daysAgo(180),
     note: 'نقوط فرحي',
     receipt_url: null,
+    is_archived: false,
+    archived_at: null,
     created_at: daysAgo(180),
   },
   {
@@ -269,6 +283,8 @@ export const SEED_TRANSACTIONS: Transaction[] = [
     occurred_at: daysAgo(140),
     note: 'واجب فرح البنت',
     receipt_url: null,
+    is_archived: false,
+    archived_at: null,
     created_at: daysAgo(140),
   },
   {
@@ -282,6 +298,8 @@ export const SEED_TRANSACTIONS: Transaction[] = [
     occurred_at: daysAgo(70),
     note: null,
     receipt_url: null,
+    is_archived: false,
+    archived_at: null,
     created_at: daysAgo(70),
   },
   {
@@ -295,6 +313,8 @@ export const SEED_TRANSACTIONS: Transaction[] = [
     occurred_at: daysAgo(65),
     note: 'رد الواجب',
     receipt_url: null,
+    is_archived: false,
+    archived_at: null,
     created_at: daysAgo(65),
   },
 ];

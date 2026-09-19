@@ -21,6 +21,7 @@ import { ContactsListScreen } from '@/screens/ContactsListScreen';
 import { EventLedgerScreen } from '@/screens/EventLedgerScreen';
 import { EventParticipantsScreen } from '@/screens/EventParticipantsScreen';
 import { EventsScreen } from '@/screens/EventsScreen';
+import { ArchiveScreen } from '@/screens/ArchiveScreen';
 import { HomeScreen } from '@/screens/HomeScreen';
 import { palette } from '@/lib/palette';
 
@@ -185,6 +186,11 @@ export function RootNavigator() {
           name="Tabs"
           component={TabsNavigator}
           options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Archive"
+          component={ArchiveScreen}
+          options={{ title: 'الأرشيف' }}
         />
         <Stack.Screen
           name="Profile"

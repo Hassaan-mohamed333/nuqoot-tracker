@@ -490,8 +490,14 @@ async function loadLocalContactLedger(
     readJson<Transaction[]>(STORAGE_KEYS.transactions, []),
   ]);
 
+  // المؤرشفة مستبعدة هنا أيضاً: هذه الشاشة تقرأ من استعلامها الخاص لا
+  // من مصفوفة المزوّد، فترشيحُها هناك وحده كان يترك حركةً مؤرشفة تظهر
+  // في دفتر الشخص وتُحسب في رصيده.
   const contactTransactions = transactions
-    .filter((transaction) => transaction.contact_id === contactId)
+    .filter(
+      (transaction) =>
+        transaction.contact_id === contactId && !transaction.is_archived,
+    )
     .sort((a, b) => b.occurred_at.localeCompare(a.occurred_at));
 
   const linkedEventIds = new Set(
@@ -535,6 +541,7 @@ export async function fetchContactLedger(
         .from(TABLES.transactions)
         .select('*')
         .eq('contact_id', contactId)
+        .eq('is_archived', false)
         .order('occurred_at', { ascending: false }),
     ]);
 
@@ -744,6 +751,8 @@ export async function createTransaction(
     ...payload,
     id: createId('t'),
     user_id: null,
+    is_archived: false,
+    archived_at: null,
     created_at: nowIso,
   };
 
@@ -1131,4 +1140,54 @@ export async function updateUserProfile(
 
   await writeJson(STORAGE_KEYS.profile, next);
   return next;
+}
+
+/**
+ * يؤرشف حركة أو يعيدها إلى الدفتر النشط.
+ *
+ * مرآةٌ لـ `setContactArchived`: الأرشفة إخفاء لا حذف. الصفّ يبقى،
+ * ويخرج من القوائم والإجماليات، ويعود منها بنقرة من شاشة الأرشيف.
+ *
+ * وهي ما يُنفَّذ عند طلب «احذف» — الحذف في دفتر مالي فعلٌ لا رجعة فيه،
+ * وأكثر ما يُحذف يُحذف بالخطأ. أمّا `deleteTransaction` فتبقى للحذف
+ * النهائي من شاشة الأرشيف بتأكيد صريح.
+ */
+export async function setTransactionArchived(
+  transactionId: string,
+  archived: boolean,
+): Promise<Transaction> {
+  const patch = {
+    is_archived: archived,
+    archived_at: archived ? new Date().toISOString() : null,
+  };
+
+  let updated: Transaction | null = null;
+
+  if (isSupabaseReady()) {
+    try {
+      const client = requireSupabase();
+      const { data, error } = await client
+        .from(TABLES.transactions)
+        .update(patch)
+        .eq('id', transactionId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      updated = data as Transaction;
+    } catch (error) {
+      noteServerFailure('أرشفة الحركة', error);
+      throw error;
+    }
+  }
+
+  const cached = await readJson<Transaction[]>(STORAGE_KEYS.transactions, []);
+  const next = cached.map((row) =>
+    row.id === transactionId ? { ...row, ...patch } : row,
+  );
+  await writeJson(STORAGE_KEYS.transactions, next);
+
+  const result = updated ?? next.find((row) => row.id === transactionId);
+  if (!result) throw new Error('الحركة غير موجودة.');
+  return result;
 }

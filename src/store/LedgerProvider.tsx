@@ -15,6 +15,7 @@ import {
   deleteTransaction,
   fetchLedgerData,
   setContactArchived,
+  setTransactionArchived,
   updateContact,
   updateTransaction,
 } from '@/lib/repository';
@@ -43,7 +44,16 @@ import {
 interface LedgerContextValue {
   contacts: Contact[];
   events: Event[];
+  /**
+   * الحركات النشطة وحدها.
+   *
+   * المؤرشفة مستبعدة هنا عمداً لا في كل مستدعٍ: القوائم والإجماليات
+   * تقرأ هذه المصفوفة، فاستبعادُها مرّةً في المصدر يضمن ألّا تتسرّب
+   * حركةٌ مؤرشفة إلى رصيدٍ لأن شاشةً نسيت أن ترشّح.
+   */
   transactions: Transaction[];
+  /** الحركات المؤرشفة، لشاشة الأرشيف. */
+  archivedTransactions: Transaction[];
   /** جهات الاتصال النشطة مع ملخص كل واحدة (بدون المؤرشفة). */
   contactsWithSummary: ContactWithSummary[];
   /** جهات الاتصال المؤرشفة مع ملخصاتها. */
@@ -64,8 +74,13 @@ interface LedgerContextValue {
     transactionId: string,
     updates: TransactionPatch,
   ) => Promise<Transaction>;
-  /** يحذف حركة نهائياً. */
+  /** يحذف حركة نهائياً — من شاشة الأرشيف وحدها. */
   removeTransaction: (transactionId: string) => Promise<void>;
+  /** ينقل حركة إلى الأرشيف أو يستعيدها منه. */
+  setTransactionArchivedState: (
+    transactionId: string,
+    archived: boolean,
+  ) => Promise<Transaction>;
   /** يعدّل بيانات جهة اتصال؛ الحقول الغائبة تبقى كما هي. */
   editContact: (contactId: string, updates: ContactPatch) => Promise<Contact>;
   /** يحذف جهة اتصال ومعها حركاتها. يعيد عدد الحركات المحذوفة. */
@@ -84,7 +99,7 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
   const { userId } = useAuth();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [allTransactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [offline, setOffline] = useState(true);
 
@@ -179,6 +194,17 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
     return removedTransactions;
   }, []);
 
+  const setTransactionArchivedState = useCallback(
+    async (transactionId: string, archived: boolean) => {
+      const saved = await setTransactionArchived(transactionId, archived);
+      setTransactions((current) =>
+        current.map((row) => (row.id === transactionId ? saved : row)),
+      );
+      return saved;
+    },
+    [],
+  );
+
   const setArchived = useCallback(
     async (contactId: string, archived: boolean) => {
       const updated = await setContactArchived(contactId, archived);
@@ -189,6 +215,17 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       );
     },
     [],
+  );
+
+  /** الفصل مرّة واحدة، وكل ما بعده مشتقّ منه. */
+  const transactions = useMemo(
+    () => allTransactions.filter((row) => !row.is_archived),
+    [allTransactions],
+  );
+
+  const archivedTransactions = useMemo(
+    () => allTransactions.filter((row) => row.is_archived),
+    [allTransactions],
   );
 
   const allWithSummary = useMemo(
@@ -232,6 +269,7 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       contacts,
       events,
       transactions,
+      archivedTransactions,
       contactsWithSummary,
       archivedContacts,
       sections,
@@ -244,6 +282,7 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       addTransaction,
       editTransaction,
       removeTransaction,
+      setTransactionArchivedState,
       editContact,
       removeContact,
       setArchived,
@@ -270,6 +309,7 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       contacts,
       events,
       transactions,
+      archivedTransactions,
       allWithSummary,
       contactsWithSummary,
       archivedContacts,
@@ -283,6 +323,7 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       addTransaction,
       editTransaction,
       removeTransaction,
+      setTransactionArchivedState,
       editContact,
       removeContact,
       setArchived,

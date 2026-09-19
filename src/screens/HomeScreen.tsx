@@ -1,6 +1,7 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
+  Archive,
   CalendarPlus,
   CloudOff,
   LogOut,
@@ -48,12 +49,15 @@ export function HomeScreen() {
     transactions,
     events,
     contacts,
+    contactsWithSummary,
     loading,
     offline,
     refresh,
     getEventById,
     editTransaction,
-    removeTransaction,
+    setTransactionArchivedState,
+    archivedTransactions,
+    archivedContacts,
   } = useLedger();
 
   const [editing, setEditing] = useState<Transaction | null>(null);
@@ -72,22 +76,27 @@ export function HomeScreen() {
     [transactions],
   );
 
-  async function confirmDeleteTransaction(transaction: Transaction) {
+  /**
+   * الحذف هنا نقلٌ إلى الأرشيف لا إتلاف.
+   *
+   * الحركة تخرج من القوائم والإجماليات وتبقى قابلة للاستعادة. والحذف
+   * النهائي فعلٌ واحد في التطبيق، موضعه شاشة الأرشيف وحدها.
+   */
+  async function confirmArchiveTransaction(transaction: Transaction) {
     const approved = await confirmAction({
-      title: 'حذف الحركة',
-      message: `سيتم حذف حركة بمبلغ ${formatAmount(
+      title: 'نقل إلى الأرشيف',
+      message: `ستُنقل حركة بمبلغ ${formatAmount(
         transaction.amount,
         transaction.currency,
-      )} نهائياً. لا يمكن التراجع.`,
-      confirmLabel: 'حذف',
-      destructive: true,
+      )} إلى الأرشيف، وتخرج من أرصدتك. يمكنك استعادتها في أي وقت.`,
+      confirmLabel: 'نقل إلى الأرشيف',
     });
     if (!approved) return;
 
     try {
-      await removeTransaction(transaction.id);
+      await setTransactionArchivedState(transaction.id, true);
     } catch (error) {
-      reportError('تعذّر الحذف', error);
+      reportError('تعذّرت الأرشفة', error);
     }
   }
 
@@ -133,7 +142,11 @@ export function HomeScreen() {
                 النقوط والواجبات
               </Text>
               <Text className="text-right text-caption text-ink-muted">
-                {contacts.length} جهة اتصال · {transactions.length} حركة
+                {/* النشط في العدّادين معاً: `transactions` صار يستبعد
+                    المؤرشف، فعدّ جهات الاتصال كلَّها بجانبه كان يعطي
+                    رقمين بمعنيين مختلفين في سطر واحد. */}
+                {contactsWithSummary.length} جهة اتصال ·{' '}
+                {transactions.length} حركة
               </Text>
               {user ? (
                 <Text className="text-right text-caption text-ink-subtle">
@@ -143,6 +156,24 @@ export function HomeScreen() {
             </View>
           </View>
           <View className="flex-row-reverse items-center">
+            {archivedTransactions.length + archivedContacts.length > 0 ? (
+              <PressableScale
+                onPress={() => navigation.navigate('Archive')}
+                accessibilityRole="button"
+                accessibilityLabel={`الأرشيف (${
+                  archivedTransactions.length + archivedContacts.length
+                } عنصر)`}
+                activeScale={0.9}
+                className="ml-2 h-11 w-11 items-center justify-center rounded-full border border-line bg-surface">
+                <Archive size={20} color={palette.muted} />
+                <View className="absolute -right-1 -top-1 min-w-[18px] items-center rounded-full bg-primary px-1">
+                  <Text className="text-[10px] font-bold text-primary-fg">
+                    {archivedTransactions.length + archivedContacts.length}
+                  </Text>
+                </View>
+              </PressableScale>
+            ) : null}
+
             <PressableScale
               onPress={() => navigation.navigate('Profile')}
               accessibilityRole="button"
@@ -302,7 +333,7 @@ export function HomeScreen() {
                   : null
               }
               onEdit={() => setEditing(transaction)}
-              onDelete={() => void confirmDeleteTransaction(transaction)}
+              onDelete={() => void confirmArchiveTransaction(transaction)}
             />
           ))
         )}

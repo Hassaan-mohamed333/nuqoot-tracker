@@ -41,6 +41,8 @@ export type RootStackParamList = {
   ScanReceipt: undefined;
   /** الملف الشخصي لصاحب الحساب. */
   Profile: undefined;
+  /** الأرشيف: ما أُخرج من الدفتر ولم يُتلف. */
+  Archive: undefined;
 };
 
 declare global {

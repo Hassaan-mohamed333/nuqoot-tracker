@@ -67,6 +67,9 @@ export interface Transaction {
   note: string | null;
   /** رابط صورة الإيصال في Supabase Storage، إن رُفعت. */
   receipt_url: string | null;
+  /** مؤرشفة: مخفيّة من القوائم والإجماليات، وقابلة للاستعادة. */
+  is_archived: boolean;
+  archived_at: string | null;
   created_at: string;
 }
 
@@ -134,7 +137,7 @@ export interface NewTransactionInput {
  */
 export type TransactionInsert = Omit<
   Transaction,
-  'id' | 'created_at' | 'user_id'
+  'id' | 'created_at' | 'user_id' | 'is_archived' | 'archived_at'
 >;
 
 /** حمولة إدراج جهة اتصال (user_id مستبعد كما في الحركات). */

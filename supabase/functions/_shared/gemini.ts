@@ -137,16 +137,31 @@ const SECURITY_HEADERS: Record<string, string> = {
 export function corsHeadersFor(origin: string | null): Record<string, string> {
   const headers: Record<string, string> = {
     ...SECURITY_HEADERS,
+    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers':
       'authorization, x-client-info, apikey, content-type, x-supabase-api-version',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin',
   };
-  if (origin && isOriginAllowed(origin)) {
+
+  /*
+   * `Access-Control-Allow-Origin` حاضرة دائماً، على كل استجابة.
+   *
+   * كانت تُحذف حين يُرفض الأصل — وحذفُها لا يمنع شيئاً، بل يحوّل رسالتنا
+   * المفهومة إلى خطأ CORS غامض في الطرفية لا يقول للمستخدم ما جرى. وهو
+   * ما كان يُبلَّغ عنه: «فشل CORS» بلا سبب. الآن يصل الردّ ويُقرأ، ويقول
+   * الجسم صراحةً إن الأصل غير مسموح.
+   *
+   * و`*` آمنة هنا: الدالّة تفرض `Authorization` في كل طلب ولا تعتمد على
+   * كوكيز، ومع النجمة لا يرسل المتصفّح اعتمادات أصلاً. فمن يستدعيها من
+   * أصل آخر لا يملك شيئاً ما لم يكن يملك رمز المستخدم سلفاً.
+   *
+   * ويبقى `ALLOWED_ORIGINS` تشديداً اختيارياً: إن ضُبط، رُدّ الأصل
+   * المسموح بعينه (مع `Vary`)، والمرفوض يُردّ عليه بـ 403 مقروء.
+   */
+  if (ALLOWED_ORIGINS.length > 0 && origin && isOriginAllowed(origin)) {
     headers['Access-Control-Allow-Origin'] = origin;
-  } else if (!origin && ALLOWED_ORIGINS.length === 0) {
-    headers['Access-Control-Allow-Origin'] = '*';
   }
   return headers;
 }

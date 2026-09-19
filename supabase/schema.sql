@@ -504,3 +504,21 @@ create policy "avatars_delete_own" on storage.objects
     bucket_id = 'avatars'
     and (storage.foldername(name))[1] = auth.uid()::text
   );
+
+-- =====================================================================
+-- الأرشفة الليّنة للحركات
+-- =====================================================================
+-- الحذف في دفتر مالي فعلٌ لا رجعة فيه، وأكثر ما يُحذف يُحذف بالخطأ.
+-- فالأرشفة تُخفي الصفّ من القوائم والإجماليات وتُبقيه قابلاً للاستعادة،
+-- والحذف النهائي يبقى متاحاً من شاشة الأرشيف وحدها بتأكيد صريح.
+--
+-- جهات الاتصال تحمل العمودين أصلاً منذ أوّل مخطّط؛ هذا يسوّي الحركات بها.
+
+alter table public.transactions
+  add column if not exists is_archived boolean not null default false;
+alter table public.transactions
+  add column if not exists archived_at timestamptz;
+
+-- القوائم والإجماليات تقرأ النشط وحده، فالفهرس على الحالة لا على الصفّ.
+create index if not exists transactions_active_idx
+  on public.transactions (user_id, is_archived, occurred_at desc);

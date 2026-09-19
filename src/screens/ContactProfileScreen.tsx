@@ -73,9 +73,8 @@ export function ContactProfileScreen() {
     getContactById,
     setArchived,
     editTransaction,
-    removeTransaction,
+    setTransactionArchivedState,
     editContact,
-    removeContact,
   } = useLedger();
   const cachedContact = getContactById(params.contactId);
 
@@ -135,23 +134,25 @@ export function ContactProfileScreen() {
     return saved;
   }
 
-  async function confirmDeleteTransaction(transaction: Transaction) {
+  // الحذف نقلٌ إلى الأرشيف؛ الإتلاف فعلٌ واحد موضعه شاشة الأرشيف.
+  async function confirmArchiveTransaction(transaction: Transaction) {
     const approved = await confirmAction({
-      title: 'حذف الحركة',
-      message: `سيتم حذف حركة بمبلغ ${formatAmount(
+      title: 'نقل إلى الأرشيف',
+      message: `ستُنقل حركة بمبلغ ${formatAmount(
         transaction.amount,
         transaction.currency,
-      )} نهائياً. لا يمكن التراجع.`,
-      confirmLabel: 'حذف',
-      destructive: true,
+      )} إلى الأرشيف، وتخرج من أرصدتك. يمكنك استعادتها في أي وقت.`,
+      confirmLabel: 'نقل إلى الأرشيف',
     });
     if (!approved) return;
 
     try {
-      await removeTransaction(transaction.id);
+      await setTransactionArchivedState(transaction.id, true);
+      // نسخة هذه الشاشة مستقلّة عن مصفوفة المزوّد، فتُحدَّث معها وإلا
+      // بقي الرصيد هنا يعدّ حركةً خرجت من كل مكان آخر.
       dropTransaction(transaction.id);
     } catch (error) {
-      reportError('تعذّر الحذف', error);
+      reportError('تعذّرت الأرشفة', error);
     }
   }
 
@@ -164,30 +165,27 @@ export function ContactProfileScreen() {
     return saved;
   }
 
-  async function confirmDeleteContact() {
+  async function confirmArchiveContact() {
     if (!contact) return;
 
-    // العدد في نصّ التحذير لا في شرحٍ عام: «ستُحذف المعاملات المرتبطة»
-    // لا تخبر المستخدم بحجم ما سيخسره، و«٧ حركات» تخبره.
     const count = transactions.length;
     const message =
       count > 0
-        ? `سيتم حذف ${contact.full_name} نهائياً، ومعه ${count} حركة مسجّلة في دفتره. لا يمكن التراجع عن هذا الإجراء.`
-        : `سيتم حذف ${contact.full_name} نهائياً. لا يمكن التراجع عن هذا الإجراء.`;
+        ? `سيُنقل ${contact.full_name} و${count} حركة في دفتره إلى الأرشيف، ويخرجون من أرصدتك. يمكنك استعادتهم في أي وقت، أو حذفهم نهائياً من شاشة الأرشيف.`
+        : `سيُنقل ${contact.full_name} إلى الأرشيف. يمكنك استعادته في أي وقت.`;
 
     const approved = await confirmAction({
-      title: 'حذف الحساب',
+      title: 'نقل إلى الأرشيف',
       message,
-      confirmLabel: 'حذف نهائياً',
-      destructive: true,
+      confirmLabel: 'نقل إلى الأرشيف',
     });
     if (!approved) return;
 
     try {
-      await removeContact(contact.id);
+      await setArchived(contact.id, true);
       navigation.goBack();
     } catch (error) {
-      reportError('تعذّر حذف الحساب', error);
+      reportError('تعذّرت الأرشفة', error);
     }
   }
 
@@ -317,9 +315,9 @@ export function ContactProfileScreen() {
             </Pressable>
 
             <Pressable
-              onPress={() => void confirmDeleteContact()}
+              onPress={() => void confirmArchiveContact()}
               accessibilityRole="button"
-              accessibilityLabel="حذف جهة الاتصال"
+              accessibilityLabel="نقل الحساب إلى الأرشيف"
               className="mr-2 flex-row-reverse items-center rounded-xl bg-danger-soft px-4 py-2">
               <Trash2 size={15} color={palette.danger} />
               <Text className="mr-1 text-sm font-semibold text-danger">
@@ -424,7 +422,7 @@ export function ContactProfileScreen() {
                   : null
               }
               onEdit={() => setEditing(transaction)}
-              onDelete={() => void confirmDeleteTransaction(transaction)}
+              onDelete={() => void confirmArchiveTransaction(transaction)}
             />
           ))
         )}

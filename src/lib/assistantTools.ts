@@ -14,7 +14,12 @@
 import { checkAmount, sanitizeLine, textLength, LIMITS } from '@/lib/validation';
 
 /** أسماء الأدوات كما يراها الطراز. مصدر واحد للاسم. */
-export const TOOL_NAMES = ['navigateTo', 'createTransaction', 'toggleModal'] as const;
+export const TOOL_NAMES = [
+  'navigateTo',
+  'createTransaction',
+  'archiveItem',
+  'toggleModal',
+] as const;
 
 export type ToolName = (typeof TOOL_NAMES)[number];
 
@@ -34,6 +39,7 @@ export const SCREEN_TARGETS = {
   addTransaction: 'نموذج إضافة حركة',
   addContact: 'نموذج إضافة جهة اتصال',
   addEvent: 'نموذج إضافة مناسبة',
+  archive: 'الأرشيف: المحذوفات القابلة للاستعادة',
   smartInput: 'الإدخال الذكي (نصّ أو صوت)',
   scanReceipt: 'قارئ الإيصالات',
 } as const;
@@ -74,7 +80,22 @@ export type AssistantAction =
       contactName: string;
       note: string | null;
     }
+  | {
+      /**
+       * الأرشفة، وهي ما يُنفَّذ عند طلب الحذف.
+       *
+       * الحذف في دفتر مالي فعلٌ لا رجعة فيه، وأكثر ما يُحذف يُحذف
+       * بالخطأ. فالأمر يُترجم إلى نقلٍ إلى الأرشيف، والحذف النهائي يبقى
+       * فعلاً يدوياً من شاشة الأرشيف — لا شيء يُتلف بجملة.
+       */
+      tool: 'archiveItem';
+      target: ArchiveTarget;
+      contactName: string;
+    }
   | { tool: 'toggleModal'; modal: ModalTarget; open: boolean };
+
+/** ما الذي يُؤرشف: آخر حركة لهذا الشخص، أم الشخص نفسه؟ */
+export type ArchiveTarget = 'transaction' | 'contact';
 
 export interface ToolCallError {
   /** رسالة عربية تُعرض للمستخدم وتُعاد إلى الطراز ليصحّح. */
@@ -173,6 +194,33 @@ export function parseToolCall(
       };
     }
 
+    case 'archiveItem': {
+      const rawTarget =
+        typeof args.target === 'string'
+          ? args.target
+          : typeof args.type === 'string'
+            ? args.type
+            : '';
+      const normalized = rawTarget.trim().toLowerCase();
+      const target: ArchiveTarget | null =
+        normalized === 'transaction'
+          ? 'transaction'
+          : normalized === 'contact'
+            ? 'contact'
+            : null;
+
+      if (!target) {
+        return fail('حدّد ما يُؤرشف: transaction للحركة أو contact للحساب.');
+      }
+
+      const contactName = optionalName(args.contactName);
+      if (!contactName) {
+        return fail('اذكر اسم صاحب الحركة أو الحساب المطلوب أرشفته.');
+      }
+
+      return { ok: true, action: { tool: 'archiveItem', target, contactName } };
+    }
+
     case 'toggleModal': {
       const modal = args.modalName ?? args.modal;
       if (typeof modal !== 'string' || !(modal in MODAL_TARGETS)) {
@@ -203,7 +251,7 @@ export function parseToolCall(
  * والحركة المكتوبة تبقى في الدفتر.
  */
 export function requiresConfirmation(action: AssistantAction): boolean {
-  return action.tool === 'createTransaction';
+  return action.tool === 'createTransaction' || action.tool === 'archiveItem';
 }
 
 /** وصف الفعل بالعربية، لبطاقة التأكيد وسجل المحادثة. */
@@ -218,6 +266,13 @@ export function describeAction(action: AssistantAction): string {
       const verb = action.direction === 'IN' ? 'استلمت' : 'دفعت';
       return `تسجيل حركة: ${verb} ${action.amount} لـ${action.contactName}`;
     }
+    case 'archiveItem':
+      // النصّ يقول «إلى الأرشيف» لا «حذف»: المستخدم طلب حذفاً، وعليه أن
+      // يعرف قبل الموافقة أن ما سيحدث قابل للتراجع وأين يجده.
+      return action.target === 'contact'
+        ? `نقل حساب ${action.contactName} وحركاته إلى الأرشيف`
+        : `نقل آخر حركة لـ${action.contactName} إلى الأرشيف`;
+
     case 'toggleModal':
       return action.open ? 'فتح المساعد' : 'إغلاق المساعد';
   }

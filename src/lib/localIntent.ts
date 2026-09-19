@@ -19,7 +19,7 @@ import { normalizeDigits, sanitizeLine } from '@/lib/validation';
 
 /** ما يفهمه المفسّر المحلي: نداء أداة جاهز، أو لا شيء. */
 export interface LocalIntent {
-  name: 'createTransaction' | 'navigateTo';
+  name: 'createTransaction' | 'navigateTo' | 'archiveItem';
   args: Record<string, unknown>;
   /** وصف عربي لما فُهم، للعرض في سجلّ المحادثة. */
   summary: string;
@@ -163,6 +163,12 @@ export function parseLocalCommand(raw: string): LocalIntent | null {
   const navigation = parseNavigation(folded);
   if (navigation) return navigation;
 
+  // ---- حذف/أرشفة ----
+  // قبل مسار التسجيل: «احذف فاتورة 500 لأحمد» تحمل رقماً أيضاً، وأولوية
+  // الفعل هنا تمنع تفسيرها تسجيلَ حركة جديدة.
+  const archive = parseArchive(normalizeDigits(clean));
+  if (archive) return archive;
+
   // ---- تسجيل حركة ----
   const amount = extractAmount(stripCurrency(folded));
   if (amount === null) return null;
@@ -197,8 +203,94 @@ export function parseLocalCommand(raw: string): LocalIntent | null {
   };
 }
 
+/**
+ * أفعال الحذف والأرشفة.
+ *
+ * كلّها تُترجم إلى أرشفة: الحذف في دفتر مالي لا رجعة فيه، وأكثر ما
+ * يُحذف يُحذف بالخطأ. والمستخدم يقول «احذف» ويقصد «اخرجها من حسابي»،
+ * لا «أتلفها إلى الأبد» — والفرق يظهر له في بطاقة التأكيد.
+ */
+const ARCHIVE_VERBS = [
+  'احذف', 'أحذف', 'حذف', 'امسح', 'أمسح', 'مسح', 'الغي', 'ألغِ', 'الغاء',
+  'إلغاء', 'شيل', 'ارشف', 'أرشف', 'ارشيف', 'اخفي', 'أخفِ', 'كنسل',
+];
+
+/** ما يدلّ على أن المقصود حركة بعينها. */
+const TRANSACTION_NOUNS = [
+  'فاتوره', 'فاتورة', 'عمليه', 'عملية', 'حركه', 'حركة', 'معامله', 'معاملة',
+  'نقطه', 'نقطة', 'مبلغ', 'قيد',
+];
+
+/** ما يدلّ على أن المقصود الحساب كلّه. */
+const CONTACT_NOUNS = [
+  'حساب', 'الحساب', 'جهه', 'جهة', 'شخص', 'الشخص', 'كارت', 'ملف',
+];
+
+/**
+ * يقتطع اسم الشخص من أمر أرشفة.
+ *
+ * بنية الأمر: فعل + اسم النوع + الاسم. فنحذف الفعل والنوع وأدوات الجرّ
+ * الشائعة وما يبقى هو الاسم. ولا نستعمل `NAME_MARKERS` هنا: «احذف
+ * فاتورة احمد» لا أداة جرّ فيها أصلاً.
+ */
+function extractArchiveName(text: string): string | null {
+  let rest = text;
+  const drop = [...ARCHIVE_VERBS, ...TRANSACTION_NOUNS, ...CONTACT_NOUNS];
+
+  for (const word of drop) {
+    rest = rest.replace(
+      new RegExp(`(?:^|\\s)${word}(?=\\s|$)`, 'gu'),
+      ' ',
+    );
+  }
+
+  /*
+   * أدوات الجرّ المنفصلة وحدها تُحذف.
+   *
+   * ولا تُمَسّ «ال» ولا اللام الملتصقة: كان حذفهما يقطع أسماءً حقيقية —
+   * «أحمد عبد الرحمن» صارت «احمد عبد رحمن» فلم تطابق أحداً في الدفتر،
+   * فلم يحدث شيء. و«ليلى» كانت ستصير «يلى». وما يبقى ملتصقاً يعالجه
+   * المطابِق بالطيّ، وهو أسلم من القصّ.
+   */
+  rest = rest
+    .replace(
+      /(?:^|\s)(?:بتاع|بتاعة|بتاعت|بتاعه|حق|الخاص ب|الخاصه ب|مع|من|عند)(?=\s)/gu,
+      ' ',
+    )
+    .replace(/\s+/gu, ' ')
+    .trim();
+
+  return rest.length >= 2 ? rest : null;
+}
+
+/** يفهم أمر حذف أو أرشفة، إن كان واضح النوع والاسم. */
+function parseArchive(text: string): LocalIntent | null {
+  const folded = foldArabic(text).toLowerCase();
+  if (!hasAny(folded, ARCHIVE_VERBS.map(foldArabic))) return null;
+
+  const wantsContact = hasAny(folded, CONTACT_NOUNS.map(foldArabic));
+  const wantsTransaction = hasAny(folded, TRANSACTION_NOUNS.map(foldArabic));
+  // بلا اسم نوع لا نخمّن: «احذف أحمد» قد تعني حركته أو حسابه كلّه،
+  // والفرق بينهما كبير. تذهب إلى الطراز ليسأل.
+  if (wantsContact === wantsTransaction) return null;
+
+  const name = extractArchiveName(text);
+  if (!name) return null;
+
+  const target = wantsContact ? 'contact' : 'transaction';
+  return {
+    name: 'archiveItem',
+    args: { target, contactName: name },
+    summary:
+      target === 'contact'
+        ? `أرشفة حساب ${name}`
+        : `أرشفة آخر حركة لـ${name}`,
+  };
+}
+
 /** وجهات يذكرها المستخدم بأسمائها الشائعة. */
 const NAV_WORDS: { words: string[]; screen: string }[] = [
+  { words: ['الارشيف', 'المحذوفات', 'ارشيف'], screen: 'archive' },
   { words: ['جهات الاتصال', 'الاشخاص', 'جهات'], screen: 'contacts' },
   { words: ['المناسبات', 'مناسبات'], screen: 'events' },
   { words: ['الرئيسيه', 'الرئيسية', 'الصفحه الرئيسيه', 'البدايه'], screen: 'home' },

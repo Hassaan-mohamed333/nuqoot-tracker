@@ -9,12 +9,13 @@ import {
   type AssistantTurn,
   type RawToolCall,
 } from '@/lib/gemini';
-import { parseLocalCommand } from '@/lib/localIntent';
+import { foldArabic, parseLocalCommand } from '@/lib/localIntent';
 import { logger } from '@/lib/logger';
 import { userMessage } from '@/lib/supabaseError';
 import { sanitizeLine } from '@/lib/validation';
 import { navigationRef } from '@/navigation/navigationRef';
 import { useLedger } from '@/store/LedgerProvider';
+import { formatDate } from '@/utils/ledger';
 
 export type MessageRole = 'user' | 'assistant' | 'action';
 
@@ -37,6 +38,7 @@ export interface PendingConfirmation {
 
 /** الشاشات التي تفتحها الوجهات مباشرة بلا معرّف. */
 const DIRECT_ROUTES = {
+  archive: 'Archive',
   addTransaction: 'AddTransaction',
   addContact: 'AddContact',
   addEvent: 'AddEvent',
@@ -50,18 +52,24 @@ const TAB_ROUTES = {
   events: 'Events',
 } as const;
 
-/** يطابق اسماً كتبه الطراز باسمٍ في الدفتر، بتسامح معقول. */
+/**
+ * يطابق اسماً كتبه الطراز أو المستخدم باسمٍ في الدفتر.
+ *
+ * المقارنة بعد طيّ صور الحروف: «احمد» و«أحمد» شخص واحد، و«ساره»
+ * و«سارة» كذلك. بلا الطيّ يفشل المطابقة فيُنشأ حسابٌ ثانٍ للشخص نفسه،
+ * أو لا يجد المساعد من يؤرشفه فلا يفعل شيئاً.
+ */
 function matchByName<T>(
   items: readonly T[],
   label: (item: T) => string,
   query: string,
 ): T | undefined {
-  const target = sanitizeLine(query).toLowerCase();
+  const target = foldArabic(sanitizeLine(query)).toLowerCase();
   if (!target) return undefined;
 
   const normalized = items.map((item) => ({
     item,
-    name: sanitizeLine(label(item)).toLowerCase(),
+    name: foldArabic(sanitizeLine(label(item))).toLowerCase(),
   }));
 
   return (
@@ -101,7 +109,15 @@ export interface AppAssistant {
  * موافقة. لا مسار ثالث يصل إلى `addTransaction` من هنا.
  */
 export function useAppAssistant(onRequestClose?: () => void): AppAssistant {
-  const { contacts, events, addTransaction, addContact } = useLedger();
+  const {
+    contacts,
+    events,
+    transactions,
+    addTransaction,
+    addContact,
+    setArchived,
+    setTransactionArchivedState,
+  } = useLedger();
 
   const [messages, setMessages] = useState<AssistantMessage[]>([
     { id: 'greeting', role: 'assistant', text: GREETING },
@@ -216,13 +232,52 @@ export function useAppAssistant(onRequestClose?: () => void): AppAssistant {
           return null;
         }
 
+        case 'archiveItem': {
+          const contact = matchByName(
+            contacts,
+            (item) => item.full_name,
+            action.contactName,
+          );
+          if (!contact) {
+            return `لا توجد جهة اتصال باسم «${action.contactName}».`;
+          }
+
+          if (action.target === 'contact') {
+            await setArchived(contact.id, true);
+            return null;
+          }
+
+          // «احذف فاتورة أحمد» تعني آخر ما سُجّل له: هو ما يقصده من
+          // يصحّح خطأً وقع للتوّ. والبطاقة تذكر مبلغه وتاريخه قبل
+          // الموافقة، فلا يُؤرشف صفٌّ لم يره المستخدم.
+          const latest = transactions
+            .filter((row) => row.contact_id === contact.id)
+            .sort((a, b) => b.occurred_at.localeCompare(a.occurred_at))[0];
+
+          if (!latest) {
+            return `لا توجد حركات نشطة لـ${contact.full_name}.`;
+          }
+
+          await setTransactionArchivedState(latest.id, true);
+          return null;
+        }
+
         case 'toggleModal': {
           if (!action.open) onRequestClose?.();
           return null;
         }
       }
     },
-    [addContact, addTransaction, contacts, events, onRequestClose],
+    [
+      addContact,
+      addTransaction,
+      contacts,
+      events,
+      onRequestClose,
+      setArchived,
+      setTransactionArchivedState,
+      transactions,
+    ],
   );
 
   /** يعالج نداءات الأدوات: تحقّق، ثم بوّابة موافقة، ثم تنفيذ. */
@@ -267,6 +322,26 @@ export function useAppAssistant(onRequestClose?: () => void): AppAssistant {
           description += ' (جهة اتصال جديدة)';
         }
 
+        // الأرشفة تسمّي الصفّ المقصود بمبلغه وتاريخه: «آخر حركة» وحدها
+        // لا تكفي ليعرف المستخدم على ماذا يوافق.
+        if (action.tool === 'archiveItem' && action.target === 'transaction') {
+          const contact = matchByName(
+            contacts,
+            (item) => item.full_name,
+            action.contactName,
+          );
+          const latest = contact
+            ? transactions
+                .filter((row) => row.contact_id === contact.id)
+                .sort((a, b) => b.occurred_at.localeCompare(a.occurred_at))[0]
+            : undefined;
+          if (latest) {
+            description = `نقل حركة ${latest.amount} بتاريخ ${formatDate(
+              latest.occurred_at,
+            )} لـ${contact?.full_name} إلى الأرشيف`;
+          }
+        }
+
         if (requiresConfirmation(action)) {
           setPending({ id: nextId('pend'), action, description });
           continue;
@@ -303,7 +378,7 @@ export function useAppAssistant(onRequestClose?: () => void): AppAssistant {
 
       return feedback;
     },
-    [contacts, execute, push, setStatus],
+    [contacts, execute, push, setStatus, transactions],
   );
 
   const runTurn = useCallback(
