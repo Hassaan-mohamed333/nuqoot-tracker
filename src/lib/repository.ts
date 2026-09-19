@@ -1,6 +1,6 @@
 import { SEED_CONTACTS, SEED_EVENTS, SEED_TRANSACTIONS } from '@/data/seed';
 import { extensionForMime, readLocalFile } from '@/lib/files';
-import { logStepFailure } from '@/lib/supabaseError';
+import { logStepFailure, logSupabaseFailure } from '@/lib/supabaseError';
 import {
   validateContactInput,
   validateContactPatch,
@@ -1157,20 +1157,36 @@ export async function updateUserProfile(
   let saved: UserProfile | null = null;
 
   if (usesServerData()) {
-    try {
-      const client = requireSupabase();
-      const { data: row, error } = await client
-        .from(TABLES.profiles)
-        .upsert({ id: userId, ...patch }, { onConflict: 'id' })
-        .select()
-        .single();
+    const client = requireSupabase();
 
-      if (error) throw error;
-      saved = row as UserProfile;
-    } catch (error) {
+    /*
+     * `upsert` لا `update`: الصفّ لا يوجد قبل أوّل حفظ. و`maybeSingle`
+     * لا `single`: صفر صفوف حالةٌ نفحصها بأنفسنا لا خطأ غامض — وهي ما
+     * تردّه RLS حين لا يطابق `id` صاحبَ الجلسة.
+     */
+    const { data: row, error } = await client
+      .from(TABLES.profiles)
+      .upsert({ id: userId, ...patch }, { onConflict: 'id' })
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      // الرمز والرسالة والتفصيل في الطرفية: بدونها لا يُشخَّص هذا
+      // العطب أصلاً، والرسالة وحدها لا تكفي صاحب التطبيق.
+      logSupabaseFailure('حفظ الملف الشخصي', error);
       noteServerFailure('حفظ الملف الشخصي', error);
       throw error;
     }
+
+    if (!row) {
+      const silent = new Error(
+        'تعذّر حفظ الملف الشخصي: الصفّ ليس ضمن حسابك، أو منعت RLS الكتابة.',
+      );
+      logSupabaseFailure('حفظ الملف الشخصي (لم يتأثّر أي صفّ)', silent);
+      throw silent;
+    }
+
+    saved = row as UserProfile;
   }
 
   const cached = await readJson<UserProfile | null>(STORAGE_KEYS.profile, null);

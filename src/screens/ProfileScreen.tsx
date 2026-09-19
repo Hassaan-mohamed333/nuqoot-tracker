@@ -1,10 +1,28 @@
 import * as ImagePicker from 'expo-image-picker';
-import { Camera, CloudOff, ImagePlus, User } from 'lucide-react-native';
+import {
+  Camera,
+  CloudOff,
+  Fingerprint,
+  ImagePlus,
+  Phone,
+  ShieldCheck,
+  User,
+} from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Platform, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Platform,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
 
 import { PressableScale } from '@/components/motion';
-import { Button, DateField, Field, Screen } from '@/components/ui';
+import { PhoneLinkSheet } from '@/components/PhoneLinkSheet';
+import { Button, DateField, Field, Screen, SectionTitle } from '@/components/ui';
+import { formatPhone } from '@/lib/phoneAuth';
+import { useLock } from '@/store/LockProvider';
 import { notify, reportError } from '@/lib/alerts';
 import { fromDateInputValue, toDateInputValue } from '@/components/ui';
 import { palette } from '@/lib/palette';
@@ -14,7 +32,9 @@ import {
   updateUserProfile,
   uploadAvatar,
 } from '@/lib/repository';
-import { isSupabaseReady } from '@/lib/supabase';
+import { usesServerData } from '@/lib/supabase';
+import { userMessage } from '@/lib/supabaseError';
+import { logger } from '@/lib/logger';
 import { LIMITS } from '@/lib/validation';
 import { useAuth } from '@/store/AuthProvider';
 import type { UserProfileInput } from '@/types';
@@ -30,6 +50,7 @@ const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
  */
 export function ProfileScreen() {
   const { userId, user, authDisabled } = useAuth();
+  const lock = useLock();
   // في الوضع المحلي لا جلسة ولا معرّف مستخدم، والتطبيق كلّه يعمل هناك.
   const profileId = resolveProfileId(userId, authDisabled);
 
@@ -41,8 +62,16 @@ export function ProfileScreen() {
   const [savedAvatar, setSavedAvatar] = useState<string | null>(null);
   /** صورة اختيرت ولم تُرفع بعد. */
   const [pendingAvatar, setPendingAvatar] = useState<string | null>(null);
+  const [phoneSheet, setPhoneSheet] = useState(false);
+  /** الرقم الموثَّق، من الجلسة أو من ربطٍ تمّ للتوّ. */
+  const [linkedPhone, setLinkedPhone] = useState<string | null>(null);
 
   const today = useMemo(() => new Date(), []);
+
+  // `phone_confirmed_at` هو ما يثبت التوثيق: وجود الرقم وحده لا يكفي،
+  // فالرقم المُرسَل إليه رمزٌ لم يُؤكَّد يظهر في الجلسة أيضاً.
+  const verifiedPhone =
+    linkedPhone ?? (user?.phone_confirmed_at ? (user.phone ?? null) : null);
 
   const load = useCallback(async () => {
     if (!profileId) {
@@ -116,30 +145,59 @@ export function ProfileScreen() {
     }
   }
 
+  /**
+   * يرفع الصورة إن وُجدت، ولا يُسقط الحفظ إن فشل الرفع.
+   *
+   * الرفع أكثر ما يفشل في هذه الشاشة: حجم، أو نوع يرفضه الدلو، أو شبكة
+   * تنقطع في منتصف الملف. وكان فشله يمنع حفظ الاسم وتاريخ الميلاد
+   * معهما — فيخسر المستخدم ما كتبه من أجل صورة. الآن يُحفظ النصّ،
+   * ويُقال له إن الصورة وحدها لم تُرفع.
+   */
+  async function resolveAvatarUrl(): Promise<{
+    url: string | null;
+    uploadError: unknown;
+  }> {
+    if (!pendingAvatar) return { url: savedAvatar, uploadError: null };
+
+    // بلا خادم لا رفع: نحتفظ بمسار الصورة على الجهاز، فتظهر الصورة في
+    // الوضع المحلي بدل أن يفشل الحفظ كله من أجلها.
+    if (!usesServerData()) return { url: pendingAvatar, uploadError: null };
+
+    try {
+      return { url: await uploadAvatar(pendingAvatar), uploadError: null };
+    } catch (error) {
+      logger.error('profile', 'فشل رفع الصورة الرمزية', error);
+      // نُبقي الرابط المحفوظ سابقاً: الفشل لا يمحو صورةً كانت تعمل.
+      return { url: savedAvatar, uploadError: error };
+    }
+  }
+
   async function handleSave() {
     if (!profileId || saving || !nameValid) return;
     setSaving(true);
     try {
-      let avatarUrl = savedAvatar;
-
-      if (pendingAvatar) {
-        // بلا خادم لا رفع: نحتفظ بمسار الصورة على الجهاز، فتظهر الصورة
-        // في الوضع المحلي بدل أن يفشل الحفظ كله من أجلها.
-        avatarUrl = isSupabaseReady()
-          ? await uploadAvatar(pendingAvatar)
-          : pendingAvatar;
-      }
+      const { url, uploadError } = await resolveAvatarUrl();
 
       const patch: UserProfileInput = {
         full_name: fullName.trim() || null,
         date_of_birth: birthDate ? toDateInputValue(birthDate) : null,
-        avatar_url: avatarUrl,
+        avatar_url: url,
       };
 
       const saved = await updateUserProfile(profileId, patch);
       setSavedAvatar(saved.avatar_url);
-      setPendingAvatar(null);
-      notify('تم الحفظ', 'حُدّثت بيانات ملفك الشخصي.');
+      if (!uploadError) setPendingAvatar(null);
+
+      if (uploadError) {
+        notify(
+          'حُفظت بياناتك، والصورة لا',
+          `الاسم وتاريخ الميلاد محفوظان. أمّا الصورة فلم تُرفع: ${userMessage(
+            uploadError,
+          )}`,
+        );
+      } else {
+        notify('تم الحفظ', 'حُدّثت بيانات ملفك الشخصي.');
+      }
     } catch (error) {
       reportError('تعذّر حفظ التغييرات', error);
     } finally {
@@ -265,6 +323,98 @@ export function ProfileScreen() {
         hint="اختياري — يُستخدم لتذكيرك بمناسباتك."
         accessibilityLabel="اختيار تاريخ الميلاد"
         className="mt-5"
+      />
+
+      <SectionTitle className="mt-8">الأمان</SectionTitle>
+
+      {/* ---- رقم الهاتف ---- */}
+      <View className="rounded-2xl border border-line bg-surface p-4">
+        <View className="flex-row-reverse items-center justify-between">
+          <View className="flex-row-reverse items-center">
+            <Phone size={16} color={palette.muted} />
+            <Text className="mr-2 text-right text-sm font-bold text-ink">
+              رقم الهاتف
+            </Text>
+          </View>
+
+          {verifiedPhone ? (
+            <View className="flex-row-reverse items-center rounded-full bg-success/15 px-2 py-0.5">
+              <ShieldCheck size={12} color={palette.success} />
+              <Text className="mr-1 text-[10px] font-bold text-success">
+                موثَّق
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        <Text className="mt-2 text-right text-sm text-ink-muted">
+          {verifiedPhone
+            ? formatPhone(verifiedPhone)
+            : 'لم يُربط رقم بعد. الربط يسهّل استعادة حسابك.'}
+        </Text>
+
+        <Button
+          title={verifiedPhone ? 'تغيير الرقم' : 'ربط رقم'}
+          variant="outline"
+          size="sm"
+          onPress={() => setPhoneSheet(true)}
+          // الربط يمرّ برسالة SMS من الخادم، فلا معنى له بلا جلسة.
+          disabled={!usesServerData()}
+          className="mt-3"
+        />
+
+        {usesServerData() ? null : (
+          <Text className="mt-2 text-right text-caption text-ink-subtle">
+            يحتاج تسجيل الدخول واتصالاً بالخادم.
+          </Text>
+        )}
+      </View>
+
+      {/* ---- القفل الحيوي ---- */}
+      {lock ? (
+        <View className="mt-3 rounded-2xl border border-line bg-surface p-4">
+          <View className="flex-row-reverse items-center justify-between">
+            <View className="flex-1 flex-row-reverse items-center">
+              <Fingerprint size={16} color={palette.muted} />
+              <Text className="mr-2 text-right text-sm font-bold text-ink">
+                قفل بالبصمة
+              </Text>
+            </View>
+
+            {lock.checking ? (
+              <ActivityIndicator color={palette.primary} size="small" />
+            ) : (
+              <Switch
+                value={lock.enabled}
+                onValueChange={(next) => void lock.setEnabled(next)}
+                disabled={!lock.capability?.available}
+                accessibilityLabel="تفعيل القفل بالبصمة"
+                trackColor={{ false: palette.border, true: palette.primary }}
+                thumbColor={palette.surface}
+              />
+            )}
+          </View>
+
+          <Text className="mt-2 text-right text-sm text-ink-muted">
+            {lock.capability?.available
+              ? 'يُطلب التحقّق عند فتح التطبيق بعد غياب قصير.'
+              : (lock.capability?.reason ??
+                'جارٍ فحص إمكانات الجهاز…')}
+          </Text>
+
+          {lock.lastError ? (
+            <Text className="mt-2 text-right text-caption text-danger">
+              {lock.lastError}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
+      <PhoneLinkSheet
+        visible={phoneSheet}
+        onClose={() => setPhoneSheet(false)}
+        currentPhone={verifiedPhone}
+        onLinked={setLinkedPhone}
       />
     </Screen>
   );

@@ -193,3 +193,41 @@ function technicalNote(error: unknown): string {
 export function logStepFailure(step: string, error: unknown): void {
   logger.error('nuqoot', `فشلت الخطوة: ${step}`, error);
 }
+
+/**
+ * يطبع تشخيص فشل Supabase كاملاً في الطرفية.
+ *
+ * ---------------------------------------------------------------------
+ * استثناء مقصود وضيّق من قاعدة هذا الملف.
+ *
+ * `logger.error` لا يطبع حمولةً في الإنتاج: التشخيص التفصيلي شغل
+ * المطوّر، وكل كائن يُطبع يبقى في سجلّ النظام. لكن عطباً مثل فشل حفظ
+ * الملف الشخصي لا يُشخَّص بلا `code` و`details` — وصاحب التطبيق هو من
+ * يفتح الطرفية، لا المهاجم.
+ *
+ * فالحدّ: هذه الدالّة تطبع الثلاثة في **الطرفية وحدها**، بعد تنقيتها.
+ * وما يصل إلى الواجهة يبقى ما تقرّره `userMessage` — بلا `hint` ولا
+ * `details`، فهما أكثر ما يحمل بنية المخطّط.
+ * ---------------------------------------------------------------------
+ */
+export function logSupabaseFailure(step: string, error: unknown): void {
+  const shape = (error ?? {}) as SupabaseErrorShape;
+
+  const line = (label: string, value: unknown): string | null => {
+    const text = asText(value);
+    return text ? `${label}=${redactText(text)}` : null;
+  };
+
+  const parts = [
+    line('code', shape.code ?? shape.statusCode),
+    line('status', shape.status),
+    line('message', shape.message ?? shape.error),
+    line('details', shape.details),
+    line('hint', shape.hint),
+  ].filter(Boolean);
+
+  console.error(
+    `[nuqoot] فشلت الخطوة: ${redactText(step)}`,
+    parts.length ? parts.join(' | ') : '(بلا تفاصيل)',
+  );
+}

@@ -6,6 +6,7 @@ import { RootNavigator } from '@/navigation/RootNavigator';
 import { AuthScreen } from '@/screens/AuthScreen';
 import { useAuth } from '@/store/AuthProvider';
 import { LedgerProvider } from '@/store/LedgerProvider';
+import { LockProvider } from '@/store/LockProvider';
 
 /** بعد هذه المدة نعرض للمستخدم مخرجاً يدوياً بدل انتظار صامت. */
 const SLOW_BOOT_HINT_MS = 4000;
@@ -28,9 +29,11 @@ export function AppGate() {
   }
 
   return (
-    <LedgerProvider>
-      <RootNavigator />
-    </LedgerProvider>
+    <LockProvider>
+      <LedgerProvider>
+        <RootNavigator />
+      </LedgerProvider>
+    </LockProvider>
   );
 }
 
