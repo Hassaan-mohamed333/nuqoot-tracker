@@ -20,6 +20,7 @@ import {
   isSupabaseKeyError,
   isSupabaseUnconfigured,
   markSupabaseKeyRejected,
+  setSessionPresent,
   OAUTH_URL_PARAMS,
   requireSupabase,
   supabase,
@@ -213,6 +214,17 @@ const AuthContext = createContext<AuthContextValue | null>(null);
  */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
+
+  /*
+   * حضور الجلسة يُنشر إلى طبقة الاتصال.
+   *
+   * المستودع يقرّر بها أيكتب على الخادم أم على الجهاز: RLS تربط كل صفّ
+   * بـ `auth.uid()`، فبلا جلسة يردّ الخادم صفراً من الصفوف على كل
+   * تحديث — وهو ما كان يُرى «تعذّرت الأرشفة» في وضع التجربة.
+   */
+  useEffect(() => {
+    setSessionPresent(session !== null);
+  }, [session]);
   // بلا عميل لا شيء يُستعاد: نبدأ جاهزين بدل وميض شاشة إقلاع.
   const [loading, setLoading] = useState(supabase !== null);
   const [initError, setInitError] = useState<string | null>(null);

@@ -20,6 +20,7 @@ import {
   markSupabaseKeyRejected,
   requireSupabase,
   TABLES,
+  usesServerData,
 } from '@/lib/supabase';
 import type {
   Contact,
@@ -114,7 +115,7 @@ async function loadLocal(seedWhenEmpty: boolean): Promise<LedgerData> {
  * في غير ذلك (أو عند فشل الطلب) حتى يظل التطبيق قابلاً للاستخدام.
  */
 export async function fetchLedgerData(): Promise<LedgerData> {
-  if (!isSupabaseReady()) {
+  if (!usesServerData()) {
     return loadLocal(true);
   }
 
@@ -272,7 +273,7 @@ async function loadLocalEventLedger(eventId: string): Promise<EventLedger> {
 
 /** يجلب دفتر المناسبة من Supabase، مع رجوع إلى النسخة المحلية عند التعذّر. */
 export async function fetchEventLedger(eventId: string): Promise<EventLedger> {
-  if (!isSupabaseReady()) return loadLocalEventLedger(eventId);
+  if (!usesServerData()) return loadLocalEventLedger(eventId);
 
   try {
     const client = requireSupabase();
@@ -338,7 +339,7 @@ export async function setEventParticipants(
 
   const rows = validateEventMembers(members).map(toRow);
 
-  if (isSupabaseReady()) {
+  if (usesServerData()) {
     const client = requireSupabase();
 
     // استبدال كامل: أبسط من مقارنة الفروق، والمناسبات صغيرة.
@@ -424,7 +425,7 @@ export async function createSharedExpense(
     share_amount: share.share_amount,
   }));
 
-  if (isSupabaseReady()) {
+  if (usesServerData()) {
     const client = requireSupabase();
 
     const { data, error } = await client
@@ -528,7 +529,7 @@ async function loadLocalContactLedger(
 export async function fetchContactLedger(
   contactId: string,
 ): Promise<ContactLedger> {
-  if (!isSupabaseReady()) {
+  if (!usesServerData()) {
     return loadLocalContactLedger(contactId);
   }
 
@@ -605,7 +606,7 @@ async function persist<TRow extends { id: string }, TInsert>(
 ): Promise<TRow> {
   let saved = draft;
 
-  if (isSupabaseReady()) {
+  if (usesServerData()) {
     const client = requireSupabase();
     const { data, error } = await client
       .from(table)
@@ -624,6 +625,83 @@ async function persist<TRow extends { id: string }, TInsert>(
   await writeJson(storageKey, [saved, ...cached]);
 
   return saved;
+}
+
+/**
+ * يُحدّث صفّاً ويتأكّد أن التحديث وقع فعلاً.
+ *
+ * ---------------------------------------------------------------------
+ * الفخّ الذي تعالجه: `update(...).eq('id', …)` على صفٍّ لا تسمح RLS
+ * بتعديله **لا يُعدّ خطأً**. الطلب ينجح ويعود بصفر صفوف — لا `error`
+ * ولا تحديث. ومن يفحص `error` وحده يظنّ أنه نجح، فيُحدّث الواجهة على
+ * تغييرٍ لم يحدث في قاعدة البيانات، ويكتشفه المستخدم عند أوّل إعادة
+ * تحميل.
+ *
+ * لذلك `maybeSingle` لا `single`: الأولى تميّز «صفر صفوف» بوصفها حالةً
+ * نفحصها بأنفسنا، والثانية تحوّلها إلى خطأ PGRST116 غامض النصّ.
+ * ---------------------------------------------------------------------
+ */
+async function updateRow<T>(
+  table: string,
+  rowId: string,
+  patch: Record<string, unknown>,
+  step: string,
+  missingMessage: string,
+): Promise<T> {
+  const client = requireSupabase();
+  const { data, error } = await client
+    .from(table)
+    .update(patch)
+    .eq('id', rowId)
+    .select()
+    .maybeSingle();
+
+  if (error) {
+    noteServerFailure(step, error);
+    throw error;
+  }
+
+  if (!data) {
+    const silent = new Error(missingMessage);
+    noteServerFailure(`${step} (لم يتأثّر أي صفّ)`, silent);
+    throw silent;
+  }
+
+  return data as T;
+}
+
+/**
+ * يؤرشف صفّاً أو يعيده، على الخادم وفي النسخة المحلية.
+ *
+ * مشترك بين الحركات وجهات الاتصال: الدلالة واحدة، وتكرارها مرّتين كان
+ * يعني إصلاح كل عطب مرّتين — وقد حدث.
+ */
+async function archiveRow<T extends { id: string }>(
+  table: string,
+  storageKey: string,
+  rowId: string,
+  archived: boolean,
+  labels: { step: string; missing: string },
+): Promise<T> {
+  const patch = {
+    is_archived: archived,
+    archived_at: archived ? new Date().toISOString() : null,
+  };
+
+  let updated: T | null = null;
+  if (usesServerData()) {
+    updated = await updateRow<T>(table, rowId, patch, labels.step, labels.missing);
+  }
+
+  const cached = await readJson<T[]>(storageKey, []);
+  const next = cached.map((row) =>
+    row.id === rowId ? { ...row, ...patch } : row,
+  );
+  await writeJson(storageKey, next);
+
+  const result = updated ?? next.find((row) => row.id === rowId);
+  if (!result) throw new Error(labels.missing);
+  return result;
 }
 
 /** يضيف جهة اتصال جديدة. */
@@ -666,36 +744,17 @@ export async function setContactArchived(
   contactId: string,
   archived: boolean,
 ): Promise<Contact> {
-  const patch = {
-    is_archived: archived,
-    archived_at: archived ? new Date().toISOString() : null,
-  };
-
-  let updated: Contact | null = null;
-
-  if (isSupabaseReady()) {
-    const client = requireSupabase();
-    const { data, error } = await client
-      .from(TABLES.contacts)
-      .update(patch)
-      .eq('id', contactId)
-      .select()
-      .single();
-
-    if (error) throw error;
-    updated = data as Contact;
-  }
-
-  const cached = await readJson<Contact[]>(STORAGE_KEYS.contacts, []);
-  const next = cached.map((contact) =>
-    contact.id === contactId ? { ...contact, ...patch } : contact,
+  return archiveRow<Contact>(
+    TABLES.contacts,
+    STORAGE_KEYS.contacts,
+    contactId,
+    archived,
+    {
+      step: 'أرشفة جهة الاتصال',
+      missing:
+        'تعذّر تعديل جهة الاتصال: غير موجودة على الخادم أو ليست ضمن حسابك.',
+    },
   );
-  await writeJson(STORAGE_KEYS.contacts, next);
-
-  const local = next.find((contact) => contact.id === contactId);
-  const result = updated ?? local;
-  if (!result) throw new Error('جهة الاتصال غير موجودة.');
-  return result;
 }
 
 /** يضيف مناسبة جديدة. */
@@ -777,25 +836,16 @@ export async function updateTransaction(
 ): Promise<Transaction> {
   const patch = validateTransactionPatch(updates);
 
-  let updated: Transaction | null = null;
-
-  if (isSupabaseReady()) {
-    try {
-      const client = requireSupabase();
-      const { data, error } = await client
-        .from(TABLES.transactions)
-        .update(patch)
-        .eq('id', transactionId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      updated = data as Transaction;
-    } catch (error) {
-      noteServerFailure('تعديل الحركة', error);
-      throw error;
-    }
-  }
+  // نفس الحارس: تحديثٌ لا يطابق صفّاً ينجح بصفر صفوف، فيبدو ناجحاً.
+  const updated = usesServerData()
+    ? await updateRow<Transaction>(
+        TABLES.transactions,
+        transactionId,
+        patch,
+        'تعديل الحركة',
+        'تعذّر تعديل الحركة: غير موجودة على الخادم أو ليست ضمن حسابك.',
+      )
+    : null;
 
   const cached = await readJson<Transaction[]>(STORAGE_KEYS.transactions, []);
   const next = cached.map((row) =>
@@ -810,7 +860,7 @@ export async function updateTransaction(
 
 /** يحذف حركة واحدة من الخادم ومن النسخة المحلية. */
 export async function deleteTransaction(transactionId: string): Promise<void> {
-  if (isSupabaseReady()) {
+  if (usesServerData()) {
     try {
       const client = requireSupabase();
       const { error } = await client
@@ -839,25 +889,15 @@ export async function updateContact(
 ): Promise<Contact> {
   const patch = validateContactPatch(updates);
 
-  let updated: Contact | null = null;
-
-  if (isSupabaseReady()) {
-    try {
-      const client = requireSupabase();
-      const { data, error } = await client
-        .from(TABLES.contacts)
-        .update(patch)
-        .eq('id', contactId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      updated = data as Contact;
-    } catch (error) {
-      noteServerFailure('تعديل جهة الاتصال', error);
-      throw error;
-    }
-  }
+  const updated = usesServerData()
+    ? await updateRow<Contact>(
+        TABLES.contacts,
+        contactId,
+        patch,
+        'تعديل جهة الاتصال',
+        'تعذّر تعديل جهة الاتصال: غير موجودة على الخادم أو ليست ضمن حسابك.',
+      )
+    : null;
 
   const cached = await readJson<Contact[]>(STORAGE_KEYS.contacts, []);
   const next = cached.map((contact) =>
@@ -891,7 +931,7 @@ export interface ContactDeletionResult {
 export async function deleteContact(
   contactId: string,
 ): Promise<ContactDeletionResult> {
-  if (isSupabaseReady()) {
+  if (usesServerData()) {
     try {
       const client = requireSupabase();
       const { error } = await client
@@ -1075,7 +1115,7 @@ function emptyProfile(userId: string): UserProfile {
  * وهي الحالة الطبيعية لا خطأ. `maybeSingle` تميّز «غير موجود» عن «فشل».
  */
 export async function fetchUserProfile(userId: string): Promise<UserProfile> {
-  if (isSupabaseReady()) {
+  if (usesServerData()) {
     try {
       const client = requireSupabase();
       const { data, error } = await client
@@ -1116,7 +1156,7 @@ export async function updateUserProfile(
 
   let saved: UserProfile | null = null;
 
-  if (isSupabaseReady()) {
+  if (usesServerData()) {
     try {
       const client = requireSupabase();
       const { data: row, error } = await client
@@ -1156,38 +1196,14 @@ export async function setTransactionArchived(
   transactionId: string,
   archived: boolean,
 ): Promise<Transaction> {
-  const patch = {
-    is_archived: archived,
-    archived_at: archived ? new Date().toISOString() : null,
-  };
-
-  let updated: Transaction | null = null;
-
-  if (isSupabaseReady()) {
-    try {
-      const client = requireSupabase();
-      const { data, error } = await client
-        .from(TABLES.transactions)
-        .update(patch)
-        .eq('id', transactionId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      updated = data as Transaction;
-    } catch (error) {
-      noteServerFailure('أرشفة الحركة', error);
-      throw error;
-    }
-  }
-
-  const cached = await readJson<Transaction[]>(STORAGE_KEYS.transactions, []);
-  const next = cached.map((row) =>
-    row.id === transactionId ? { ...row, ...patch } : row,
+  return archiveRow<Transaction>(
+    TABLES.transactions,
+    STORAGE_KEYS.transactions,
+    transactionId,
+    archived,
+    {
+      step: 'أرشفة الحركة',
+      missing: 'تعذّر تعديل الحركة: غير موجودة على الخادم أو ليست ضمن حسابك.',
+    },
   );
-  await writeJson(STORAGE_KEYS.transactions, next);
-
-  const result = updated ?? next.find((row) => row.id === transactionId);
-  if (!result) throw new Error('الحركة غير موجودة.');
-  return result;
 }

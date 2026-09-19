@@ -10,7 +10,7 @@
  *   - userMessage: رسالة عربية مفهومة، بلا أي تفصيل داخلي.
  */
 
-import { logger } from '@/lib/logger';
+import { logger, redactText } from '@/lib/logger';
 import { ValidationError } from '@/lib/validation';
 
 interface SupabaseErrorShape {
@@ -62,6 +62,13 @@ export function describeSupabaseError(error: unknown): string {
   return parts.join(' ');
 }
 
+const SCHEMA_OUT_OF_DATE =
+  'قاعدة بياناتك أقدم من التطبيق: عمود أو جدول مفقود. ' +
+  'شغّل supabase/schema.sql على مشروعك. ' +
+  // خزن PostgREST للمخطّط يتأخّر أحياناً بعد الهجرة، فيردّ الرمز نفسه
+  // رغم أن العمود صار موجوداً. إعادة التحميل أسرع من مطاردة الوهم.
+  'وإن كنت شغّلته للتوّ، أعد تحميل مخطّط الـ API من إعدادات المشروع.';
+
 /**
  * ترجمة الأسباب المعروفة إلى رسائل صالحة للعرض.
  *
@@ -89,7 +96,19 @@ const BY_CODE: Record<string, string> = {
   '23502': 'حقل مطلوب ناقص.',
   '42501': 'لا تملك صلاحية لهذا الإجراء.',
   PGRST301: 'انتهت جلستك. سجّل الدخول من جديد.',
-  PGRST116: 'لم يُعثر على السجل المطلوب.',
+  PGRST116: 'لم يُعثر على السجل المطلوب، أو لا تملك صلاحية تعديله.',
+  /*
+   * مخطّط ناقص: العمود أو الجدول غير موجود في قاعدة بياناتك.
+   *
+   * هذه هي الحالة التي أوقعت «تعذّر إتمام العملية» عند الأرشفة: ميزةٌ
+   * أُضيفت في الشيفرة وأُضيف عمودها في `schema.sql`، ولم يُشغَّل الملف
+   * على المشروع. PostgREST يردّ PGRST204 وPostgres يردّ 42703، ولم
+   * يكن أيٌّ منهما مترجَماً — فظهرت الرسالة العامّة ولم تقل ما ينقص.
+   */
+  PGRST204: SCHEMA_OUT_OF_DATE,
+  PGRST205: SCHEMA_OUT_OF_DATE,
+  '42703': SCHEMA_OUT_OF_DATE,
+  '42P01': SCHEMA_OUT_OF_DATE,
 };
 
 const GENERIC = 'تعذّر إتمام العملية. حاول مرّة أخرى.';
@@ -133,8 +152,36 @@ export function userMessage(error: unknown): string {
     if (status >= 500) return 'الخدمة غير متاحة مؤقتاً. أعد المحاولة بعد قليل.';
   }
 
-  // في التطوير نُظهر التفصيل الكامل: تشخيصُه أسرع، والجهاز جهاز المطوّر.
-  return logger.isDev() ? describeSupabaseError(error) : GENERIC;
+  // ما لا نعرفه نقوله كما ورد، لا نستبدله برسالة عامّة.
+  return `${GENERIC} ${technicalNote(error)}`.trim();
+}
+
+/**
+ * سطر تقني موجز يُلحَق بالرسالة حين لا نعرف السبب.
+ *
+ * ---------------------------------------------------------------------
+ * مقايضةٌ مقصودة. كان هذا الملف يمنع كل تفصيل عن المستخدم، لأن `hint`
+ * في PostgREST قد يحمل جملة SQL أو اسم قيد — بنية قاعدة البيانات. وبقي
+ * `hint` ممنوعاً هنا. لكن حجب **كل شيء** جعل كل عطب مجهول جملةً واحدة
+ * لا تدلّ على شيء، فلا المستخدم يفهم ولا صاحب التطبيق يستطيع مساعدته.
+ *
+ * فالوسط: الرمز والرسالة فقط — وهما ما يميّز «العمود مفقود» عن «الشبكة
+ * مقطوعة» — بعد تنقيتهما وقصّهما. لا `hint` ولا `details`، فهما أكثر
+ * ما يحمل بنية المخطّط.
+ * ---------------------------------------------------------------------
+ */
+function technicalNote(error: unknown): string {
+  if (!error || typeof error !== 'object') return '';
+  const shape = error as SupabaseErrorShape;
+
+  const code = asText(shape.code) ?? asText(shape.statusCode);
+  const message = asText(shape.message) ?? asText(shape.error);
+  if (!code && !message) return '';
+
+  // `redactText` يمسح ما يشبه المفاتيح والرموز من النصّ قبل عرضه.
+  const clean = message ? redactText(message).slice(0, 160) : '';
+  const parts = [code ? `[${code}]` : '', clean].filter(Boolean);
+  return parts.length ? `(${parts.join(' ')})` : '';
 }
 
 /**

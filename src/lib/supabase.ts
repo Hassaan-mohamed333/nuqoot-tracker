@@ -64,6 +64,31 @@ export function markSupabaseKeyRejected(): void {
   runtimeIssue = 'rejected-key';
 }
 
+/**
+ * هل توجد جلسة مستخدم الآن؟
+ *
+ * ينشرها `AuthProvider` عند كل تغيّر. والمستودع يحتاجها لأن RLS تربط
+ * كل صفّ بـ `auth.uid()`: بلا جلسة لا تُقرأ صفوف ولا تُكتب، فيردّ
+ * الخادم صفراً من الصفوف على كل تحديث. وهذا ما كان يحدث في وضع
+ * التجربة إن كان المفتاح سليم الشكل — البيانات محليّة والكتابة تُرسل
+ * إلى خادمٍ لا يعرفها.
+ */
+let sessionPresent = false;
+
+export function setSessionPresent(present: boolean): void {
+  sessionPresent = present;
+}
+
+/**
+ * هل تُكتب بيانات الدفتر على الخادم الآن؟
+ *
+ * أضيق من `isSupabaseReady`: ذاك يقول إن العميل صالح، وهذا يقول إن
+ * وراءه مستخدماً تعرفه RLS. القراءة والكتابة في الجداول تستعمل هذه.
+ */
+export function usesServerData(): boolean {
+  return isSupabaseReady() && sessionPresent;
+}
+
 /** الخلل الحالي إن وُجد: الثابت أولاً، ثم ما انكشف أثناء التشغيل. */
 export function supabaseConfigIssue(): SupabaseConfigIssue | null {
   return staticIssue ?? runtimeIssue;

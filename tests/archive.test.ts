@@ -105,11 +105,58 @@ describe('الأرشفة في المخطّط والمستودع والمزوّد
     );
   });
 
-  test('المستودع يؤرشف الحركة على الخادم وفي النسخة المحلية', () => {
-    const fn = REPO.slice(REPO.indexOf('export async function setTransactionArchived'));
-    assert.ok(fn.includes('TABLES.transactions'), 'بلا كتابة على الخادم');
-    assert.ok(fn.includes('STORAGE_KEYS.transactions'), 'بلا مزامنة محلية');
-    assert.ok(fn.includes('archived_at'), 'بلا وقت أرشفة');
+  test('الأرشفة تكتب على الخادم وفي النسخة المحلية معاً', () => {
+    const helper = REPO.slice(
+      REPO.indexOf('async function archiveRow'),
+      REPO.indexOf('/** يضيف جهة اتصال جديدة. */'),
+    );
+    assert.ok(helper.includes('archived_at'), 'بلا وقت أرشفة');
+    assert.ok(helper.includes('usesServerData()'), 'بلا شرط جلسة');
+    assert.ok(helper.includes('writeJson(storageKey'), 'بلا مزامنة محلية');
+
+    for (const fn of ['setTransactionArchived', 'setContactArchived']) {
+      const body = REPO.slice(REPO.indexOf(`export async function ${fn}`));
+      assert.ok(
+        body.slice(0, 500).includes('archiveRow'),
+        `${fn} لا تمرّ على الحارس المشترك`,
+      );
+    }
+  });
+
+  test('التحديث الذي لا يطابق صفّاً يُرفض لا يُبتلع', () => {
+    /*
+     * الفخّ: `update(...).eq('id', …)` على صفٍّ لا تسمح RLS بتعديله لا
+     * يُعدّ خطأً — ينجح بصفر صفوف. ومن يفحص `error` وحده يظنّ أنه نجح،
+     * فيُحدّث الواجهة على تغييرٍ لم يحدث في قاعدة البيانات.
+     */
+    const fn = REPO.slice(
+      REPO.indexOf('async function updateRow'),
+      REPO.indexOf('async function archiveRow'),
+    );
+    assert.ok(fn.includes('.maybeSingle()'), 'single تحوّل صفر صفوف إلى خطأ غامض');
+    assert.ok(fn.includes('if (!data)'), 'لا فحص لعدد الصفوف المتأثّرة');
+    assert.ok(fn.includes('throw silent'), 'صفر صفوف يمرّ بوصفه نجاحاً');
+  });
+
+  test('كل تحديث صفّ يمرّ على الحارس', () => {
+    for (const fn of ['updateTransaction', 'updateContact']) {
+      const body = REPO.slice(
+        REPO.indexOf(`export async function ${fn}`),
+        REPO.indexOf(`export async function ${fn}`) + 900,
+      );
+      assert.ok(body.includes('updateRow'), `${fn} تحدّث بلا تحقّق من الأثر`);
+    }
+  });
+
+  test('الكتابة على الخادم مشروطة بوجود جلسة', () => {
+    // RLS تربط كل صفّ بـ auth.uid(): بلا جلسة يردّ الخادم صفراً من
+    // الصفوف على كل تحديث. وهو ما كان يُرى «تعذّرت الأرشفة» في وضع
+    // التجربة ببيانات محليّة ومفتاح سليم الشكل.
+    assert.ok(
+      !/if \(isSupabaseReady\(\)\) \{/.test(REPO),
+      'ما زالت هناك كتابة تعتمد على صلاحية العميل وحدها',
+    );
+    assert.ok(REPO.includes('usesServerData()'));
   });
 
   test('المؤرشفة مستبعدة من المصدر لا من كل مستدعٍ', () => {
@@ -280,5 +327,51 @@ describe('دفتر الشخص يستبعد المؤرشف أيضاً', () => {
       REPO.indexOf('export async function fetchContactLedger'),
     );
     assert.match(fn, /!transaction\.is_archived/);
+  });
+});
+
+describe('تشخيص فشل الأرشفة', () => {
+  test('المخطّط الناقص يُسمّى ويُذكر علاجه', async () => {
+    // العطب المُبلَّغ عنه: «تعذّرت الأرشفة — تعذّر إتمام العملية».
+    // السبب أن schema.sql لم يُشغَّل، فالعمود is_archived غير موجود،
+    // وPostgREST يردّ PGRST204 ولم يكن مترجَماً.
+    const { userMessage } = await import('../src/lib/supabaseError.ts');
+    for (const code of ['PGRST204', 'PGRST205', '42703', '42P01']) {
+      const message = userMessage({
+        code,
+        message: "Could not find the 'is_archived' column of 'transactions'",
+      });
+      assert.match(message, /schema\.sql/, `الرمز ${code} بلا علاج`);
+      assert.ok(
+        !message.startsWith('تعذّر إتمام العملية'),
+        `الرمز ${code} ما زال يسقط إلى الرسالة العامّة`,
+      );
+    }
+  });
+
+  test('الخطأ المجهول يحمل رمزه ورسالته لا جملة عامّة وحدها', async () => {
+    const { userMessage } = await import('../src/lib/supabaseError.ts');
+    const message = userMessage({ code: 'XX999', message: 'weird failure' });
+    assert.match(message, /XX999/);
+    assert.match(message, /weird failure/);
+  });
+
+  test('لا يُسرَّب hint ولا details إلى المستخدم', async () => {
+    // hint في PostgREST قد يحمل جملة SQL أو اسم قيد — بنية قاعدة
+    // البيانات، لا شأن للمستخدم بها.
+    const { userMessage } = await import('../src/lib/supabaseError.ts');
+    const message = userMessage({
+      code: 'XX999',
+      message: 'weird failure',
+      details: 'Key (user_id)=(abc) is not present in table "users"',
+      hint: 'Perhaps you meant the column "transactions.user_id"',
+    });
+    assert.ok(!message.includes('Key (user_id)'), 'details مسرَّب');
+    assert.ok(!message.includes('Perhaps you meant'), 'hint مسرَّب');
+  });
+
+  test('صفر صفوف يقول إن الصفّ ليس ضمن حسابك', async () => {
+    const { userMessage } = await import('../src/lib/supabaseError.ts');
+    assert.match(userMessage({ code: 'PGRST116' }), /صلاحية|حساب/);
   });
 });
