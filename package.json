@@ -51,7 +51,7 @@
     "check:secrets": "node scripts/check-secrets.js",
     "build:web": "node scripts/expo.js export --platform web",
     "deploy": "gh-pages -d dist -t -f",
-    "deploy:web": "npm run build:web && npm run deploy"
+    "deploy:web": "node scripts/expo.js export --platform web && npx gh-pages -d dist -t -f"
   },
   "private": true
 }
