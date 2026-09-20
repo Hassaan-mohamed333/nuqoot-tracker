@@ -1,7 +1,12 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
-import { Camera, Image as ImageIcon, TriangleAlert } from 'lucide-react-native';
+import {
+  Camera,
+  Image as ImageIcon,
+  Split,
+  TriangleAlert,
+} from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -86,7 +91,7 @@ export function ScanReceiptScreen() {
     }
   }
 
-  function continueToForm() {
+  function continueToForm(split = false) {
     navigation.navigate('AddTransaction', {
       prefill: {
         amount: scan?.total ?? undefined,
@@ -94,6 +99,7 @@ export function ScanReceiptScreen() {
         direction: 'OUT',
         note: scan?.merchant ?? scan?.summary ?? undefined,
         receiptUri: imageUri ?? undefined,
+        split,
       },
     });
   }
@@ -164,11 +170,25 @@ export function ScanReceiptScreen() {
 
       {imageUri && !busy ? (
         <Pressable
-          onPress={continueToForm}
+          onPress={() => continueToForm()}
           accessibilityRole="button"
           className="mt-6 items-center rounded-full bg-primary py-3">
           <Text className="text-base font-bold text-primary-fg">
             متابعة في النموذج
+          </Text>
+        </Pressable>
+      ) : null}
+
+      {/* فاتورةٌ بين عدّة أشخاص: نذهب إلى النموذج وورقة القسمة مفتوحة على
+          الإجمالي المقروء، بدل أن يعيد المستخدم كتابته. */}
+      {imageUri && !busy && (scan?.total ?? 0) > 0 ? (
+        <Pressable
+          onPress={() => continueToForm(true)}
+          accessibilityRole="button"
+          className="mt-3 flex-row-reverse items-center justify-center rounded-full border border-primary/50 bg-primary-soft py-3">
+          <Split size={16} color={palette.primary} />
+          <Text className="mr-2 text-base font-bold text-ink">
+            تقسيم الفاتورة مع أفراد
           </Text>
         </Pressable>
       ) : null}

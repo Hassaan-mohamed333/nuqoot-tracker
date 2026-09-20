@@ -10,6 +10,7 @@ import React, {
 import {
   createContact,
   createEvent,
+  createSplitBill,
   createTransaction,
   deleteContact,
   deleteTransaction,
@@ -24,6 +25,7 @@ import type {
   TransactionPatch,
 } from '@/lib/validateEntities';
 import { useAuth } from '@/store/AuthProvider';
+import type { SplitBillInput } from '@/lib/repository';
 import type {
   Contact,
   ContactSection,
@@ -69,6 +71,8 @@ interface LedgerContextValue {
   addContact: (input: NewContactInput) => Promise<Contact>;
   addEvent: (input: NewEventInput) => Promise<Event>;
   addTransaction: (input: NewTransactionInput) => Promise<Transaction>;
+  /** يسجّل فاتورة مقسومة: حركة لكل مشارك. */
+  addSplitBill: (input: SplitBillInput) => Promise<Transaction[]>;
   /** يعدّل حركة قائمة؛ الحقول الغائبة تبقى كما هي. */
   editTransaction: (
     transactionId: string,
@@ -138,6 +142,17 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
     setTransactions((current) => [saved, ...current]);
     return saved;
   }, []);
+
+  const addSplitBill = useCallback(async (input: SplitBillInput) => {
+    const saved = await createSplitBill(input);
+    setTransactions((current) => [...saved, ...current]);
+    // الأسماء الجديدة أُنشئت جهاتِ اتصال داخل المستودع، فنعيد القراءة
+    // لتظهر في القوائم — إعادةٌ واحدة أرخص من تتبّع ما أُنشئ منها.
+    if (input.entries.some((entry) => entry.contactId === null)) {
+      await refresh();
+    }
+    return saved;
+  }, [refresh]);
 
   const editTransaction = useCallback(
     async (transactionId: string, updates: TransactionPatch) => {
@@ -280,6 +295,7 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       addContact,
       addEvent,
       addTransaction,
+      addSplitBill,
       editTransaction,
       removeTransaction,
       setTransactionArchivedState,
@@ -321,6 +337,7 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       addContact,
       addEvent,
       addTransaction,
+      addSplitBill,
       editTransaction,
       removeTransaction,
       setTransactionArchivedState,

@@ -180,6 +180,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
     receipt_url: null,
     is_archived: false,
     archived_at: null,
+    split_group_id: null,
     created_at: daysAgo(120),
   },
   {
@@ -195,6 +196,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
     receipt_url: null,
     is_archived: false,
     archived_at: null,
+    split_group_id: null,
     created_at: daysAgo(365),
   },
   {
@@ -210,6 +212,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
     receipt_url: null,
     is_archived: false,
     archived_at: null,
+    split_group_id: null,
     created_at: daysAgo(300),
   },
   {
@@ -225,6 +228,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
     receipt_url: null,
     is_archived: false,
     archived_at: null,
+    split_group_id: null,
     created_at: daysAgo(45),
   },
   {
@@ -240,6 +244,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
     receipt_url: null,
     is_archived: false,
     archived_at: null,
+    split_group_id: null,
     created_at: daysAgo(200),
   },
   {
@@ -255,6 +260,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
     receipt_url: null,
     is_archived: false,
     archived_at: null,
+    split_group_id: null,
     created_at: daysAgo(20),
   },
   {
@@ -270,6 +276,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
     receipt_url: null,
     is_archived: false,
     archived_at: null,
+    split_group_id: null,
     created_at: daysAgo(180),
   },
   {
@@ -285,6 +292,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
     receipt_url: null,
     is_archived: false,
     archived_at: null,
+    split_group_id: null,
     created_at: daysAgo(140),
   },
   {
@@ -300,6 +308,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
     receipt_url: null,
     is_archived: false,
     archived_at: null,
+    split_group_id: null,
     created_at: daysAgo(70),
   },
   {
@@ -315,6 +324,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
     receipt_url: null,
     is_archived: false,
     archived_at: null,
+    split_group_id: null,
     created_at: daysAgo(65),
   },
 ];

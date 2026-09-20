@@ -6,12 +6,14 @@ import {
   ArrowUpRight,
   Paperclip,
   Plus,
+  Split,
   Users,
   UserPlus,
 } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 
+import { BillSplitSheet } from '@/components/BillSplitSheet';
 import { FadeSlideIn, PressableScale } from '@/components/motion';
 import {
   Button,
@@ -23,12 +25,13 @@ import {
 } from '@/components/ui';
 import { reportError } from '@/lib/alerts';
 import { palette } from '@/lib/palette';
+import type { SplitEntry } from '@/lib/repository';
 import { uploadReceipt } from '@/lib/repository';
 import { isSupabaseReady } from '@/lib/supabase';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
 import type { TransactionDirection } from '@/types';
-import { formatDate, getNetTheme } from '@/utils/ledger';
+import { formatAmount, formatDate, getNetTheme } from '@/utils/ledger';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 type AddRoute = RouteProp<RootStackParamList, 'AddTransaction'>;
@@ -37,7 +40,7 @@ type AddRoute = RouteProp<RootStackParamList, 'AddTransaction'>;
 export function AddTransactionScreen() {
   const navigation = useNavigation<Navigation>();
   const { params } = useRoute<AddRoute>();
-  const { contacts, events, addTransaction } = useLedger();
+  const { contacts, events, totals, addTransaction, addSplitBill } = useLedger();
 
   const [direction, setDirection] = useState<TransactionDirection>('OUT');
   const [contactId, setContactId] = useState<string | null>(
@@ -50,6 +53,13 @@ export function AddTransactionScreen() {
   const [receiptUri, setReceiptUri] = useState<string | null>(
     params?.prefill?.receiptUri ?? null,
   );
+  const [splitOpen, setSplitOpen] = useState(false);
+  // القسمة تُحفظ مع المبلغ الذي حُسبت عليه: تعديل المبلغ بعدها يُبطلها،
+  // وإلا حُفظت حصصٌ لا تجمع الفاتورة الجديدة.
+  const [split, setSplit] = useState<{
+    amount: number;
+    entries: SplitEntry[];
+  } | null>(null);
 
   // العودة من شاشة الإنشاء تمرّ عبر تحديث المعاملات، لا عبر إعادة التركيب،
   // لذا نزامن الاختيار يدوياً. نتجاهل القيم الفارغة حتى لا يُمسح اختيار قائم.
@@ -72,6 +82,10 @@ export function AddTransactionScreen() {
     if (prefill.direction) setDirection(prefill.direction);
     if (prefill.note) setNote(prefill.note);
     if (prefill.receiptUri) setReceiptUri(prefill.receiptUri);
+    // قادمٌ من الإيصال بنيّة القسمة: الورقة تُفتح على المبلغ المقروء.
+    if (prefill.split && prefill.amount !== undefined && prefill.amount > 0) {
+      setSplitOpen(true);
+    }
   }, [prefill]);
 
   const sortedContacts = useMemo(
@@ -82,7 +96,13 @@ export function AddTransactionScreen() {
 
   const parsedAmount = Number(amount.replace(',', '.'));
   const amountValid = Number.isFinite(parsedAmount) && parsedAmount > 0;
-  const isValid = contactId !== null && amountValid;
+  // القسمة سارية ما دام المبلغ لم يتغيّر عمّا حُسبت عليه.
+  const activeSplit =
+    split && amountValid && Math.abs(split.amount - parsedAmount) < 0.005
+      ? split
+      : null;
+  // القسمة تختار مشاركيها بنفسها، فلا تُطلب جهة اتصال واحدة معها.
+  const isValid = amountValid && (activeSplit !== null || contactId !== null);
 
   /** معاينة أثر الحركة على الصافي: OUT يزيده، IN ينقصه. */
   const previewTheme = getNetTheme(direction === 'OUT' ? 1 : -1);
@@ -105,7 +125,7 @@ export function AddTransactionScreen() {
   }
 
   async function handleSave() {
-    if (!isValid || !contactId) return;
+    if (!isValid) return;
     setSaving(true);
     try {
       // الرفع قبل الإدراج: حركة تشير إلى إيصال غير موجود أسوأ من حركة
@@ -115,16 +135,28 @@ export function AddTransactionScreen() {
         receiptPath = await uploadReceipt(receiptUri);
       }
 
-      await addTransaction({
-        contact_id: contactId,
-        event_id: eventId,
-        direction,
-        amount: parsedAmount,
-        // العملة تُترك للمستودع: هو من يقرأ تفضيل الملف الشخصي، وضبطها
-        // هنا أيضاً كان سيعني مصدرين للحقيقة يتباعدان.
-        note: note.trim() || null,
-        receipt_url: receiptPath,
-      });
+      if (activeSplit) {
+        // فاتورة مقسومة: حركةٌ لكل مشارك بنفس الاتجاه والمناسبة، يجمعها
+        // معرّف قسمة واحد. الإيصال نفسه يُربط بها جميعاً.
+        await addSplitBill({
+          entries: activeSplit.entries,
+          direction,
+          event_id: eventId,
+          note: note.trim() || null,
+          receipt_url: receiptPath,
+        });
+      } else if (contactId) {
+        await addTransaction({
+          contact_id: contactId,
+          event_id: eventId,
+          direction,
+          amount: parsedAmount,
+          // العملة تُترك للمستودع: هو من يقرأ تفضيل الملف الشخصي، وضبطها
+          // هنا أيضاً كان سيعني مصدرين للحقيقة يتباعدان.
+          note: note.trim() || null,
+          receipt_url: receiptPath,
+        });
+      }
       navigation.goBack();
     } catch (error) {
       reportError('تعذّر الحفظ', error);
@@ -137,7 +169,11 @@ export function AddTransactionScreen() {
     <Screen
       footer={
         <Button
-          title="حفظ الحركة"
+          title={
+            activeSplit
+              ? `حفظ ${activeSplit.entries.length} حركة`
+              : 'حفظ الحركة'
+          }
           onPress={() => void handleSave()}
           disabled={!isValid}
           loading={saving}
@@ -195,6 +231,72 @@ export function AddTransactionScreen() {
       </FadeSlideIn>
 
       <FadeSlideIn index={2} className="mt-6">
+        {/* تقسيم الفاتورة: الفاتورة الواحدة تصير حركةً لكل مشارك، فتظهر
+            حصّة كلٍّ في دفتره ورصيده مباشرة. */}
+        <Card variant="panel" animate={false}>
+          <View className="flex-row-reverse items-center">
+            <Split size={16} color={palette.primary} />
+            <Text className="mr-2 flex-1 text-right text-body font-bold text-ink">
+              تقسيم الفاتورة مع أفراد
+            </Text>
+          </View>
+
+          {activeSplit ? (
+            <>
+              <Text className="mt-2 text-right text-caption text-ink-muted">
+                مقسومة على {activeSplit.entries.length}:{' '}
+                {activeSplit.entries
+                  .map(
+                    (entry) =>
+                      `${entry.name} ${formatAmount(
+                        entry.amount,
+                        totals.currency,
+                      )}`,
+                  )
+                  .join(' · ')}
+              </Text>
+              <View className="mt-3 flex-row-reverse">
+                <Button
+                  title="تعديل القسمة"
+                  variant="outline"
+                  size="sm"
+                  block={false}
+                  className="flex-1"
+                  onPress={() => setSplitOpen(true)}
+                />
+                <View className="w-3" />
+                <Button
+                  title="إلغاء القسمة"
+                  variant="ghost"
+                  size="sm"
+                  block={false}
+                  className="flex-1"
+                  onPress={() => setSplit(null)}
+                />
+              </View>
+            </>
+          ) : (
+            <>
+              <Text className="mt-1 text-right text-caption text-ink-muted">
+                {amountValid
+                  ? 'اقسم المبلغ على عدة أشخاص — بالتساوي أو بنسبة أو بمبلغ محدّد — وتُسجَّل حركة لكل منهم.'
+                  : 'أدخل المبلغ أولاً لتتمكن من قسمته.'}
+              </Text>
+              <Button
+                title="اختر المشاركين"
+                variant="primary"
+                size="sm"
+                className="mt-3"
+                disabled={!amountValid}
+                onPress={() => setSplitOpen(true)}
+              />
+            </>
+          )}
+        </Card>
+      </FadeSlideIn>
+
+      {activeSplit ? null : (
+      <FadeSlideIn index={3} className="mt-6">
         <SectionTitle
           action={
             <PillAction
@@ -241,8 +343,9 @@ export function AddTransactionScreen() {
           )}
         </Card>
       </FadeSlideIn>
+      )}
 
-      <FadeSlideIn index={3} className="mt-6">
+      <FadeSlideIn index={4} className="mt-6">
         <SectionTitle
           action={
             <PillAction
@@ -277,7 +380,7 @@ export function AddTransactionScreen() {
         </Card>
       </FadeSlideIn>
 
-      <FadeSlideIn index={4} className="mt-6">
+      <FadeSlideIn index={5} className="mt-6">
         <Field
           label="ملاحظة (اختياري)"
           value={note}
@@ -286,8 +389,8 @@ export function AddTransactionScreen() {
         />
       </FadeSlideIn>
 
-      {eventId ? (
-        <FadeSlideIn index={5} className="mt-4">
+      {eventId && !activeSplit ? (
+        <FadeSlideIn index={6} className="mt-4">
           {/* مسار المصروف المشترك: بنفسجي، هوية المناسبات في التطبيق. */}
           <Card variant="secondary" animate={false}>
             <View className="flex-row-reverse items-center">
@@ -315,7 +418,7 @@ export function AddTransactionScreen() {
       ) : null}
 
       {receiptUri ? (
-        <FadeSlideIn index={6} className="mt-6">
+        <FadeSlideIn index={7} className="mt-6">
           <Card variant="primary" animate={false} padded={false}>
             <View className="flex-row-reverse items-center p-3">
               <Paperclip size={16} color={palette.primary} />
@@ -335,6 +438,15 @@ export function AddTransactionScreen() {
           </Card>
         </FadeSlideIn>
       ) : null}
+
+      <BillSplitSheet
+        visible={splitOpen}
+        onClose={() => setSplitOpen(false)}
+        amount={amountValid ? parsedAmount : 0}
+        currency={totals.currency}
+        contacts={sortedContacts}
+        onConfirm={(entries) => setSplit({ amount: parsedAmount, entries })}
+      />
     </Screen>
   );
 }

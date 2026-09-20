@@ -571,3 +571,20 @@ alter table public.transactions
 -- القوائم والإجماليات تقرأ النشط وحده، فالفهرس على الحالة لا على الصفّ.
 create index if not exists transactions_active_idx
   on public.transactions (user_id, is_archived, occurred_at desc);
+
+-- =====================================================================
+-- تقسيم الفاتورة
+-- =====================================================================
+-- الفاتورة المقسومة تصير حركةً لكل مشارك، لا كياناً جديداً: الأرصدة
+-- تُحسب بجمع حركات كل شخص، فالتقسيم يظهر في دفاتر الجميع فوراً بلا
+-- طبقةِ «ديون» موازية تحتاج مزامنةً مع الأرصدة وتتباعد عنها.
+--
+-- و`split_group_id` هو ما يربط حركات الفاتورة الواحدة: بدونه تبدو
+-- حركاتٍ متفرّقة وقع أن لها التاريخ والوصف نفسه.
+
+alter table public.transactions
+  add column if not exists split_group_id uuid;
+
+create index if not exists transactions_split_group_idx
+  on public.transactions (split_group_id)
+  where split_group_id is not null;

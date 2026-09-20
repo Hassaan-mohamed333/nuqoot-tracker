@@ -23,6 +23,8 @@ export type RootStackParamList = {
           direction?: TransactionDirection;
           note?: string;
           receiptUri?: string;
+          /** فتح ورقة تقسيم الفاتورة فور الوصول. */
+          split?: boolean;
         };
       }
     | undefined;

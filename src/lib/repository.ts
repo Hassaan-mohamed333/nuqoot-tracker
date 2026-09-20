@@ -1,3 +1,5 @@
+import * as Crypto from 'expo-crypto';
+
 import { SEED_CONTACTS, SEED_EVENTS, SEED_TRANSACTIONS } from '@/data/seed';
 import { extensionForMime, readLocalFile } from '@/lib/files';
 import { logStepFailure, logSupabaseFailure } from '@/lib/supabaseError';
@@ -38,6 +40,7 @@ import type {
   NewEventInput,
   NewTransactionInput,
   Transaction,
+  TransactionDirection,
   TransactionInsert,
   UserProfile,
   UserProfileInput,
@@ -832,6 +835,7 @@ export async function createTransaction(
     occurred_at: clean.occurred_at ?? nowIso,
     note: clean.note ?? null,
     receipt_url: clean.receipt_url ?? null,
+    split_group_id: input.split_group_id ?? null,
   };
 
   const draft: Transaction = {
@@ -1296,4 +1300,78 @@ export async function setTransactionArchived(
       missing: 'تعذّر تعديل الحركة: غير موجودة على الخادم أو ليست ضمن حسابك.',
     },
   );
+}
+
+/** مشارك واحد في فاتورة مقسومة، كما تصل من الواجهة. */
+export interface SplitEntry {
+  /** جهة اتصال قائمة، أو `null` لاسم جديد يُنشأ. */
+  contactId: string | null;
+  /** يُستعمل عند الإنشاء، وللرسائل. */
+  name: string;
+  amount: number;
+}
+
+export interface SplitBillInput {
+  entries: SplitEntry[];
+  direction: TransactionDirection;
+  note: string | null;
+  occurred_at?: string;
+  currency?: string;
+  event_id?: string | null;
+  receipt_url?: string | null;
+}
+
+/**
+ * يسجّل فاتورة مقسومة: حركةٌ لكل مشارك، بمعرّف مجموعة واحد.
+ *
+ * ---------------------------------------------------------------------
+ * **لماذا حركات لا كيان «دَين» جديد**: الأرصدة في هذا التطبيق تُحسب
+ * بجمع حركات كل شخص. فحصّةُ المشارك حركةٌ في اتجاه الفاتورة نفسه —
+ * دفعتُ عنه فصار له عليّ حقّ... لا: دفعتُ عنه فصار لي عنده. وهي
+ * بالضبط دلالة `OUT` في هذا الدفتر. فتظهر في دفتره وفي «لك عند
+ * الآخرين» فوراً، بلا طبقةٍ موازية تحتاج مزامنة.
+ *
+ * **والأسماء الجديدة تُنشأ جهاتِ اتصال**: الحصّة تحتاج صاحباً في
+ * الدفتر لتُحسب في رصيد. ورفضُ الاسم غير المسجَّل كان سيعني أن يفتح
+ * المستخدم شاشةً أخرى ويعود.
+ *
+ * **وحصّتك أنت ليست هنا**: الواجهة تحسبها ولا ترسلها — لا تَدين لنفسك.
+ * ---------------------------------------------------------------------
+ */
+export async function createSplitBill(
+  input: SplitBillInput,
+): Promise<Transaction[]> {
+  if (input.entries.length === 0) {
+    throw new Error('لا مشاركين في القسمة.');
+  }
+
+  // معرّف المجموعة يُولَّد مرّة: بدونه تبدو حركاتٍ متفرّقة وقع أن لها
+  // التاريخ والوصف نفسه.
+  // معرّف حقيقي بصيغة UUID: العمود في قاعدة البيانات من نوع uuid،
+  // ومعرّفُنا المحلي `createId` ليس كذلك فيرفضه الخادم.
+  const groupId = Crypto.randomUUID();
+  const occurredAt = input.occurred_at ?? new Date().toISOString();
+  const created: Transaction[] = [];
+
+  for (const entry of input.entries) {
+    const contactId =
+      entry.contactId ??
+      (await createContact({ full_name: entry.name })).id;
+
+    created.push(
+      await createTransaction({
+        contact_id: contactId,
+        event_id: input.event_id ?? null,
+        direction: input.direction,
+        amount: entry.amount,
+        currency: input.currency,
+        occurred_at: occurredAt,
+        note: input.note,
+        receipt_url: input.receipt_url ?? null,
+        split_group_id: groupId,
+      }),
+    );
+  }
+
+  return created;
 }

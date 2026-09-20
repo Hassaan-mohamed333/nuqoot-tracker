@@ -70,6 +70,8 @@ export interface Transaction {
   /** مؤرشفة: مخفيّة من القوائم والإجماليات، وقابلة للاستعادة. */
   is_archived: boolean;
   archived_at: string | null;
+  /** يربط حركات فاتورة واحدة قُسِّمت على عدّة أشخاص. */
+  split_group_id: string | null;
   created_at: string;
 }
 
@@ -120,6 +122,8 @@ export interface NewEventInput {
 /** بيانات إنشاء حركة جديدة قبل حفظها. */
 export interface NewTransactionInput {
   contact_id: string;
+  /** يُملأ من مسار تقسيم الفاتورة وحده. */
+  split_group_id?: string | null;
   event_id: string | null;
   direction: TransactionDirection;
   amount: number;
