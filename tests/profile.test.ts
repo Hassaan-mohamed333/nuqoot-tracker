@@ -123,12 +123,16 @@ describe('تعديل الملف الشخصي', () => {
   test('null مسحٌ مقصود لا خطأ', () => {
     const clean = validateProfilePatch({
       full_name: null,
-      date_of_birth: null,
+      birth_date: null,
       avatar_url: null,
+      phone: null,
+      currency: null,
     });
     assert.equal(clean.full_name, null);
-    assert.equal(clean.date_of_birth, null);
+    assert.equal(clean.birth_date, null);
     assert.equal(clean.avatar_url, null);
+    assert.equal(clean.phone, null);
+    assert.equal(clean.currency, null);
   });
 
   test('يرفض اسماً من حرف واحد', () => {
@@ -157,7 +161,38 @@ describe('مخطّط الملف الشخصي ودلو الصور', () => {
 
   test('تاريخ الميلاد عمود date لا timestamptz', () => {
     // timestamptz يزيح اليوم لمن يسكن غرب غرينتش، والميلاد يوم لا لحظة.
-    assert.match(SCHEMA, /date_of_birth date,/);
+    assert.match(SCHEMA, /birth_date date,/);
+  });
+
+  test('كل عمود يُضاف صراحةً، لا بالاعتماد على create table', () => {
+    /*
+     * `create table if not exists` لا يفعل شيئاً إن كان الجدول موجوداً
+     * ولو بأعمدة مختلفة. فمن كان عنده `profiles` من عمل سابق لم يحصل
+     * على العمود الجديد، ولا تُغيّر إعادةُ تشغيل الملف شيئاً — ثم يردّ
+     * PostgREST بـ PGRST204 ويقال له «شغّل الهجرة»، وقد شغّلها.
+     */
+    for (const column of [
+      'full_name',
+      'birth_date',
+      'avatar_url',
+      'phone',
+      'currency',
+    ]) {
+      assert.match(
+        SCHEMA,
+        new RegExp(
+          `alter table public\\.profiles\\s+add column if not exists ${column}\\b`,
+        ),
+        `العمود ${column} لا يُضاف على جدول قائم`,
+      );
+    }
+  });
+
+  test('الاسم القديم يُرحَّل لا يُترك', () => {
+    assert.match(
+      SCHEMA,
+      /alter table public\.profiles rename column date_of_birth to birth_date/,
+    );
   });
 
   test('دلو avatars عام، والكتابة محصورة في مجلد صاحبها', () => {

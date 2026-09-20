@@ -259,16 +259,28 @@ export interface UserProfile {
   id: string;
   full_name: string | null;
   /** `YYYY-MM-DD` لا طابع زمني: لتاريخ الميلاد يوم لا لحظة. */
-  date_of_birth: string | null;
+  birth_date: string | null;
   /** رابط عام ثابت داخل دلو avatars. */
   avatar_url: string | null;
+  /** نسخة معروضة من الرقم الموثَّق في auth.users. */
+  phone: string | null;
+  /** عملة افتراضية للحركات الجديدة. */
+  currency: string | null;
   created_at: string;
   updated_at: string;
 }
 
-/** ما يمكن للمستخدم تغييره في ملفه. */
+/**
+ * ما يمكن تغييره في الملف.
+ *
+ * المفاتيح هنا هي أسماء الأعمدة حرفياً — وهي ما يُبنى منه جسم `upsert`
+ * عبر قائمة صريحة في المستودع. أيّ مفتاح زائد يردّ عليه PostgREST
+ * بـ PGRST204، وهو العطب الذي ظلّ يُقرأ «قاعدة بياناتك أقدم».
+ */
 export interface UserProfileInput {
   full_name?: string | null;
-  date_of_birth?: string | null;
+  birth_date?: string | null;
   avatar_url?: string | null;
+  phone?: string | null;
+  currency?: string | null;
 }

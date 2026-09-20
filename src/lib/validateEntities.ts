@@ -25,6 +25,7 @@ import {
   type ValidationIssue,
   ValidationError,
 } from '@/lib/validation';
+import { DEFAULT_CURRENCY } from '@/utils/ledger';
 import type {
   EventType,
   UserProfileInput,
@@ -180,7 +181,8 @@ export function validateTransactionInput(
   const result = collect({
     contact_id: checkRowId('contact_id', input.contact_id, 'جهة الاتصال'),
     amount: checkAmount(input.amount),
-    currency: checkCurrency(input.currency ?? 'EGP'),
+    // الملاذ الأخير فقط: المستودع يحلّ تفضيل المستخدم قبل الوصول هنا.
+    currency: checkCurrency(input.currency ?? DEFAULT_CURRENCY),
     occurred_at: checkIsoDate(
       'occurred_at',
       input.occurred_at ?? new Date().toISOString(),
@@ -227,7 +229,7 @@ export function validateSharedExpenseInput(
       required: true,
     }),
     amount: checkAmount(input.amount),
-    currency: checkCurrency(input.currency ?? 'EGP'),
+    currency: checkCurrency(input.currency ?? DEFAULT_CURRENCY),
     occurred_at: checkIsoDate(
       'occurred_at',
       input.occurred_at ?? new Date().toISOString(),
@@ -465,14 +467,26 @@ export function validateProfilePatch(patch: UserProfileInput): UserProfileInput 
     else issues.push(...name.issues);
   }
 
-  if (patch.date_of_birth !== undefined) {
-    const birth = checkBirthDate(
-      'date_of_birth',
-      patch.date_of_birth,
-      'تاريخ الميلاد',
-    );
-    if (birth.ok) clean.date_of_birth = birth.value;
+  if (patch.birth_date !== undefined) {
+    const birth = checkBirthDate('birth_date', patch.birth_date, 'تاريخ الميلاد');
+    if (birth.ok) clean.birth_date = birth.value;
     else issues.push(...birth.issues);
+  }
+
+  if (patch.phone !== undefined) {
+    const phone = checkPhone(patch.phone);
+    if (phone.ok) clean.phone = phone.value;
+    else issues.push(...phone.issues);
+  }
+
+  if (patch.currency !== undefined) {
+    if (patch.currency === null) {
+      clean.currency = null;
+    } else {
+      const currency = checkCurrency(patch.currency);
+      if (currency.ok) clean.currency = currency.value;
+      else issues.push(...currency.issues);
+    }
   }
 
   if (patch.avatar_url !== undefined) {

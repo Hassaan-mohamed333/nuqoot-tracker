@@ -330,7 +330,35 @@ describe('حفظ الملف الشخصي', () => {
 
   test('upsert لا update: الصفّ لا يوجد قبل أوّل حفظ', () => {
     const fn = REPO.slice(REPO.indexOf('export async function updateUserProfile'));
-    assert.match(fn, /\.upsert\(\{ id: userId, \.\.\.patch \}, \{ onConflict: 'id' \}\)/);
+    assert.match(fn, /\.upsert\(buildProfilePayload\(userId, patch\), \{ onConflict: 'id' \}\)/);
+  });
+
+  test('الجسم يُبنى من قائمة أعمدة صريحة لا بنشر الكائن', () => {
+    // `{ id, ...patch }` يرسل كل مفتاح يصل إليه، وأيّ مفتاح لا يقابله
+    // عمود يردّ عليه PostgREST بـ PGRST204 ويُفشل الطلب كلّه.
+    const fn = REPO.slice(
+      REPO.indexOf('const PROFILE_COLUMNS'),
+      REPO.indexOf('export async function updateUserProfile'),
+    );
+    assert.ok(fn.length > 0 && fn.length < 1500, 'حدود القصّ خاطئة');
+    for (const column of [
+      'full_name',
+      'birth_date',
+      'avatar_url',
+      'phone',
+      'currency',
+    ]) {
+      assert.ok(fn.includes(`'${column}'`), `${column} خارج القائمة`);
+    }
+    // الإسناد لا ذكرُ الاسم: التعليق يشرح لماذا لا يُرسل من العميل.
+    assert.ok(
+      !/updated_at\s*:/.test(fn) && !/payload\['updated_at'\]/.test(fn),
+      'updated_at يُرسل من العميل بدل المُشغِّل',
+    );
+    assert.ok(
+      REPO.includes('satisfies readonly (keyof UserProfileInput)[]'),
+      'القائمة غير مربوطة بالنوع، فينحرف الاسم بلا أن يشكو tsc',
+    );
   });
 
   test('صفر صفوف يُرفض ويُسجَّل', () => {
@@ -379,5 +407,72 @@ describe('حفظ الملف الشخصي', () => {
     }
     assert.ok(fn.includes('console.error'), 'لا يُطبع في الطرفية');
     assert.ok(fn.includes('redactText'), 'يُطبع بلا تنقية');
+  });
+});
+
+describe('عقد أعمدة الملف الشخصي', () => {
+  const SCHEMA = readFileSync(path.join(ROOT, 'supabase', 'schema.sql'), 'utf8');
+  const TYPES = readFileSync(path.join(ROOT, 'src', 'types', 'index.ts'), 'utf8');
+  const REPO = readFileSync(path.join(ROOT, 'src', 'lib', 'repository.ts'), 'utf8');
+
+  /** الأعمدة كما هي في قاعدة البيانات. */
+  const COLUMNS = ['full_name', 'birth_date', 'avatar_url', 'phone', 'currency'];
+
+  test('المخطّط والنوع وقائمة الإرسال تتّفق على الأسماء', () => {
+    /*
+     * العطب الذي أوقع «قاعدة بياناتك أقدم من التطبيق»: الشيفرة كانت
+     * ترسل `date_of_birth` وقاعدة البيانات تحمل `birth_date`. ثلاثة
+     * مواضع تحمل الأسماء نفسها، وانحرافُ أحدها لا يظهر إلا عند
+     * المستخدم — فهذا الاختبار يجعله يظهر هنا.
+     */
+    const payload = REPO.slice(
+      REPO.indexOf('const PROFILE_COLUMNS'),
+      REPO.indexOf('export async function updateUserProfile'),
+    );
+
+    for (const column of COLUMNS) {
+      assert.match(
+        SCHEMA,
+        new RegExp(`add column if not exists ${column}\\b`),
+        `المخطّط بلا ${column}`,
+      );
+      assert.ok(payload.includes(`'${column}'`), `قائمة الإرسال بلا ${column}`);
+    }
+
+    const profileType = TYPES.slice(
+      TYPES.indexOf('export interface UserProfile {'),
+      TYPES.indexOf('export interface UserProfileInput {'),
+    );
+    for (const column of COLUMNS) {
+      assert.ok(profileType.includes(`${column}:`), `النوع بلا ${column}`);
+    }
+  });
+
+  test('الاسم القديم لم يبقَ في الشيفرة', () => {
+    for (const file of [
+      'src/types/index.ts',
+      'src/lib/repository.ts',
+      'src/lib/validateEntities.ts',
+      'src/screens/ProfileScreen.tsx',
+    ]) {
+      const source = readFileSync(path.join(ROOT, file), 'utf8');
+      assert.ok(
+        !source.includes('date_of_birth'),
+        `${file} ما زال يستعمل الاسم القديم`,
+      );
+    }
+  });
+
+  test('رسالة خلل المخطّط تحمل نصّ الخادم لا جملة عامّة', async () => {
+    // رسالة PostgREST تسمّي العمود المفقود بالحرف، وهي ما يحسم الأمر
+    // لمن شغّل الهجرة وظنّ العطب في التطبيق.
+    const { userMessage } = await import('../src/lib/supabaseError.ts');
+    const message = userMessage({
+      code: 'PGRST204',
+      message: "Could not find the 'birth_date' column of 'profiles' in the schema cache",
+    });
+    assert.match(message, /birth_date/);
+    assert.match(message, /profiles/);
+    assert.match(message, /schema\.sql/);
   });
 });

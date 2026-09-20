@@ -20,9 +20,17 @@ import {
 
 import { PressableScale } from '@/components/motion';
 import { PhoneLinkSheet } from '@/components/PhoneLinkSheet';
-import { Button, DateField, Field, Screen, SectionTitle } from '@/components/ui';
+import {
+  Button,
+  DateField,
+  Field,
+  Screen,
+  SectionTitle,
+  SegmentedControl,
+} from '@/components/ui';
 import { formatPhone } from '@/lib/phoneAuth';
 import { useLock } from '@/store/LockProvider';
+import { DEFAULT_CURRENCY } from '@/utils/ledger';
 import { notify, reportError } from '@/lib/alerts';
 import { fromDateInputValue, toDateInputValue } from '@/components/ui';
 import { palette } from '@/lib/palette';
@@ -41,6 +49,14 @@ import type { UserProfileInput } from '@/types';
 
 /** الحدّ الذي يقبله دلو avatars؛ مطابق لـ file_size_limit في المخطط. */
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+
+/** العملات المتاحة. قصيرة عمداً، كقائمة الدول في منتقي الهاتف. */
+const CURRENCIES = [
+  { value: 'EGP', label: 'ج.م' },
+  { value: 'SAR', label: 'ر.س' },
+  { value: 'AED', label: 'د.إ' },
+  { value: 'USD', label: '$' },
+] as const;
 
 /**
  * الملف الشخصي: الاسم، تاريخ الميلاد، والصورة.
@@ -63,6 +79,7 @@ export function ProfileScreen() {
   /** صورة اختيرت ولم تُرفع بعد. */
   const [pendingAvatar, setPendingAvatar] = useState<string | null>(null);
   const [phoneSheet, setPhoneSheet] = useState(false);
+  const [currency, setCurrency] = useState<string>(DEFAULT_CURRENCY);
   /** الرقم الموثَّق، من الجلسة أو من ربطٍ تمّ للتوّ. */
   const [linkedPhone, setLinkedPhone] = useState<string | null>(null);
 
@@ -83,9 +100,11 @@ export function ProfileScreen() {
       const profile = await fetchUserProfile(profileId);
       setFullName(profile.full_name ?? '');
       setBirthDate(
-        profile.date_of_birth ? fromDateInputValue(profile.date_of_birth) : null,
+        profile.birth_date ? fromDateInputValue(profile.birth_date) : null,
       );
       setSavedAvatar(profile.avatar_url);
+      setCurrency(profile.currency ?? DEFAULT_CURRENCY);
+      if (profile.phone) setLinkedPhone(profile.phone);
       setPendingAvatar(null);
     } catch (error) {
       reportError('تعذّر تحميل الملف الشخصي', error);
@@ -180,8 +199,11 @@ export function ProfileScreen() {
 
       const patch: UserProfileInput = {
         full_name: fullName.trim() || null,
-        date_of_birth: birthDate ? toDateInputValue(birthDate) : null,
+        birth_date: birthDate ? toDateInputValue(birthDate) : null,
         avatar_url: url,
+        currency,
+        // الرقم الموثَّق يُنسخ إلى الملف ليُقرأ بلا نداء على الجلسة.
+        phone: verifiedPhone,
       };
 
       const saved = await updateUserProfile(profileId, patch);
@@ -325,6 +347,18 @@ export function ProfileScreen() {
         className="mt-5"
       />
 
+      <Text className="mb-2 mt-5 text-right text-sm font-bold text-ink">
+        العملة الافتراضية
+      </Text>
+      <SegmentedControl
+        options={CURRENCIES}
+        value={currency}
+        onChange={setCurrency}
+      />
+      <Text className="mt-1.5 text-right text-caption text-ink-muted">
+        تُقترح في كل حركة جديدة، ويمكن تغييرها لكل حركة.
+      </Text>
+
       <SectionTitle className="mt-8">الأمان</SectionTitle>
 
       {/* ---- رقم الهاتف ---- */}
@@ -414,7 +448,16 @@ export function ProfileScreen() {
         visible={phoneSheet}
         onClose={() => setPhoneSheet(false)}
         currentPhone={verifiedPhone}
-        onLinked={setLinkedPhone}
+        onLinked={(phone) => {
+          setLinkedPhone(phone);
+          // يُكتب في الملف فوراً لا عند الحفظ التالي: من ربط رقمه ثم
+          // أغلق الشاشة كان يفقده حتى تحقّقٍ ثانٍ.
+          if (profileId) {
+            void updateUserProfile(profileId, { phone }).catch((error) => {
+              logger.error('profile', 'تعذّر حفظ الرقم في الملف', error);
+            });
+          }
+        }}
       />
     </Screen>
   );

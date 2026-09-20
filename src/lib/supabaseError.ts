@@ -62,12 +62,19 @@ export function describeSupabaseError(error: unknown): string {
   return parts.join(' ');
 }
 
-const SCHEMA_OUT_OF_DATE =
-  'قاعدة بياناتك أقدم من التطبيق: عمود أو جدول مفقود. ' +
-  'شغّل supabase/schema.sql على مشروعك. ' +
+/** رموز تعني أن المخطّط لا يطابق ما يرسله التطبيق. */
+const SCHEMA_CODES: ReadonlySet<string> = new Set([
+  'PGRST204',
+  'PGRST205',
+  '42703',
+  '42P01',
+]);
+
+const SCHEMA_HINT =
+  'شغّل supabase/schema.sql على مشروعك، ' +
   // خزن PostgREST للمخطّط يتأخّر أحياناً بعد الهجرة، فيردّ الرمز نفسه
   // رغم أن العمود صار موجوداً. إعادة التحميل أسرع من مطاردة الوهم.
-  'وإن كنت شغّلته للتوّ، أعد تحميل مخطّط الـ API من إعدادات المشروع.';
+  'وإن كنت شغّلته للتوّ فأعد تحميل مخطّط الـ API من إعدادات المشروع.';
 
 /**
  * ترجمة الأسباب المعروفة إلى رسائل صالحة للعرض.
@@ -105,10 +112,6 @@ const BY_CODE: Record<string, string> = {
    * على المشروع. PostgREST يردّ PGRST204 وPostgres يردّ 42703، ولم
    * يكن أيٌّ منهما مترجَماً — فظهرت الرسالة العامّة ولم تقل ما ينقص.
    */
-  PGRST204: SCHEMA_OUT_OF_DATE,
-  PGRST205: SCHEMA_OUT_OF_DATE,
-  '42703': SCHEMA_OUT_OF_DATE,
-  '42P01': SCHEMA_OUT_OF_DATE,
 };
 
 const GENERIC = 'تعذّر إتمام العملية. حاول مرّة أخرى.';
@@ -142,6 +145,23 @@ export function userMessage(error: unknown): string {
   if (error && typeof error === 'object') {
     const shape = error as SupabaseErrorShape;
     const code = asText(shape.code) ?? asText(shape.statusCode);
+
+    /*
+     * خلل المخطّط: رسالة الخادم أولى من أي نصّ نكتبه.
+     *
+     * كانت تُستبدل بجملة عامّة «قاعدة بياناتك أقدم من التطبيق» — وهي
+     * صحيحة ولا تفيد: من شغّل الهجرة وقرأها ظنّها خطأً في التطبيق.
+     * ورسالة PostgREST تسمّي **العمود** المفقود بالحرف
+     * (`Could not find the 'birth_date' column…`) وهي ما يحسم الأمر
+     * في سطر: عمودٌ باسمٍ آخر، أو جدولٌ قديم لم تلمسه الهجرة.
+     */
+    if (code && SCHEMA_CODES.has(code)) {
+      const detail = asText(shape.message) ?? asText(shape.error);
+      return detail
+        ? `${redactText(detail).slice(0, 200)} — ${SCHEMA_HINT}`
+        : `عمود أو جدول مفقود. ${SCHEMA_HINT}`;
+    }
+
     if (code && BY_CODE[code]) return BY_CODE[code];
 
     const status = Number(asText(shape.status) ?? NaN);

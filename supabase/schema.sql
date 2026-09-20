@@ -412,11 +412,49 @@ create table if not exists public.profiles (
   full_name text,
   -- تاريخ لا طابع زمني: تاريخ الميلاد لا وقت له، وتخزينه timestamptz
   -- يزيحه يوماً كاملاً لكل من يسكن غرب غرينتش.
-  date_of_birth date,
+  birth_date date,
   avatar_url text,
+  phone text,
+  currency text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- ---------------------------------------------------------------------
+-- الأعمدة تُضاف صراحةً بعد إنشاء الجدول، لا بالاعتماد عليه.
+--
+-- `create table if not exists` **لا يفعل شيئاً** إن كان الجدول موجوداً
+-- ولو بأعمدة مختلفة. فمن كان عنده `profiles` من عمل سابق لم يحصل على
+-- العمود الجديد، ولا تُغيّر إعادةُ تشغيل الملف شيئاً — ثم يردّ PostgREST
+-- بـ PGRST204 ويقال له «شغّل الهجرة»، وقد شغّلها. هذه السطور هي ما يجعل
+-- تشغيل الملف مفيداً على جدول قائم.
+-- ---------------------------------------------------------------------
+
+-- ترحيل الاسم القديم قبل إضافة الجديد، حتى لا يضيع ما كان مخزَّناً.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'profiles'
+      and column_name = 'date_of_birth'
+  ) and not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'profiles'
+      and column_name = 'birth_date'
+  ) then
+    alter table public.profiles rename column date_of_birth to birth_date;
+  end if;
+end $$;
+
+alter table public.profiles add column if not exists full_name text;
+alter table public.profiles add column if not exists birth_date date;
+alter table public.profiles add column if not exists avatar_url text;
+alter table public.profiles add column if not exists phone text;
+alter table public.profiles add column if not exists currency text;
+alter table public.profiles
+  add column if not exists created_at timestamptz not null default now();
+alter table public.profiles
+  add column if not exists updated_at timestamptz not null default now();
 
 alter table public.profiles enable row level security;
 
@@ -426,6 +464,10 @@ create policy "profiles_owner" on public.profiles
 
 -- حاجز أخير لو أُدرج صفّ من خارج التطبيق. التحقّق الأساسي في
 -- src/lib/validation.ts، وهذا ما لا يمكن الالتفاف عليه.
+-- القيد يُسقط ويُعاد بناؤه: نسخته القديمة تشير إلى `date_of_birth`،
+-- والعمود صار اسمه `birth_date`.
+alter table public.profiles drop constraint if exists profiles_limits;
+
 do $$
 begin
   if not exists (select 1 from pg_constraint where conname = 'profiles_limits') then
@@ -433,8 +475,10 @@ begin
       (full_name is null or length(full_name) between 2 and 120)
       and (avatar_url is null or length(avatar_url) <= 500)
       -- تاريخ ميلاد في المستقبل خطأ إدخال لا نيّة.
-      and (date_of_birth is null or date_of_birth <= current_date)
-      and (date_of_birth is null or date_of_birth >= date '1900-01-01')
+      and (birth_date is null or birth_date <= current_date)
+      and (birth_date is null or birth_date >= date '1900-01-01')
+      and (phone is null or length(phone) <= 32)
+      and (currency is null or length(currency) = 3)
     );
   end if;
 end $$;

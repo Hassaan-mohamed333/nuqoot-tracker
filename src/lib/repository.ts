@@ -70,6 +70,20 @@ function createId(prefix: string): string {
 }
 
 /**
+ * العملة الافتراضية للحركات الجديدة.
+ *
+ * تُقرأ من الملف الشخصي المخزَّن لا من ثابتٍ في الشيفرة: من ضبط حسابه
+ * بالريال لا يريد كتابة كل حركة بالجنيه ثم تصحيحها. وموضعها هنا لا في
+ * الشاشات: للحركة أبواب عدّة — النموذج، والمساعد، والإدخال الذكي،
+ * وقارئ الإيصالات — وضبطُها في أحدها يترك البقيّة على الثابت القديم،
+ * وهو ما وقع فعلاً.
+ */
+async function preferredCurrency(): Promise<string> {
+  const profile = await readJson<UserProfile | null>(STORAGE_KEYS.profile, null);
+  return profile?.currency ?? DEFAULT_CURRENCY;
+}
+
+/**
  * يحمّل النسخة المحلية.
  *
  * البيانات التجريبية تُزرع فقط في الوضع المحلي (بلا Supabase). عند وجود
@@ -397,7 +411,11 @@ export async function createSharedExpense(
 ): Promise<SharedExpenseWithShares> {
   const nowIso = new Date().toISOString();
 
-  const clean = validateSharedExpenseInput(input);
+  // المصروف الجماعي يتبع التفضيل نفسه: عملتان في دفتر واحد إرباك.
+  const clean = validateSharedExpenseInput({
+    ...input,
+    currency: input.currency ?? (await preferredCurrency()),
+  });
   const payload: SharedExpenseInsert = {
     event_id: clean.event_id,
     payer_participant_id: clean.payer_participant_id,
@@ -792,7 +810,16 @@ export async function createTransaction(
 ): Promise<Transaction> {
   const nowIso = new Date().toISOString();
 
-  const clean = validateTransactionInput(input);
+  /*
+   * تفضيل العملة يُحلّ **قبل** التحقّق لا بعده.
+   *
+   * `validateTransactionInput` يضع 'EGP' حين لا تُذكر عملة، فلا تصل
+   * قيمةٌ فارغة إلى ما بعده — وكان احتياطُنا بعده شيفرةً ميّتة: يُحفظ
+   * ملفٌ بالريال ثم تُكتب كل حركة بالجنيه.
+   */
+  const currency = input.currency ?? (await preferredCurrency());
+  const clean = validateTransactionInput({ ...input, currency });
+
   const payload: TransactionInsert = {
     contact_id: clean.contact_id,
     event_id: clean.event_id,
@@ -800,7 +827,8 @@ export async function createTransaction(
     // المبلغ موجب دائماً؛ الاتجاه وحده يحدد الإشارة. checkAmount ضمِن
     // أنه رقم صالح ضمن مدى numeric(12,2) قبل الوصول إلى هنا.
     amount: clean.amount,
-    currency: clean.currency ?? DEFAULT_CURRENCY,
+    // المتحقّق يضمنها؛ النوع اختياري فنُثبّته بالقيمة التي دخلت به.
+    currency: clean.currency ?? currency,
     occurred_at: clean.occurred_at ?? nowIso,
     note: clean.note ?? null,
     receipt_url: clean.receipt_url ?? null,
@@ -1101,8 +1129,10 @@ function emptyProfile(userId: string): UserProfile {
   return {
     id: userId,
     full_name: null,
-    date_of_birth: null,
+    birth_date: null,
     avatar_url: null,
+    phone: null,
+    currency: null,
     created_at: nowIso,
     updated_at: nowIso,
   };
@@ -1142,6 +1172,35 @@ export async function fetchUserProfile(userId: string): Promise<UserProfile> {
 }
 
 /**
+ * أعمدة `profiles` التي يجوز إرسالها، بأسمائها في قاعدة البيانات.
+ *
+ * قائمة صريحة لا نشرٌ للكائن: `{ id, ...patch }` يرسل كل مفتاح يصل
+ * إليه، وأيّ مفتاح لا يقابله عمود يردّ عليه PostgREST بـ PGRST204
+ * ويُفشل الطلب كلّه. والقائمة هنا تجعل انحراف الاسم خطأَ ترجمة يظهر في
+ * `tsc` لا عطباً يظهر عند المستخدم.
+ */
+const PROFILE_COLUMNS = [
+  'full_name',
+  'birth_date',
+  'avatar_url',
+  'phone',
+  'currency',
+] as const satisfies readonly (keyof UserProfileInput)[];
+
+function buildProfilePayload(
+  userId: string,
+  patch: UserProfileInput,
+): Record<string, unknown> {
+  // `updated_at` من المُشغِّل في قاعدة البيانات لا من العميل: قيمةٌ
+  // يرسلها العميل يستطيع العميل تزويرها.
+  const payload: Record<string, unknown> = { id: userId };
+  for (const column of PROFILE_COLUMNS) {
+    if (patch[column] !== undefined) payload[column] = patch[column];
+  }
+  return payload;
+}
+
+/**
  * يحفظ تعديلات الملف الشخصي.
  *
  * `upsert` لا `update`: الصفّ لا يوجد قبل أوّل حفظ، و`update` على صفّ
@@ -1166,7 +1225,7 @@ export async function updateUserProfile(
      */
     const { data: row, error } = await client
       .from(TABLES.profiles)
-      .upsert({ id: userId, ...patch }, { onConflict: 'id' })
+      .upsert(buildProfilePayload(userId, patch), { onConflict: 'id' })
       .select()
       .maybeSingle();
 

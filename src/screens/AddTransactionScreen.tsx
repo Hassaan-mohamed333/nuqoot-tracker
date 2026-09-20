@@ -28,7 +28,7 @@ import { isSupabaseReady } from '@/lib/supabase';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
 import type { TransactionDirection } from '@/types';
-import { DEFAULT_CURRENCY, formatDate, getNetTheme } from '@/utils/ledger';
+import { formatDate, getNetTheme } from '@/utils/ledger';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 type AddRoute = RouteProp<RootStackParamList, 'AddTransaction'>;
@@ -120,7 +120,8 @@ export function AddTransactionScreen() {
         event_id: eventId,
         direction,
         amount: parsedAmount,
-        currency: DEFAULT_CURRENCY,
+        // العملة تُترك للمستودع: هو من يقرأ تفضيل الملف الشخصي، وضبطها
+        // هنا أيضاً كان سيعني مصدرين للحقيقة يتباعدان.
         note: note.trim() || null,
         receipt_url: receiptPath,
       });
