@@ -338,7 +338,20 @@ const IMAGE_SCHEMES: ReadonlySet<string> = new Set([
   'https:',
   'file:',
   'blob:',
+  // `data:` للصور وحدها، وللوضع المحلي وحده — انظر الحدّ أدناه.
+  'data:',
 ]);
+
+/**
+ * سقف طول العنوان.
+ *
+ * `data:` يحمل الصورة نفسها فيتجاوز أي حدّ معقول لعمود نصّي؛ لذلك يُقاس
+ * بحدٍّ أوسع، وقيد قاعدة البيانات (٥٠٠ محرفاً) يمنع وصوله إلى الخادم
+ * أصلاً. وفي الوضع المحلي لا خادم، والصورة مضغوطة إلى عشرات
+ * الكيلوبايتات.
+ */
+const MAX_URL_LENGTH = 500;
+const MAX_DATA_URI_LENGTH = 400_000;
 
 /** رابط صورة: من خدمة التخزين، أو من منتقي الصور محلياً. */
 export function checkImageUrl(
@@ -349,7 +362,8 @@ export function checkImageUrl(
   const text = sanitizeLine(raw);
   if (!text) return { ok: true, value: null };
 
-  if (textLength(text) > 500) {
+  const isDataUri = text.startsWith('data:');
+  if (textLength(text) > (isDataUri ? MAX_DATA_URI_LENGTH : MAX_URL_LENGTH)) {
     return {
       ok: false,
       issues: [issue(field, 'too_long', `${label} أطول من المسموح.`)],
@@ -361,6 +375,14 @@ export function checkImageUrl(
     parsed = new URL(text);
   } catch {
     return { ok: false, issues: [issue(field, 'invalid', `${label} غير صالح.`)] };
+  }
+
+  // `data:` لصورة فقط: أي نوع آخر ليس صورةً وإنما حمولة أخرى تتنكّر.
+  if (isDataUri && !/^data:image\/(png|jpeg|webp);base64,/.test(text)) {
+    return {
+      ok: false,
+      issues: [issue(field, 'invalid', `${label} غير صالح.`)],
+    };
   }
 
   if (!IMAGE_SCHEMES.has(parsed.protocol)) {

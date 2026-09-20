@@ -4,11 +4,9 @@ import {
   Archive,
   CalendarPlus,
   CloudOff,
-  LogOut,
   Plus,
   ScanLine,
   Sparkles,
-  User,
   UserPlus,
 } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
@@ -30,6 +28,7 @@ import { EventCard } from '@/components/EventCard';
 import { LedgerSummaryBar } from '@/components/LedgerSummaryBar';
 import { TransactionCard } from '@/components/TransactionCard';
 import { TransactionEditSheet } from '@/components/TransactionEditSheet';
+import { greeting, initialOf } from '@/lib/displayName';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import type { RootStackParamList } from '@/navigation/types';
 import { useAuth } from '@/store/AuthProvider';
@@ -43,7 +42,9 @@ type Navigation = NativeStackNavigationProp<RootStackParamList>;
 /** الشاشة الرئيسية: نظرة عامة على الواجبات، آخر الحركات، والمناسبات القادمة. */
 export function HomeScreen() {
   const navigation = useNavigation<Navigation>();
-  const { authDisabled, user, signOut } = useAuth();
+  // لا `signOut` هنا: الخروج انتقل إلى الملف الشخصي، فالترويسة للعرض
+  // لا للإجراءات الحسّاسة — زرُّ خروجٍ بجانب زرّ إضافةٍ يُضغط بالخطأ.
+  const { authDisabled, user } = useAuth();
   const {
     totals,
     transactions,
@@ -100,23 +101,6 @@ export function HomeScreen() {
     }
   }
 
-  async function confirmSignOut() {
-    const approved = await confirmAction({
-      title: 'تسجيل الخروج',
-      message:
-        'ستُحذف النسخة المحفوظة على هذا الجهاز، وتبقى بياناتك على الخادم.',
-      confirmLabel: 'خروج',
-      destructive: true,
-    });
-    if (!approved) return;
-
-    try {
-      await signOut();
-    } catch (error) {
-      reportError('تعذّر تسجيل الخروج', error);
-    }
-  }
-
   const upcomingEvents = useMemo(
     () =>
       events
@@ -138,8 +122,13 @@ export function HomeScreen() {
           <View className="flex-1 flex-row-reverse items-center">
             <AppLogo size={44} variant="badge" />
             <View className="mr-3 flex-1">
+              {/* التحية بالاسم لا بالبريد: البريد معرّف حساب لا اسم —
+                  يطول فيُقصّ، ويُرى ممّن ينظر إلى الشاشة. */}
               <Text className="text-right text-display text-ink">
-                النقوط والواجبات
+                {greeting({
+                  profileName: profile?.full_name,
+                  metadataName: user?.user_metadata?.full_name,
+                })}
               </Text>
               <Text className="text-right text-caption text-ink-muted">
                 {/* النشط في العدّادين معاً: `transactions` صار يستبعد
@@ -148,11 +137,6 @@ export function HomeScreen() {
                 {contactsWithSummary.length} جهة اتصال ·{' '}
                 {transactions.length} حركة
               </Text>
-              {user ? (
-                <Text className="text-right text-caption text-ink-subtle">
-                  {user.email ?? 'حساب ضيف'}
-                </Text>
-              ) : null}
             </View>
           </View>
           <View className="flex-row-reverse items-center">
@@ -179,7 +163,7 @@ export function HomeScreen() {
               accessibilityRole="button"
               accessibilityLabel="الملف الشخصي"
               activeScale={0.9}
-              className="ml-2 h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-line bg-surface">
+              className="ml-2 h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-line bg-primary/15">
               {profile?.avatar_url ? (
                 <Image
                   source={{ uri: profile.avatar_url }}
@@ -188,7 +172,14 @@ export function HomeScreen() {
                   accessibilityLabel="صورتك الشخصية"
                 />
               ) : (
-                <User size={20} color={palette.muted} />
+                // الحرف الأوّل بدل أيقونة عامّة: يميّز الحساب بلحظة نظر،
+                // ولا يبدو مكاناً فارغاً ينتظر صورة.
+                <Text className="text-lg font-bold text-primary">
+                  {initialOf({
+                    profileName: profile?.full_name,
+                    metadataName: user?.user_metadata?.full_name,
+                  })}
+                </Text>
               )}
             </PressableScale>
 
@@ -201,16 +192,6 @@ export function HomeScreen() {
               <Plus size={22} color={palette.onPrimary} />
             </PressableScale>
 
-            {authDisabled ? null : (
-              <PressableScale
-                onPress={() => void confirmSignOut()}
-                accessibilityRole="button"
-                accessibilityLabel="تسجيل الخروج"
-                activeScale={0.9}
-                className="mr-2 h-11 w-11 items-center justify-center rounded-full border border-line bg-surface">
-                <LogOut size={20} color={palette.muted} />
-              </PressableScale>
-            )}
           </View>
         </View>
 

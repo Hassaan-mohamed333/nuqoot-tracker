@@ -1060,23 +1060,29 @@ export const AVATARS_BUCKET = 'avatars';
  * تُبقي الصورة القديمة في ذاكرة المتصفّح والـ CDN، فيرى المستخدم صورته
  * السابقة بعد تغييرها ويظنّ أن الحفظ فشل.
  */
-export async function uploadAvatar(localUri: string): Promise<string> {
+export async function uploadAvatar(
+  localUri: string,
+  /** البايتات إن كانت مقروءة سلفاً (بعد الضغط عند الاختيار). */
+  prepared?: { bytes: ArrayBuffer; mimeType: string },
+): Promise<string> {
   const client = requireSupabase();
 
   const { data: userData, error: userError } = await client.auth.getUser();
   if (userError) {
-    logStepFailure('قراءة المستخدم الحالي', userError);
+    logSupabaseFailure('قراءة المستخدم الحالي', userError);
     throw userError;
   }
   const user = userData?.user;
   if (!user) throw new Error('يلزم تسجيل الدخول لرفع الصورة.');
 
-  let file;
-  try {
-    file = await readLocalFile(localUri);
-  } catch (error) {
-    logStepFailure('قراءة ملف الصورة', error);
-    throw error;
+  let file = prepared;
+  if (!file) {
+    try {
+      file = await readLocalFile(localUri);
+    } catch (error) {
+      logSupabaseFailure('قراءة ملف الصورة', error);
+      throw error;
+    }
   }
 
   // الامتداد من نوع المحتوى لا من العنوان: على الويب يكون العنوان
@@ -1086,10 +1092,19 @@ export async function uploadAvatar(localUri: string): Promise<string> {
 
   const { error } = await client.storage
     .from(AVATARS_BUCKET)
-    .upload(path, file.bytes, { contentType: file.mimeType, upsert: false });
+    .upload(path, file.bytes, { contentType: file.mimeType, upsert: true });
 
   if (error) {
-    logStepFailure(`رفع الصورة إلى ${AVATARS_BUCKET}/${path}`, error);
+    /*
+     * تشخيص الرفع يُطبع كاملاً: خطأ التخزين يحمل `statusCode` و`error`
+     * لا `code`، فالسطر العام لا يميّز «الدلو غير موجود» (404) من
+     * «سياسة تمنع الكتابة» (403) من «أكبر من الحدّ» (413) — وعلاج كلٍّ
+     * منها مختلف تماماً.
+     */
+    logSupabaseFailure(
+      `رفع الصورة إلى ${AVATARS_BUCKET}/${path} (${file.bytes.byteLength} بايت)`,
+      error,
+    );
     throw error;
   }
 

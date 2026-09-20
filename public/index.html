@@ -21,7 +21,14 @@
       script-src بلا 'unsafe-inline': التصدير لا يُنتج سكربتات مضمَّنة،
       وهذا هو التوجيه الذي يهمّ فعلاً ضد حقن السكربتات.
 
-      connect-src: عدّل النطاق إن كنت تستعمل نطاقاً مخصّصاً لـ Supabase.
+      connect-src يشمل blob: و data: — وهما ليسا شبكةً بل محتوى من
+      الجهاز نفسه. وغيابهما كان يُسقط رفع الصور والإيصالات والصوت على
+      الويب: قراءة الملف المنتقى تمرّ بـ fetch على عنوان blob:، و fetch
+      يخضع لـ connect-src لا لـ img-src. فيُرفَض الطلب بـ
+      "Failed to fetch" الذي يُقرأ «تعذّر الاتصال بالخادم» — والخادم
+      لم يُخاطَب أصلاً.
+
+      وعدّل نطاق Supabase أدناه إن كنت تستعمل نطاقاً مخصّصاً.
     -->
     <meta
       http-equiv="Content-Security-Policy"
@@ -32,7 +39,7 @@
         img-src 'self' data: blob:;
         media-src 'self' data: blob:;
         font-src 'self' data:;
-        connect-src 'self' https://*.supabase.co wss://*.supabase.co;
+        connect-src 'self' blob: data: https://*.supabase.co wss://*.supabase.co;
         worker-src 'self' blob:;
         object-src 'none';
         base-uri 'self';

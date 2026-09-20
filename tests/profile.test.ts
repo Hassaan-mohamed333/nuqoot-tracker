@@ -95,12 +95,11 @@ describe('رابط الصورة', () => {
     }
   });
 
-  test('يرفض المخطّطات التي تُنفَّذ أو تُحشى', () => {
-    // javascript: ينفّذ إن وصل إلى عنصر قابل للنقر على الويب، و data:
-    // يحشو صورة كاملة داخل عمود نصّي، و http: يُرسل بلا تشفير.
+  test('يرفض المخطّطات التي تُنفَّذ', () => {
+    // javascript: ينفّذ إن وصل إلى عنصر قابل للنقر، و http: يُرسل بلا
+    // تشفير، وما ليس عنواناً أصلاً لا يُعرض.
     for (const url of [
       'javascript:alert(1)',
-      'data:image/png;base64,iVBORw0KGgo=',
       'http://example.com/a.png',
       'not a url',
     ]) {
@@ -110,6 +109,39 @@ describe('رابط الصورة', () => {
         `يجب رفض ${url}`,
       );
     }
+  });
+
+  test('data: لصورة مضغوطة فقط', () => {
+    /*
+     * يُقبل للوضع المحلي وحده: عنوان `blob:` يموت مع إعادة تحميل
+     * الصفحة فتعود الصورة مربّعاً مكسوراً. وقيد قاعدة البيانات
+     * (٥٠٠ محرفاً) يمنع وصول عنوان `data:` إلى الخادم أصلاً.
+     */
+    assert.equal(
+      checkImageUrl('avatar_url', 'data:image/jpeg;base64,/9j/4AAQ', 'ر').ok,
+      true,
+    );
+
+    for (const url of [
+      'data:text/html;base64,PHNjcmlwdD4=',
+      'data:image/svg+xml;base64,PHN2Zz4=',
+      'data:application/javascript;base64,YWxlcnQ=',
+      'data:image/png,notbase64',
+    ]) {
+      assert.equal(
+        checkImageUrl('avatar_url', url, 'رابط الصورة').ok,
+        false,
+        `يجب رفض ${url}`,
+      );
+    }
+  });
+
+  test('الطول محدود في الحالتين', () => {
+    const long = `https://demo.supabase.co/${'a'.repeat(600)}`;
+    assert.equal(checkImageUrl('avatar_url', long, 'ر').ok, false);
+
+    const hugeData = `data:image/jpeg;base64,${'A'.repeat(500_000)}`;
+    assert.equal(checkImageUrl('avatar_url', hugeData, 'ر').ok, false);
   });
 });
 

@@ -58,16 +58,48 @@ export function extensionForMime(mimeType: string): string {
  * this.validatePath المفقودة)، لذا نستخدم fetch هناك — وهو يقرأ blob:
  * و data: و http: ويعطينا النوع الحقيقي من الـ Blob.
  */
-export async function readLocalFile(uri: string): Promise<LocalFile> {
-  if (Platform.OS === 'web') {
-    const response = await fetch(uri);
-    if (!response.ok) {
-      throw new Error(`تعذّرت قراءة الملف (${response.status}).`);
-    }
-    const blob = await response.blob();
+export async function readLocalFile(
+  uri: string,
+  /**
+   * الملف نفسه إن كان بين أيدينا.
+   *
+   * `expo-image-picker` يعيد `asset.file` على الويب، وقراءته مباشرةً
+   * أضمن من جلب عنوان blob: — وأسرع، ولا تمرّ بسياسة المحتوى أصلاً.
+   */
+  blob?: Blob,
+): Promise<LocalFile> {
+  if (blob) {
     return {
       bytes: await blob.arrayBuffer(),
       mimeType: blob.type || mimeFromUri(uri),
+    };
+  }
+
+  if (Platform.OS === 'web') {
+    let response: Response;
+    try {
+      response = await fetch(uri);
+    } catch (error) {
+      /*
+       * `fetch` على عنوان blob: أو data: يخضع لـ `connect-src` لا لـ
+       * `img-src`. وغيابهما من السياسة كان يُسقط كل رفع بـ
+       * "Failed to fetch" — وهو نصّ يُترجَم «تعذّر الاتصال بالخادم»
+       * رغم أن الملف على الجهاز والخادمُ لم يُخاطَب.
+       */
+      throw new Error(
+        'تعذّرت قراءة الملف من الجهاز. إن كنت على الويب فتحقّق من أن ' +
+          "سياسة المحتوى تسمح بـ blob: و data: في connect-src. " +
+          `(${(error as Error)?.message ?? 'سبب غير معروف'})`,
+      );
+    }
+
+    if (!response.ok) {
+      throw new Error(`تعذّرت قراءة الملف (${response.status}).`);
+    }
+    const body = await response.blob();
+    return {
+      bytes: await body.arrayBuffer(),
+      mimeType: body.type || mimeFromUri(uri),
     };
   }
 

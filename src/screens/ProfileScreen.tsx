@@ -4,6 +4,8 @@ import {
   CloudOff,
   Fingerprint,
   ImagePlus,
+  LogIn,
+  LogOut,
   Phone,
   ShieldCheck,
   User,
@@ -28,10 +30,15 @@ import {
   SectionTitle,
   SegmentedControl,
 } from '@/components/ui';
+import {
+  compressForUpload,
+  toDataUri,
+  type CompressedImage,
+} from '@/lib/imageCompress';
 import { formatPhone } from '@/lib/phoneAuth';
 import { useLock } from '@/store/LockProvider';
 import { DEFAULT_CURRENCY } from '@/utils/ledger';
-import { notify, reportError } from '@/lib/alerts';
+import { confirmAction, notify, reportError } from '@/lib/alerts';
 import { fromDateInputValue, toDateInputValue } from '@/components/ui';
 import { palette } from '@/lib/palette';
 import {
@@ -65,7 +72,7 @@ const CURRENCIES = [
  * ملفاً معلّقاً لكل مرّة يبدّل فيها المستخدم رأيه ثم يخرج بلا حفظ.
  */
 export function ProfileScreen() {
-  const { userId, user, authDisabled } = useAuth();
+  const { userId, user, authDisabled, signOut } = useAuth();
   const lock = useLock();
   // في الوضع المحلي لا جلسة ولا معرّف مستخدم، والتطبيق كلّه يعمل هناك.
   const profileId = resolveProfileId(userId, authDisabled);
@@ -76,9 +83,17 @@ export function ProfileScreen() {
   const [birthDate, setBirthDate] = useState<Date | null>(null);
   /** الرابط المحفوظ فعلاً على الخادم. */
   const [savedAvatar, setSavedAvatar] = useState<string | null>(null);
-  /** صورة اختيرت ولم تُرفع بعد. */
-  const [pendingAvatar, setPendingAvatar] = useState<string | null>(null);
+  /**
+   * صورة اختيرت ولم تُرفع بعد — مضغوطةً وبايتاتها جاهزة.
+   *
+   * تُقرأ وتُضغط لحظة الاختيار لا لحظة الحفظ: عنوان blob: على الويب
+   * يعيش ما دامت الصفحة، والقراءة المؤجَّلة تمرّ بـ fetch عليه فتخضع
+   * لسياسة المحتوى. وإمساك البايتات مبكّراً يُخرج الرفع من كل ذلك.
+   */
+  const [pendingAvatar, setPendingAvatar] =
+    useState<CompressedImage | null>(null);
   const [phoneSheet, setPhoneSheet] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [currency, setCurrency] = useState<string>(DEFAULT_CURRENCY);
   /** الرقم الموثَّق، من الجلسة أو من ربطٍ تمّ للتوّ. */
   const [linkedPhone, setLinkedPhone] = useState<string | null>(null);
@@ -117,17 +132,27 @@ export function ProfileScreen() {
     void load();
   }, [load]);
 
-  const shownAvatar = pendingAvatar ?? savedAvatar;
+  const shownAvatar = pendingAvatar?.uri ?? savedAvatar;
   const nameValid = fullName.trim().length === 0 || fullName.trim().length >= 2;
 
   async function useAsset(asset: ImagePicker.ImagePickerAsset) {
-    // الفحص هنا لا عند الرفع: رسالة الخادم عن تجاوز الحجم عامّة، ورفعُ
-    // ملفين ميغابايت ثم رفضه يُهدر وقت المستخدم وحزمة بياناته.
-    if (asset.fileSize && asset.fileSize > MAX_AVATAR_BYTES) {
-      notify('الصورة كبيرة', 'اختر صورة أصغر من ٢ ميغابايت.');
-      return;
+    try {
+      // الضغط أولاً: صورة هاتفٍ حديث بضعة ميغابايت وتُعرض في دائرة
+      // قطرها ١١٢ بكسل. وبعده يندر أن يقترب شيء من سقف الدلو.
+      const compressed = await compressForUpload(
+        asset.uri,
+        (asset as { file?: Blob }).file,
+      );
+
+      if (compressed.bytes.byteLength > MAX_AVATAR_BYTES) {
+        notify('الصورة كبيرة', 'اختر صورة أصغر أو أقلّ تفصيلاً.');
+        return;
+      }
+
+      setPendingAvatar(compressed);
+    } catch (error) {
+      reportError('تعذّرت قراءة الصورة', error);
     }
-    setPendingAvatar(asset.uri);
   }
 
   async function pickFromLibrary() {
@@ -180,14 +205,64 @@ export function ProfileScreen() {
 
     // بلا خادم لا رفع: نحتفظ بمسار الصورة على الجهاز، فتظهر الصورة في
     // الوضع المحلي بدل أن يفشل الحفظ كله من أجلها.
-    if (!usesServerData()) return { url: pendingAvatar, uploadError: null };
+    if (!usesServerData()) {
+      // عنوان `data:` لا `blob:`: الثاني يموت مع إعادة تحميل الصفحة،
+      // فتعود الصورة مربّعاً مكسوراً في المرّة التالية.
+      return {
+        url: toDataUri(pendingAvatar.bytes, pendingAvatar.mimeType),
+        uploadError: null,
+      };
+    }
 
     try {
-      return { url: await uploadAvatar(pendingAvatar), uploadError: null };
+      const url = await uploadAvatar(pendingAvatar.uri, {
+        bytes: pendingAvatar.bytes,
+        mimeType: pendingAvatar.mimeType,
+      });
+      return { url, uploadError: null };
     } catch (error) {
       logger.error('profile', 'فشل رفع الصورة الرمزية', error);
       // نُبقي الرابط المحفوظ سابقاً: الفشل لا يمحو صورةً كانت تعمل.
       return { url: savedAvatar, uploadError: error };
+    }
+  }
+
+  /**
+   * الخروج — أو الدخول في الوضع المحلي.
+   *
+   * موضعه هنا لا في الترويسة: زرُّ خروجٍ بجانب زرّ «إضافة حركة» يُضغط
+   * بالخطأ، وثمنُه جلسةٌ تُفقد ونسخةٌ محليّة تُمسح. وفي صفحة الحساب
+   * يُبحث عنه قصداً.
+   */
+  async function handleAuthAction() {
+    if (signingOut) return;
+
+    if (authDisabled) {
+      // لا جلسة لتُنهى: `signOut` يمسح النسخة المحلية ويعيد شاشة الدخول
+      // إن كان الخادم مُعدّاً، وهو ما يريده من ضغط «تسجيل الدخول».
+      await signOut().catch((error) =>
+        reportError('تعذّر فتح شاشة الدخول', error),
+      );
+      return;
+    }
+
+    const approved = await confirmAction({
+      title: 'تسجيل الخروج',
+      message:
+        'ستُحذف النسخة المحفوظة على هذا الجهاز، وتبقى بياناتك على الخادم.',
+      confirmLabel: 'خروج',
+      destructive: true,
+    });
+    if (!approved) return;
+
+    setSigningOut(true);
+    try {
+      await signOut();
+      // لا تنقّل يدوي: `AppGate` يعرض شاشة الدخول فور اختفاء الجلسة.
+    } catch (error) {
+      reportError('تعذّر تسجيل الخروج', error);
+    } finally {
+      setSigningOut(false);
     }
   }
 
@@ -443,6 +518,36 @@ export function ProfileScreen() {
           ) : null}
         </View>
       ) : null}
+
+      <SectionTitle className="mt-8">الحساب</SectionTitle>
+
+      <View className="rounded-2xl border border-line bg-surface p-4">
+        <Text className="text-right text-sm text-ink-muted">
+          {user?.email ?? (authDisabled ? 'وضع محلي بلا حساب' : 'حساب ضيف')}
+        </Text>
+
+        <PressableScale
+          onPress={() => void handleAuthAction()}
+          disabled={signingOut}
+          accessibilityRole="button"
+          accessibilityLabel={authDisabled ? 'تسجيل الدخول' : 'تسجيل الخروج'}
+          accessibilityState={{ disabled: signingOut, busy: signingOut }}
+          activeScale={0.97}
+          className={`mt-3 flex-row-reverse items-center justify-center rounded-xl bg-danger-soft py-3 ${
+            signingOut ? 'opacity-50' : ''
+          }`}>
+          {signingOut ? (
+            <ActivityIndicator color={palette.danger} size="small" />
+          ) : authDisabled ? (
+            <LogIn size={16} color={palette.danger} />
+          ) : (
+            <LogOut size={16} color={palette.danger} />
+          )}
+          <Text className="mr-2 text-sm font-bold text-danger">
+            {authDisabled ? 'تسجيل الدخول' : 'تسجيل الخروج'}
+          </Text>
+        </PressableScale>
+      </View>
 
       <PhoneLinkSheet
         visible={phoneSheet}

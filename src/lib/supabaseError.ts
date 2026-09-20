@@ -114,6 +114,21 @@ const BY_CODE: Record<string, string> = {
    */
 };
 
+/**
+ * أخطاء التخزين تحمل `statusCode` نصّاً لا `code`.
+ *
+ * وثلاثتها تعني أشياء مختلفة تماماً: 404 دلوٌ غير موجود، و403 سياسةٌ
+ * تمنع الكتابة، و413 ملفٌ أكبر من الحدّ. وكانت كلّها تُقرأ رسالةً واحدة.
+ */
+const BY_STORAGE_STATUS: Record<string, string> = {
+  '404': 'دلو التخزين غير موجود. شغّل supabase/schema.sql لإنشاء دلو avatars.',
+  '403':
+    'سياسة التخزين تمنع الرفع. تأكّد أن سياسات دلو avatars تسمح للمستخدم ' +
+    'بالكتابة في مجلده (auth.uid()).',
+  '413': 'الصورة أكبر من الحدّ المسموح في الدلو (٢ ميغابايت).',
+  '415': 'نوع الملف غير مسموح في الدلو. المسموح: JPEG و PNG و WebP.',
+};
+
 const GENERIC = 'تعذّر إتمام العملية. حاول مرّة أخرى.';
 const NETWORK = 'تعذّر الاتصال بالخادم. تحقّق من الشبكة ثم أعد المحاولة.';
 
@@ -163,6 +178,12 @@ export function userMessage(error: unknown): string {
     }
 
     if (code && BY_CODE[code]) return BY_CODE[code];
+
+    // `statusCode` حقل التخزين، وقد يصل نصّاً ('404') أو رقماً.
+    const storageStatus = asText(shape.statusCode);
+    if (storageStatus && BY_STORAGE_STATUS[storageStatus]) {
+      return BY_STORAGE_STATUS[storageStatus];
+    }
 
     const status = Number(asText(shape.status) ?? NaN);
     if (status === 401 || status === 403) {

@@ -391,7 +391,8 @@ describe('حفظ الملف الشخصي', () => {
   });
 
   test('بلا جلسة يُحفظ محلياً', () => {
-    assert.match(SCREEN, /if \(!usesServerData\(\)\) return \{ url: pendingAvatar/);
+    // عنوان `data:` لا `blob:`: الثاني يموت مع إعادة تحميل الصفحة.
+    assert.match(SCREEN, /toDataUri\(pendingAvatar\.bytes, pendingAvatar\.mimeType\)/);
     const fn = REPO.slice(REPO.indexOf('export async function updateUserProfile'));
     assert.ok(fn.includes('writeJson(STORAGE_KEYS.profile'), 'بلا نسخة محلية');
   });
