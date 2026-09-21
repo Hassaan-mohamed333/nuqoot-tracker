@@ -12,7 +12,6 @@ import {
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -22,13 +21,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppLogo } from '@/components/brand/AppLogo';
+import { Avatar } from '@/components/ui';
 import { PressableScale } from '@/components/motion';
 import { confirmAction, reportError } from '@/lib/alerts';
 import { EventCard } from '@/components/EventCard';
 import { LedgerSummaryBar } from '@/components/LedgerSummaryBar';
 import { TransactionCard } from '@/components/TransactionCard';
 import { TransactionEditSheet } from '@/components/TransactionEditSheet';
-import { greeting, initialOf } from '@/lib/displayName';
+import { greeting } from '@/lib/displayName';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import type { RootStackParamList } from '@/navigation/types';
 import { useAuth } from '@/store/AuthProvider';
@@ -164,23 +164,16 @@ export function HomeScreen() {
               accessibilityLabel="الملف الشخصي"
               activeScale={0.9}
               className="ml-2 h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-line bg-primary/15">
-              {profile?.avatar_url ? (
-                <Image
-                  source={{ uri: profile.avatar_url }}
-                  style={{ width: 44, height: 44 }}
-                  resizeMode="cover"
-                  accessibilityLabel="صورتك الشخصية"
-                />
-              ) : (
-                // الحرف الأوّل بدل أيقونة عامّة: يميّز الحساب بلحظة نظر،
-                // ولا يبدو مكاناً فارغاً ينتظر صورة.
-                <Text className="text-lg font-bold text-primary">
-                  {initialOf({
-                    profileName: profile?.full_name,
-                    metadataName: user?.user_metadata?.full_name,
-                  })}
-                </Text>
-              )}
+              {/* الحرف الأوّل بدل أيقونة عامّة حين لا صورة — أو حين
+                  يفشل تحميلها: يميّز الحساب بلحظة نظر، ولا يبدو مكاناً
+                  فارغاً ينتظر صورة. */}
+              <Avatar
+                url={profile?.avatar_url}
+                size={44}
+                profileName={profile?.full_name}
+                metadataName={user?.user_metadata?.full_name}
+                accessibilityLabel="صورتك الشخصية"
+              />
             </PressableScale>
 
             <PressableScale

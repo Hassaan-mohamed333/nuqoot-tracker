@@ -8,12 +8,10 @@ import {
   LogOut,
   Phone,
   ShieldCheck,
-  User,
 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Platform,
   Switch,
   Text,
@@ -23,6 +21,7 @@ import {
 import { PressableScale } from '@/components/motion';
 import { PhoneLinkSheet } from '@/components/PhoneLinkSheet';
 import {
+  Avatar,
   Button,
   DateField,
   Field,
@@ -345,20 +344,15 @@ export function ProfileScreen() {
       ) : null}
 
       <View className="items-center">
-        <View className="h-28 w-28 items-center justify-center overflow-hidden rounded-full border border-line bg-surface-raised">
-          {shownAvatar ? (
-            <Image
-              source={{ uri: shownAvatar }}
-              // النمط لا الأصناف: الأبعاد الثابتة داخل حاوية دائرية أوضح
-              // هنا، وresizeMode لا يقابله صنف.
-              style={{ width: 112, height: 112 }}
-              resizeMode="cover"
-              accessibilityLabel="صورة الملف الشخصي"
-            />
-          ) : (
-            <User size={44} color={palette.subtle} />
-          )}
-        </View>
+        {/* البديل أيقونةٌ لا حرف: الدائرة هنا كبيرة وموضعُها موضع
+            الصورة، فحرفٌ وحده فيها يبدو نصّاً تائهاً لا صورةً غائبة. */}
+        <Avatar
+          url={shownAvatar}
+          size={112}
+          fallback="icon"
+          accessibilityLabel="صورة الملف الشخصي"
+          className="border border-line bg-surface-raised"
+        />
 
         {pendingAvatar ? (
           <Text className="mt-2 text-center text-caption text-ink-muted">

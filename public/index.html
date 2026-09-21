@@ -28,7 +28,13 @@
       "Failed to fetch" الذي يُقرأ «تعذّر الاتصال بالخادم» — والخادم
       لم يُخاطَب أصلاً.
 
-      وعدّل نطاق Supabase أدناه إن كنت تستعمل نطاقاً مخصّصاً.
+      و img-src يشمل نطاق Supabase: الصورة الرمزية والإيصالات تُحفظ في
+      التخزين وتُقرأ بعنوان عامّ على نطاق المشروع. وكان غيابه يجعل الرفع
+      ينجح والحفظ ينجح ثم تُرسم الدائرة فارغةً بلا خطأ في الشبكة — لأن
+      CSP يمنع قبل الشبكة، فلا طلبَ يفشل ليُشتكى منه. والوضع المحلي كان
+      يعمل لأن عنوانه `data:` وهو مسموح.
+
+      وعدّل نطاق Supabase في الموضعين أدناه إن كنت تستعمل نطاقاً مخصّصاً.
     -->
     <meta
       http-equiv="Content-Security-Policy"
@@ -36,8 +42,8 @@
         default-src 'self';
         script-src 'self';
         style-src 'self' 'unsafe-inline';
-        img-src 'self' data: blob:;
-        media-src 'self' data: blob:;
+        img-src 'self' data: blob: https://*.supabase.co;
+        media-src 'self' data: blob: https://*.supabase.co;
         font-src 'self' data:;
         connect-src 'self' blob: data: https://*.supabase.co wss://*.supabase.co;
         worker-src 'self' blob:;

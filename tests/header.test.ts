@@ -70,8 +70,16 @@ describe('الترويسة بعد إعادة البناء', () => {
   });
 
   test('الصورة في الترويسة، والحرف الأوّل بديلها', () => {
-    assert.match(HOME, /uri: profile\.avatar_url/);
-    assert.match(HOME, /initialOf\(\{/);
+    // الرسم انتقل إلى مكوّن `Avatar` المشترك: هو من يحمل الصورة والحرف
+    // البديل معاً، ويعود إلى الحرف حين يفشل تحميل الرابط كذلك.
+    assert.match(HOME, /<Avatar\s+url=\{profile\?\.avatar_url\}/);
+    assert.match(HOME, /profileName=\{profile\?\.full_name\}/);
+
+    const AVATAR = readFileSync(
+      path.join(ROOT, 'src', 'components', 'ui', 'Avatar.tsx'),
+      'utf8',
+    );
+    assert.match(AVATAR, /initialOf\(\{/);
   });
 
   test('لا خروج من الترويسة', () => {
