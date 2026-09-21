@@ -232,6 +232,21 @@ export function isRowId(raw: unknown): raw is string {
   return UUID_SHAPE.test(raw) || LOCAL_ID_SHAPE.test(raw);
 }
 
+/**
+ * هل هذا معرّفٌ يمكن أن تكون قاعدة البيانات أصدرته؟
+ *
+ * أعمدة المعرّفات كلها `uuid`، فما ليس UUID لا يوجد على الخادم ولا
+ * يمكن أن يوجد. وإرساله إليه لا يعيد «غير موجود» بل يُسقط الاستعلام
+ * قبل أن يُنفَّذ: `22P02 invalid input syntax for type uuid: "t9"` —
+ * خطأ صيغةٍ في لغة الاستعلام لا نتيجةَ بحث.
+ *
+ * وهذا ما يميّز الصفوف التجريبية وصفوفَ الوضع المحلي (`t9`، `c_m1a_x9`)
+ * عن صفوف الخادم، فتُعدَّل محليّاً ولا تُرسل أصلاً.
+ */
+export function isServerRowId(raw: unknown): raw is string {
+  return typeof raw === 'string' && UUID_SHAPE.test(raw);
+}
+
 export function checkRowId(
   field: string,
   raw: unknown,

@@ -15,6 +15,7 @@ import {
   type ContactPatch,
   type TransactionPatch,
 } from '@/lib/validateEntities';
+import { isServerRowId } from '@/lib/validation';
 import { readJson, STORAGE_KEYS, writeJson } from '@/lib/storage';
 import {
   isSupabaseKeyError,
@@ -290,7 +291,8 @@ async function loadLocalEventLedger(eventId: string): Promise<EventLedger> {
 
 /** يجلب دفتر المناسبة من Supabase، مع رجوع إلى النسخة المحلية عند التعذّر. */
 export async function fetchEventLedger(eventId: string): Promise<EventLedger> {
-  if (!usesServerData()) return loadLocalEventLedger(eventId);
+  // القراءة كالكتابة: معرّفٌ ليس UUID يُسقط الاستعلام بـ 22P02.
+  if (!rowLivesOnServer(eventId)) return loadLocalEventLedger(eventId);
 
   try {
     const client = requireSupabase();
@@ -356,7 +358,7 @@ export async function setEventParticipants(
 
   const rows = validateEventMembers(members).map(toRow);
 
-  if (usesServerData()) {
+  if (rowLivesOnServer(eventId)) {
     const client = requireSupabase();
 
     // استبدال كامل: أبسط من مقارنة الفروق، والمناسبات صغيرة.
@@ -446,7 +448,7 @@ export async function createSharedExpense(
     share_amount: share.share_amount,
   }));
 
-  if (usesServerData()) {
+  if (refsLiveOnServer([clean.event_id, clean.payer_participant_id])) {
     const client = requireSupabase();
 
     const { data, error } = await client
@@ -550,7 +552,7 @@ async function loadLocalContactLedger(
 export async function fetchContactLedger(
   contactId: string,
 ): Promise<ContactLedger> {
-  if (!usesServerData()) {
+  if (!rowLivesOnServer(contactId)) {
     return loadLocalContactLedger(contactId);
   }
 
@@ -624,10 +626,12 @@ async function persist<TRow extends { id: string }, TInsert>(
   storageKey: string,
   draft: TRow,
   payload: TInsert,
+  /** ما يشير إليه الصفّ؛ صفٌّ محلّي بينها يُبقي الإدراج محليّاً. */
+  refs: ReadonlyArray<string | null | undefined> = [],
 ): Promise<TRow> {
   let saved = draft;
 
-  if (usesServerData()) {
+  if (refsLiveOnServer(refs)) {
     const client = requireSupabase();
     const { data, error } = await client
       .from(table)
@@ -662,6 +666,44 @@ async function persist<TRow extends { id: string }, TInsert>(
  * نفحصها بأنفسنا، والثانية تحوّلها إلى خطأ PGRST116 غامض النصّ.
  * ---------------------------------------------------------------------
  */
+/**
+ * هل يُسأل الخادم عن هذا الصفّ أصلاً؟
+ *
+ * شرطان لا واحد: أن تكون هناك جلسة وخادم (`usesServerData`)، وأن يكون
+ * المعرّف من النوع الذي يصدره الخادم (`isServerRowId`).
+ *
+ * الشرط الثاني هو ما كان ناقصاً. أعمدة المعرّفات `uuid`، فصفٌّ تجريبي
+ * معرّفه `t9` يُسقط الاستعلام بـ `22P02` قبل أن يُنفَّذ — لا «غير
+ * موجود» يُعالَج، بل خطأ صيغة يصعد إلى المستخدم نصّاً من PostgreSQL:
+ * «تعذرت الأرشفة — invalid input syntax for type uuid: "t9"».
+ *
+ * ومتى يجتمع الشرطان على النقيض؟ حين يُجرَّب التطبيق بلا حساب فتُزرع
+ * البيانات التجريبية في التخزين، ثم يسجّل المستخدم دخوله ويفشل طلب
+ * الخادم مرّةً واحدة — فتُعرض النسخة المحلية، وفيها `t1..t10`، وهي
+ * معروضةٌ قابلةٌ للضغط.
+ *
+ * والصفّ الذي لا يوجد على الخادم يُعدَّل محليّاً وكفى: هذا هو مكانه
+ * الوحيد، لا حيلةٌ يُتحايل بها على فشل.
+ */
+function rowLivesOnServer(rowId: string): boolean {
+  return usesServerData() && isServerRowId(rowId);
+}
+
+/**
+ * هل يُدرَج هذا الصفّ الجديد على الخادم؟
+ *
+ * الصفّ الجديد لا معرّف له بعد — الخادم يصدره. لكنه قد يشير إلى غيره:
+ * حركةٌ لها `contact_id`، ومصروفٌ له `event_id`. وإشارةٌ إلى صفٍّ
+ * تجريبي (`c3`) تُسقط الإدراج بـ 22P02 على عمود المفتاح الأجنبي، تماماً
+ * كما يُسقطه معرّفٌ تجريبي في `where`.
+ *
+ * فما يشير إلى ما ليس على الخادم يبقى حيث يشير: محليّاً.
+ */
+function refsLiveOnServer(refs: ReadonlyArray<string | null | undefined>): boolean {
+  if (!usesServerData()) return false;
+  return refs.every((ref) => ref == null || isServerRowId(ref));
+}
+
 async function updateRow<T>(
   table: string,
   rowId: string,
@@ -710,7 +752,7 @@ async function archiveRow<T extends { id: string }>(
   };
 
   let updated: T | null = null;
-  if (usesServerData()) {
+  if (rowLivesOnServer(rowId)) {
     updated = await updateRow<T>(table, rowId, patch, labels.step, labels.missing);
   }
 
@@ -804,6 +846,7 @@ export async function createEvent(input: NewEventInput): Promise<Event> {
     STORAGE_KEYS.events,
     draft,
     payload,
+    [clean.host_contact_id],
   );
 }
 
@@ -852,6 +895,7 @@ export async function createTransaction(
     STORAGE_KEYS.transactions,
     draft,
     payload,
+    [clean.contact_id, clean.event_id],
   );
 }
 
@@ -869,7 +913,7 @@ export async function updateTransaction(
   const patch = validateTransactionPatch(updates);
 
   // نفس الحارس: تحديثٌ لا يطابق صفّاً ينجح بصفر صفوف، فيبدو ناجحاً.
-  const updated = usesServerData()
+  const updated = rowLivesOnServer(transactionId)
     ? await updateRow<Transaction>(
         TABLES.transactions,
         transactionId,
@@ -892,7 +936,7 @@ export async function updateTransaction(
 
 /** يحذف حركة واحدة من الخادم ومن النسخة المحلية. */
 export async function deleteTransaction(transactionId: string): Promise<void> {
-  if (usesServerData()) {
+  if (rowLivesOnServer(transactionId)) {
     try {
       const client = requireSupabase();
       const { error } = await client
@@ -921,7 +965,7 @@ export async function updateContact(
 ): Promise<Contact> {
   const patch = validateContactPatch(updates);
 
-  const updated = usesServerData()
+  const updated = rowLivesOnServer(contactId)
     ? await updateRow<Contact>(
         TABLES.contacts,
         contactId,
@@ -963,7 +1007,7 @@ export interface ContactDeletionResult {
 export async function deleteContact(
   contactId: string,
 ): Promise<ContactDeletionResult> {
-  if (usesServerData()) {
+  if (rowLivesOnServer(contactId)) {
     try {
       const client = requireSupabase();
       const { error } = await client

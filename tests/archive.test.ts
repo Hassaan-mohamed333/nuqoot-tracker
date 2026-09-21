@@ -111,7 +111,9 @@ describe('الأرشفة في المخطّط والمستودع والمزوّد
       REPO.indexOf('/** يضيف جهة اتصال جديدة. */'),
     );
     assert.ok(helper.includes('archived_at'), 'بلا وقت أرشفة');
-    assert.ok(helper.includes('usesServerData()'), 'بلا شرط جلسة');
+    // الشرط صار مركّباً: جلسةٌ **ومعرّفٌ يعرفه الخادم**. انظر
+    // `rowLivesOnServer` وسببه في tests/localRows.test.ts.
+    assert.ok(helper.includes('rowLivesOnServer(rowId)'), 'بلا شرط جلسة');
     assert.ok(helper.includes('writeJson(storageKey'), 'بلا مزامنة محلية');
 
     for (const fn of ['setTransactionArchived', 'setContactArchived']) {
