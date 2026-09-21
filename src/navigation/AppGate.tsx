@@ -51,7 +51,7 @@ function BootScreen({ onSkip }: { onSkip: () => void }) {
 
   return (
     <View className="flex-1 items-center justify-center bg-base px-8">
-      <ActivityIndicator color={palette.primary} />
+      <ActivityIndicator color={palette.primaryStrong} />
       <Text className="mt-3 text-xs text-ink-muted">جارٍ التحميل…</Text>
 
       {showSkip ? (
@@ -63,7 +63,7 @@ function BootScreen({ onSkip }: { onSkip: () => void }) {
             onPress={onSkip}
             accessibilityRole="button"
             className="mt-3 rounded-2xl border border-line bg-surface px-5 py-2.5">
-            <Text className="text-sm font-bold text-primary">
+            <Text className="text-sm font-bold text-primary-strong">
               متابعة إلى شاشة الدخول
             </Text>
           </Pressable>

@@ -154,7 +154,7 @@ export function SmartInputScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView className="flex-1" contentContainerClassName="p-4 pb-10">
         <View className="flex-row-reverse items-center">
-          <Sparkles size={18} color={palette.primary} />
+          <Sparkles size={18} color={palette.primaryStrong} />
           <Text className="mr-2 text-right text-base font-bold text-ink">
             اكتب أو تكلّم
           </Text>
@@ -205,7 +205,7 @@ export function SmartInputScreen() {
             {recording ? (
               <Square size={18} color="#ffffff" />
             ) : (
-              <Mic size={20} color={palette.primary} />
+              <Mic size={20} color={palette.primaryStrong} />
             )}
           </Pressable>
         </View>

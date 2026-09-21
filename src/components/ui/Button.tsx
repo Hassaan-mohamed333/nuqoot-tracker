@@ -10,7 +10,15 @@ const button = sv({
   base: 'flex-row-reverse items-center justify-center rounded-full',
   variants: {
     variant: {
-      primary: 'bg-primary',
+      /*
+       * حدٌّ كهرماني داكن حول التعبئة الساطعة.
+       *
+       * #F59E0B فوق الأبيض تباينه ‎2.15:1‎ — دون ‎3:1‎ التي يطلبها
+       * WCAG 1.4.11 لحدود عناصر الواجهة. فالزرّ الأصفر على بطاقة بيضاء
+       * لا حافّةَ له تُرى، وشكلُه هو الزرّ. والحدّ يردّ الحافّة بلا أن
+       * يُعتم اللون الذي اختير للهوية.
+       */
+      primary: 'border border-primary-strong/70 bg-primary',
       secondary: 'bg-secondary',
       success: 'bg-success',
       danger: 'bg-danger',
@@ -44,7 +52,7 @@ const label = sv({
       outline: 'text-ink',
       contrast: 'text-ink',
       glass: 'text-ink',
-      ghost: 'text-primary',
+      ghost: 'text-primary-strong',
     },
     size: { sm: 'text-xs', md: 'text-sm', lg: 'text-base' },
   },
@@ -124,5 +132,5 @@ const SPINNER_TONE: Record<ButtonVariant, (palette: Palette) => string> = {
   outline: (palette) => palette.text,
   contrast: (palette) => palette.text,
   glass: (palette) => palette.text,
-  ghost: (palette) => palette.primary,
+  ghost: (palette) => palette.primaryStrong,
 };

@@ -57,7 +57,7 @@ export function Field({
       error
         ? palette.danger
         : focus.value > 0.5
-          ? palette.primary
+          ? palette.primaryStrong
           : palette.border,
       { duration: 160, easing: MOTION.easing },
     ),

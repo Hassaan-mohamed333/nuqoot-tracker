@@ -317,7 +317,7 @@ export function ProfileScreen() {
     return (
       <Screen scroll={false}>
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color={palette.primary} />
+          <ActivityIndicator color={palette.primaryStrong} />
         </View>
       </Screen>
     );
@@ -485,7 +485,7 @@ export function ProfileScreen() {
             </View>
 
             {lock.checking ? (
-              <ActivityIndicator color={palette.primary} size="small" />
+              <ActivityIndicator color={palette.primaryStrong} size="small" />
             ) : (
               <Switch
                 value={lock.enabled}

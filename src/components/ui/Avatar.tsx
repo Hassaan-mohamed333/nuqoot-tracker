@@ -72,7 +72,7 @@ export function Avatar({
       ) : (
         <Text
           style={{ fontSize: Math.round(size * 0.4) }}
-          className="font-bold text-primary">
+          className="font-bold text-primary-strong">
           {initialOf({ profileName, metadataName })}
         </Text>
       )}

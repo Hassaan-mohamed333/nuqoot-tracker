@@ -127,7 +127,7 @@ export function DateField({
           onPress={() => setShowPicker(false)}
           accessibilityRole="button"
           className="mt-1 self-start rounded-full bg-surface-raised px-4 py-1.5">
-          <Text className="text-xs font-bold text-primary">تم</Text>
+          <Text className="text-xs font-bold text-primary-strong">تم</Text>
         </Pressable>
       ) : null}
 

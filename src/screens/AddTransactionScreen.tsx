@@ -235,7 +235,7 @@ export function AddTransactionScreen() {
             حصّة كلٍّ في دفتره ورصيده مباشرة. */}
         <Card variant="panel" animate={false}>
           <View className="flex-row-reverse items-center">
-            <Split size={16} color={palette.primary} />
+            <Split size={16} color={palette.primaryStrong} />
             <Text className="mr-2 flex-1 text-right text-body font-bold text-ink">
               تقسيم الفاتورة مع أفراد
             </Text>
@@ -421,7 +421,7 @@ export function AddTransactionScreen() {
         <FadeSlideIn index={7} className="mt-6">
           <Card variant="primary" animate={false} padded={false}>
             <View className="flex-row-reverse items-center p-3">
-              <Paperclip size={16} color={palette.primary} />
+              <Paperclip size={16} color={palette.primaryStrong} />
               <Text className="mr-2 flex-1 text-right text-caption text-ink">
                 {isSupabaseReady()
                   ? 'إيصال مرفق — يُرفع عند الحفظ.'

@@ -59,7 +59,7 @@ export function AssistantModal({
     <Sheet visible={visible} onClose={onClose} dismissable={!loading}>
       <View className="flex-row-reverse items-center justify-between">
         <View className="flex-row-reverse items-center">
-          <Sparkles size={18} color={palette.primary} />
+          <Sparkles size={18} color={palette.primaryStrong} />
           <Text className="mr-2 text-right text-title text-ink">المساعد</Text>
         </View>
         <PressableScale
@@ -112,7 +112,7 @@ export function AssistantModal({
 
           {loading ? (
             <View className="mt-3 flex-row-reverse items-center">
-              <ActivityIndicator color={palette.primary} />
+              <ActivityIndicator color={palette.primaryStrong} />
               <Text className="mr-2 text-right text-caption text-ink-muted">
                 جارٍ التفكير…
               </Text>
@@ -187,7 +187,7 @@ function ActionCard({ message }: { message: AssistantMessage }) {
       className="mt-2">
       <View className="flex-row-reverse items-center p-3">
         {message.status === 'running' ? (
-          <ActivityIndicator size="small" color={palette.primary} />
+          <ActivityIndicator size="small" color={palette.primaryStrong} />
         ) : failed || cancelled ? (
           <CircleAlert size={16} color={failed ? palette.danger : palette.muted} />
         ) : (

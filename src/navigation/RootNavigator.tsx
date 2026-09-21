@@ -23,6 +23,7 @@ import { EventParticipantsScreen } from '@/screens/EventParticipantsScreen';
 import { EventsScreen } from '@/screens/EventsScreen';
 import { ArchiveScreen } from '@/screens/ArchiveScreen';
 import { HomeScreen } from '@/screens/HomeScreen';
+import { APP_NAME } from '@/lib/brand';
 import { palette } from '@/lib/palette';
 
 /**
@@ -165,7 +166,7 @@ export function RootNavigator() {
     ...DefaultTheme,
     colors: {
       ...DefaultTheme.colors,
-      primary: palette.primary,
+      primary: palette.primaryStrong,
       background: palette.base,
       card: palette.surface,
       text: palette.text,
@@ -174,7 +175,25 @@ export function RootNavigator() {
   };
 
   return (
-    <NavigationContainer ref={navigationRef} theme={navigationTheme}>
+    <NavigationContainer
+      ref={navigationRef}
+      theme={navigationTheme}
+      /*
+       * عنوان التبويب في المتصفّح.
+       *
+       * `NavigationContainer` يكتب `document.title` باسم الشاشة عند كل
+       * تنقّل، فيمحو ما في `<title>` بعد أوّل رسم — كان التبويب يقرأ
+       * «الرئيسية» لا اسم التطبيق، والصفحة المحفوظة في المفضّلة تُسمّى
+       * باسم شاشةٍ لا باسم برنامج. فنكتبه هنا بدل أن نتركه له.
+       */
+      documentTitle={{
+        formatter: (options, route) => {
+          const screen = options?.title ?? route?.name;
+          return screen && screen !== APP_NAME
+            ? `${screen} · ${APP_NAME}`
+            : APP_NAME;
+        },
+      }}>
       <Stack.Navigator
         screenOptions={{
           headerTitleAlign: 'center',

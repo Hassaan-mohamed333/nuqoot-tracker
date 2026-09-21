@@ -76,7 +76,7 @@ export function EventLedgerScreen() {
     return (
       <SafeAreaView className="flex-1 items-center justify-center bg-base px-8">
         {loading ? (
-          <ActivityIndicator color={palette.primary} />
+          <ActivityIndicator color={palette.primaryStrong} />
         ) : (
           <Text className="text-center text-body text-ink-muted">
             {error ?? 'المناسبة غير موجودة.'}
@@ -97,7 +97,7 @@ export function EventLedgerScreen() {
           <RefreshControl
             refreshing={loading}
             onRefresh={() => void refresh()}
-            tintColor={palette.primary}
+            tintColor={palette.primaryStrong}
           />
         }>
         {error ? (
@@ -208,12 +208,12 @@ export function EventLedgerScreen() {
               padded={false}
               index={index + 2}>
               <View className="flex-row-reverse items-center p-3">
-                <ArrowLeftRight size={18} color={palette.primary} />
+                <ArrowLeftRight size={18} color={palette.primaryStrong} />
                 <Text className="mx-3 flex-1 text-right text-body text-ink">
                   <Text className="font-bold">{settlement.fromName}</Text> يدفع لـ{' '}
                   <Text className="font-bold">{settlement.toName}</Text>
                 </Text>
-                <Text className="text-body font-bold text-primary">
+                <Text className="text-body font-bold text-primary-strong">
                   {formatAmount(settlement.amount, currency)}
                 </Text>
               </View>
@@ -265,7 +265,7 @@ export function EventLedgerScreen() {
 
         <SectionTitle className="mb-2 mt-6">المصاريف</SectionTitle>
         {loading && expenses.length === 0 ? (
-          <ActivityIndicator color={palette.primary} />
+          <ActivityIndicator color={palette.primaryStrong} />
         ) : expenses.length === 0 ? (
           <Card variant="outline" index={0}>
             <Text className="text-center text-body text-ink-muted">

@@ -222,8 +222,8 @@ export function HomeScreen() {
               onPress={() => navigation.navigate('AddEvent')}
               accessibilityRole="button"
               className="mt-2 flex-row-reverse items-center justify-center rounded-full border border-line bg-surface py-3">
-              <CalendarPlus size={18} color={palette.primary} />
-              <Text className="mr-2 text-sm font-bold text-primary">
+              <CalendarPlus size={18} color={palette.primaryStrong} />
+              <Text className="mr-2 text-sm font-bold text-primary-strong">
                 إضافة مناسبة
               </Text>
             </Pressable>
@@ -242,8 +242,8 @@ export function HomeScreen() {
             onPress={() => navigation.navigate('ScanReceipt')}
             accessibilityRole="button"
             className="mr-2 flex-1 flex-row-reverse items-center justify-center rounded-full border border-line bg-surface py-3">
-            <ScanLine size={18} color={palette.primary} />
-            <Text className="mr-2 text-sm font-bold text-primary">
+            <ScanLine size={18} color={palette.primaryStrong} />
+            <Text className="mr-2 text-sm font-bold text-primary-strong">
               قراءة إيصال
             </Text>
           </Pressable>
@@ -252,7 +252,7 @@ export function HomeScreen() {
         <View className="mt-3 flex-row-reverse">
           <View className="flex-1 rounded-2xl border border-line bg-surface p-4">
             <Text className="text-right text-xs text-ink-muted">إجمالي ما دفعت</Text>
-            <Text className="text-right text-lg font-bold text-primary">
+            <Text className="text-right text-lg font-bold text-primary-strong">
               {formatAmount(totals.totalOut, totals.currency)}
             </Text>
           </View>
@@ -290,7 +290,7 @@ export function HomeScreen() {
           آخر الحركات
         </Text>
         {loading && transactions.length === 0 ? (
-          <ActivityIndicator color={palette.primary} />
+          <ActivityIndicator color={palette.primaryStrong} />
         ) : recentTransactions.length === 0 ? (
           <Text className="text-right text-sm text-ink-muted">
             لم تُسجَّل أي حركة بعد.

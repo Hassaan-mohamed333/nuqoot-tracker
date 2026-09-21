@@ -222,7 +222,7 @@ export function AddSharedExpenseScreen() {
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-base">
-        <ActivityIndicator color={palette.primary} />
+        <ActivityIndicator color={palette.primaryStrong} />
       </View>
     );
   }

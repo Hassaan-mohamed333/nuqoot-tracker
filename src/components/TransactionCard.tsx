@@ -38,7 +38,7 @@ export function TransactionCard({
 }: TransactionCardProps) {
   const isIncoming = transaction.direction === 'IN';
   const Icon = isIncoming ? ArrowDownLeft : ArrowUpRight;
-  const accent = isIncoming ? 'text-danger' : 'text-primary';
+  const accent = isIncoming ? 'text-danger' : 'text-primary-strong';
   const chipBg = isIncoming ? 'bg-danger-soft' : 'bg-primary/15';
   // دلالي لا جمالي: الوارد يزيد ما عليّ (أحمر)، والصادر يزيد ما لي (أخضر).
   const iconColor = isIncoming ? palette.danger : palette.success;

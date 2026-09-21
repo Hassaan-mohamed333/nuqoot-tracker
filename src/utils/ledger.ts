@@ -1,3 +1,4 @@
+import { palette } from '@/lib/palette';
 import type {
   Contact,
   ContactSection,
@@ -32,19 +33,22 @@ interface StatusTheme {
   bgClass: string;
   /** أصناف NativeWind للحدود. */
   borderClass: string;
-  /**
-   * مفتاح اللون في لوحة الوضع الحالي.
-   *
-   * `color` أعلاه ثابت للوضع الفاتح، ولا يصلح للأيقونات في الوضع الليلي.
-   * من يستورد `palette` يقرأ اللون الصحيح عبر هذا المفتاح.
-   */
+  /** مفتاح اللون في اللوحة، ومنه يُشتقّ `color`. */
   colorKey: 'success' | 'danger' | 'muted';
 }
 
+/*
+ * `color` مشتقّ لا مكتوب.
+ *
+ * كان ثابتاً مكتوباً بجوار `colorKey`، فصار مصدراً ثانياً للحقيقة: تبديل
+ * اللوحة إلى الكهرماني حرّك `success` و`danger` وترك هذه الثوابت على
+ * قيمها القديمة، فظهرت أيقونة الشريط بأخضرَ لا يشبه الأخضر من حوله.
+ * والاشتقاق يمنع تكرار ذلك أصلاً.
+ */
 const STATUS_THEME: Record<LedgerStatus, StatusTheme> = {
   credit: {
     label: 'دائن',
-    color: '#10B981',
+    color: palette.success,
     colorKey: 'success',
     textClass: 'text-credit',
     bgClass: 'bg-success-soft',
@@ -52,7 +56,7 @@ const STATUS_THEME: Record<LedgerStatus, StatusTheme> = {
   },
   debit: {
     label: 'مدين',
-    color: '#FF453A',
+    color: palette.danger,
     colorKey: 'danger',
     textClass: 'text-debit',
     bgClass: 'bg-danger-soft',
@@ -60,7 +64,7 @@ const STATUS_THEME: Record<LedgerStatus, StatusTheme> = {
   },
   settled: {
     label: 'متعادل',
-    color: '#003566',
+    color: palette.muted,
     colorKey: 'muted',
     textClass: 'text-ink-muted',
     bgClass: 'bg-line/40',

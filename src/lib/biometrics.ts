@@ -19,6 +19,7 @@
 
 import { Platform } from 'react-native';
 
+import { APP_HANDLE, APP_NAME } from '@/lib/brand';
 import { logger } from '@/lib/logger';
 
 /** الآلية المتاحة على هذا الجهاز. */
@@ -137,8 +138,8 @@ async function enrollWeb(): Promise<BiometricOutcome> {
     const credential = (await navigator.credentials.create({
       publicKey: {
         challenge: randomChallenge(),
-        rp: { name: 'نقوط' },
-        user: { id: userId, name: 'nuqoot', displayName: 'نقوط' },
+        rp: { name: APP_NAME },
+        user: { id: userId, name: APP_HANDLE, displayName: APP_NAME },
         pubKeyCredParams: [
           { type: 'public-key', alg: -7 }, // ES256
           { type: 'public-key', alg: -257 }, // RS256
@@ -275,7 +276,7 @@ export function inspectBiometrics(): Promise<BiometricCapability> {
 
 /** يطلب التحقّق. يُستدعى عند التفعيل وعند كل فتح للتطبيق. */
 export function promptBiometrics(
-  reason = 'افتح نقوط ببصمتك',
+  reason = `افتح ${APP_NAME} ببصمتك`,
 ): Promise<BiometricOutcome> {
   return Platform.OS === 'web' ? promptWeb() : promptNative(reason);
 }
@@ -284,7 +285,7 @@ export function promptBiometrics(
 export function enrollBiometrics(): Promise<BiometricOutcome> {
   return Platform.OS === 'web'
     ? enrollWeb()
-    : promptNative('فعّل قفل نقوط ببصمتك');
+    : promptNative(`فعّل قفل ${APP_NAME} ببصمتك`);
 }
 
 /** ينسى اعتماد هذا المتصفّح عند إطفاء القفل. */

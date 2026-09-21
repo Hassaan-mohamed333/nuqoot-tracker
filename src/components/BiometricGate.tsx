@@ -5,6 +5,7 @@ import { ActivityIndicator, Modal, Text, View } from 'react-native';
 import { PressableScale } from '@/components/motion';
 import { AppLogo } from '@/components/brand/AppLogo';
 import type { BiometricLock } from '@/hooks/useBiometricLock';
+import { APP_NAME } from '@/lib/brand';
 import { palette } from '@/lib/palette';
 
 /**
@@ -27,7 +28,7 @@ export function BiometricGate({ lock }: { lock: BiometricLock }) {
 
         <View className="mt-6 flex-row-reverse items-center">
           <LockKeyhole size={18} color={palette.muted} />
-          <Text className="mr-2 text-title text-ink">نقوط مقفل</Text>
+          <Text className="mr-2 text-title text-ink">{APP_NAME} مقفل</Text>
         </View>
 
         <Text className="mt-2 text-center text-sm text-ink-muted">

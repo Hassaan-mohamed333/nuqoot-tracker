@@ -207,7 +207,7 @@ export function ContactsListScreen() {
           renderSectionHeader={({ section }) => (
             // خلفية مصمتة: العناوين لاصقة، فبدونها يمرّ المحتوى تحتها ظاهراً.
             <View className="bg-base py-1.5">
-              <Text className="text-right text-sm font-bold text-primary">
+              <Text className="text-right text-sm font-bold text-primary-strong">
                 {section.letter}
               </Text>
             </View>
@@ -248,7 +248,7 @@ export function ContactsListScreen() {
               />
             ) : (
               <EmptyState
-                icon={<UserPlus size={26} color={palette.primary} />}
+                icon={<UserPlus size={26} color={palette.primaryStrong} />}
                 tone="primary"
                 title="ابدأ بإضافة أول جهة اتصال"
                 hint="بعدها يمكنك تسجيل النقوط والواجبات الخاصة بها."

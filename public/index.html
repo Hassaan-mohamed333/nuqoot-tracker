@@ -58,7 +58,44 @@
     <!-- لا يُرسل المسار الكامل إلى أي أصل آخر. -->
     <meta name="referrer" content="strict-origin-when-cross-origin" />
 
-    <title>نقوط</title>
+    <title>الكراسة الصفرا</title>
+
+    <!--
+      الوصف وبطاقة المشاركة.
+
+      `og:` لواتساب وفيسبوك ولينكدإن، و`twitter:` لتويتر — لا يقرأ أحدهما
+      وسوم الآخر، فتُكتب المجموعتان أو تظهر المعاينة رابطاً عارياً.
+
+      والمسارات المطلقة تحمل بادئة `/nuqoot-tracker` لأن الموقع يُنشر في
+      مجلد فرعي على GitHub Pages؛ بدونها تُطلب من جذر النطاق وتردّ ٤٠٤.
+      و`scripts/expo.js` يرفض أي بناء تسقط منه البادئة.
+    -->
+    <meta
+      name="description"
+      content="دفتر النقوط والواجبات: سجّل ما دفعته وما استلمته، واعرف ما لك وما عليك عند كل شخص."
+    />
+    <meta name="application-name" content="الكراسة الصفرا" />
+    <meta name="apple-mobile-web-app-title" content="الكراسة الصفرا" />
+    <meta name="theme-color" content="#F59E0B" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="الكراسة الصفرا" />
+    <meta property="og:title" content="الكراسة الصفرا" />
+    <meta
+      property="og:description"
+      content="دفتر النقوط والواجبات: سجّل ما دفعته وما استلمته، واعرف ما لك وما عليك عند كل شخص."
+    />
+    <meta property="og:locale" content="ar_EG" />
+    <meta property="og:image" content="/nuqoot-tracker/favicon.ico" />
+
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="الكراسة الصفرا" />
+    <meta
+      name="twitter:description"
+      content="دفتر النقوط والواجبات: سجّل ما دفعته وما استلمته، واعرف ما لك وما عليك عند كل شخص."
+    />
+
+    <link rel="manifest" href="/nuqoot-tracker/manifest.json" />
 
     <style id="root-reset">
       html,
@@ -67,6 +104,11 @@
         height: 100%;
         margin: 0;
         padding: 0;
+      }
+      /* ورقُ الكراسة خلف التطبيق: بدونه يظهر الأبيض عند السحب الزائد
+         على iOS، ويومض الأبيض قبل أوّل رسم. */
+      body {
+        background: #faf8f3;
       }
       #root {
         display: flex;

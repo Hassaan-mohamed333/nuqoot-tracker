@@ -27,7 +27,7 @@ export function ContactRow({ contact, onPress }: ContactRowProps) {
       activeScale={0.985}
       className="mb-2 flex-row-reverse items-center rounded-card border border-line bg-surface p-3">
       <View className="h-11 w-11 items-center justify-center rounded-full bg-primary/15">
-        <Text className="text-base font-bold text-primary">{initial}</Text>
+        <Text className="text-base font-bold text-primary-strong">{initial}</Text>
       </View>
 
       <View className="mx-3 flex-1">

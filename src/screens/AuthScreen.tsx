@@ -20,6 +20,7 @@ import Svg, { Path } from 'react-native-svg';
 
 import { AppLogo } from '@/components/brand/AppLogo';
 import { notify, reportError } from '@/lib/alerts';
+import { APP_NAME } from '@/lib/brand';
 import { palette } from '@/lib/palette';
 import { SUPABASE_CONFIG_MESSAGES } from '@/lib/supabase';
 import { userMessage } from '@/lib/supabaseError';
@@ -162,7 +163,7 @@ export function AuthScreen() {
           contentContainerClassName="flex-grow justify-center p-6">
           <View className="items-center">
             <AppLogo size={72} variant="badge" animated />
-            <Text className="mt-3 text-display text-ink">نقوط</Text>
+            <Text className="mt-3 text-center text-display text-ink">{APP_NAME}</Text>
             <Text className="mt-1 text-center text-caption text-ink-muted">
               سجّل الدخول لحفظ نقوطك وواجباتك ومزامنتها بين أجهزتك.
             </Text>
@@ -347,8 +348,8 @@ export function AuthScreen() {
             className={`mt-2 flex-row-reverse items-center justify-center rounded-full border border-line bg-surface py-3 ${
               blocked ? 'opacity-40' : ''
             }`}>
-            <UserRound size={18} color={palette.primary} />
-            <Text className="mr-2 text-base font-bold text-primary">
+            <UserRound size={18} color={palette.primaryStrong} />
+            <Text className="mr-2 text-base font-bold text-primary-strong">
               متابعة كضيف
             </Text>
           </Pressable>

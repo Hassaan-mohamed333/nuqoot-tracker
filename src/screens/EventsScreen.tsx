@@ -120,7 +120,7 @@ export function EventsScreen() {
         ListEmptyComponent={
           <View className="mt-10 items-center">
             <View className="h-14 w-14 items-center justify-center rounded-full bg-primary/15">
-              <CalendarPlus size={26} color={palette.primary} />
+              <CalendarPlus size={26} color={palette.primaryStrong} />
             </View>
             <Text className="mt-3 text-center text-sm font-semibold text-ink">
               {tab === 'upcoming'

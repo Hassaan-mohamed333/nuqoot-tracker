@@ -132,7 +132,7 @@ export function EventParticipantsScreen() {
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-base">
-        <ActivityIndicator color={palette.primary} />
+        <ActivityIndicator color={palette.primaryStrong} />
       </View>
     );
   }
@@ -162,7 +162,7 @@ export function EventParticipantsScreen() {
             <Text className="text-right text-sm font-semibold text-ink">
               {ME_LABEL}
             </Text>
-            {includeMe ? <Check size={16} color={palette.primary} /> : null}
+            {includeMe ? <Check size={16} color={palette.primaryStrong} /> : null}
           </Pressable>
 
           {sortedContacts.length === 0 ? (
@@ -182,7 +182,7 @@ export function EventParticipantsScreen() {
                   {contact.full_name}
                 </Text>
                 {selected.has(contact.id) ? (
-                  <Check size={16} color={palette.primary} />
+                  <Check size={16} color={palette.primaryStrong} />
                 ) : null}
               </Pressable>
             ))

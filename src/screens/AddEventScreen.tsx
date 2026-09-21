@@ -142,7 +142,7 @@ export function AddEventScreen() {
               hostContactId === null ? 'bg-primary/10' : ''
             }`}>
             <Text className="text-right text-sm text-ink">بدون تحديد</Text>
-            {hostContactId === null ? <Check size={16} color={palette.primary} /> : null}
+            {hostContactId === null ? <Check size={16} color={palette.primaryStrong} /> : null}
           </Pressable>
 
           {sortedContacts.length === 0 ? (
@@ -162,7 +162,7 @@ export function AddEventScreen() {
                   {contact.full_name}
                 </Text>
                 {hostContactId === contact.id ? (
-                  <Check size={16} color={palette.primary} />
+                  <Check size={16} color={palette.primaryStrong} />
                 ) : null}
               </Pressable>
             ))

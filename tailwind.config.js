@@ -11,14 +11,19 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // القيم الفعلية في global.css، وتتبدّل مع الوضع الليلي تلقائياً.
+        // القيم الفعلية في global.css.
+        /**
+         * الكهرماني بدورين: `primary` تعبئةٌ يعلوها `primary-fg` الداكن،
+         * و`primary-strong` نصٌّ وأيقونات فوق الأسطح الفاتحة. و`text-primary`
+         * خطأ دائماً — تباينه فوق الأبيض ‎2.1:1‎.
+         */
         primary: {
           DEFAULT: token('primary'),
           soft: token('primary-soft'),
           strong: token('primary-strong'),
           fg: token('on-primary'),
         },
-        /** مؤشّر الحالة النشطة: ذهب، ونصّه دائماً `accent-fg` الداكن. */
+        /** مؤشّر الحالة النشطة: كهرماني أعمق، ونصّه `accent-fg`. */
         accent: {
           DEFAULT: token('accent'),
           soft: token('accent-soft'),

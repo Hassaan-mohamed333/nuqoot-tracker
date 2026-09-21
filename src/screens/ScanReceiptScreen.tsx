@@ -120,8 +120,8 @@ export function ScanReceiptScreen() {
           disabled={busy}
           accessibilityRole="button"
           className="mr-2 flex-1 flex-row-reverse items-center justify-center rounded-full border border-line bg-surface py-3">
-          <ImageIcon size={18} color={palette.primary} />
-          <Text className="mr-2 text-sm font-bold text-primary">من المعرض</Text>
+          <ImageIcon size={18} color={palette.primaryStrong} />
+          <Text className="mr-2 text-sm font-bold text-primary-strong">من المعرض</Text>
         </Pressable>
       </View>
 
@@ -135,7 +135,7 @@ export function ScanReceiptScreen() {
 
       {busy ? (
         <View className="mt-4 items-center">
-          <ActivityIndicator color={palette.primary} />
+          <ActivityIndicator color={palette.primaryStrong} />
           <Text className="mt-2 text-xs text-ink-muted">جارٍ قراءة الإيصال…</Text>
         </View>
       ) : null}
@@ -186,7 +186,7 @@ export function ScanReceiptScreen() {
           onPress={() => continueToForm(true)}
           accessibilityRole="button"
           className="mt-3 flex-row-reverse items-center justify-center rounded-full border border-primary/50 bg-primary-soft py-3">
-          <Split size={16} color={palette.primary} />
+          <Split size={16} color={palette.primaryStrong} />
           <Text className="mr-2 text-base font-bold text-ink">
             تقسيم الفاتورة مع أفراد
           </Text>

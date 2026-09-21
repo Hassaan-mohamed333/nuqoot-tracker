@@ -76,7 +76,7 @@ export function EventCard({
         </Text>
         {isUpcoming ? (
           <View className="mr-2 rounded-full bg-primary/15 px-2 py-0.5">
-            <Text className="text-[10px] font-semibold text-primary">قادمة</Text>
+            <Text className="text-[10px] font-semibold text-primary-strong">قادمة</Text>
           </View>
         ) : null}
       </View>
@@ -98,7 +98,7 @@ export function EventCard({
       ) : null}
 
       {typeof totalPaid === 'number' && totalPaid > 0 ? (
-        <Text className="mt-2 text-right text-sm font-semibold text-primary">
+        <Text className="mt-2 text-right text-sm font-semibold text-primary-strong">
           إجمالي النقوط: {formatAmount(totalPaid, currency)}
         </Text>
       ) : null}

@@ -19,6 +19,7 @@ import Svg, {
   Stop,
 } from 'react-native-svg';
 
+import { APP_NAME, APP_TAGLINE } from '@/lib/brand';
 import { BRAND, palette } from '@/lib/palette';
 
 export type LogoVariant = 'mark' | 'badge' | 'full';
@@ -63,7 +64,7 @@ export function AppLogo({
       ? palette.text
       : tone === 'inverse'
         ? palette.onPrimary
-        : palette.primary;
+        : palette.primaryStrong;
 
   /**
    * الخلفية والرسم في عنصر SVG واحد لا اثنين متراكبين.
@@ -113,7 +114,7 @@ export function AppLogo({
       <View
         className={className}
         accessibilityRole="image"
-        accessibilityLabel="نقوط">
+        accessibilityLabel={APP_NAME}>
         {body}
       </View>
     );
@@ -123,20 +124,22 @@ export function AppLogo({
     <View
       className={`flex-row-reverse items-center ${className ?? ''}`}
       accessibilityRole="image"
-      accessibilityLabel="نقوط">
+      accessibilityLabel={APP_NAME}>
       {body}
       <View className="mr-3">
         {/* الاسم بنص React Native لا SVG: تشكيل الحروف العربية داخل
             react-native-svg غير موثوق عبر المنصّات. */}
+        {/* الاسم ثلاث كلمات لا واحدة، فنسبةُ الخطّ أصغر ممّا كانت
+            وإلا خرج عن عرض الشاشة على الهواتف الضيّقة. */}
         <Text
-          style={{ fontSize: size * 0.46 }}
+          style={{ fontSize: size * 0.34 }}
           className="text-right font-extrabold text-ink">
-          نقوط
+          {APP_NAME}
         </Text>
         <Text
-          style={{ fontSize: size * 0.24 }}
+          style={{ fontSize: size * 0.2 }}
           className="-mt-0.5 text-right font-semibold text-ink-muted">
-          دفتر النقوط والواجبات
+          {APP_TAGLINE}
         </Text>
       </View>
     </View>

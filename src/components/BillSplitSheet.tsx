@@ -209,7 +209,7 @@ export function BillSplitSheet({
                   </Text>
                 </View>
               ) : selected && share ? (
-                <Text className="text-sm font-bold text-primary">
+                <Text className="text-sm font-bold text-primary-strong">
                   {formatAmount(share.amount, currency)}
                 </Text>
               ) : null}

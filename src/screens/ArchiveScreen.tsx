@@ -123,7 +123,7 @@ export function ArchiveScreen() {
     return (
       <Screen scroll={false}>
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color={palette.primary} />
+          <ActivityIndicator color={palette.primaryStrong} />
         </View>
       </Screen>
     );
@@ -241,7 +241,7 @@ function ArchiveRow({
       </View>
 
       {busy ? (
-        <ActivityIndicator color={palette.primary} />
+        <ActivityIndicator color={palette.primaryStrong} />
       ) : (
         <View className="flex-row-reverse items-center">
           <PressableScale
@@ -250,8 +250,8 @@ function ArchiveRow({
             accessibilityLabel={`استعادة ${title}`}
             activeScale={0.9}
             className="flex-row-reverse items-center rounded-full bg-primary/15 px-3 py-1.5">
-            <Undo2 size={14} color={palette.primary} />
-            <Text className="mr-1 text-xs font-bold text-primary">استعادة</Text>
+            <Undo2 size={14} color={palette.primaryStrong} />
+            <Text className="mr-1 text-xs font-bold text-primary-strong">استعادة</Text>
           </PressableScale>
 
           <PressableScale

@@ -148,7 +148,7 @@ export function PhoneLinkSheet({
             accessibilityLabel="إعادة إرسال الرمز"
             activeScale={0.97}
             className="mt-3 items-center py-2">
-            <Text className="text-xs font-bold text-primary">
+            <Text className="text-xs font-bold text-primary-strong">
               لم يصلك الرمز؟ أعد الإرسال
             </Text>
           </PressableScale>

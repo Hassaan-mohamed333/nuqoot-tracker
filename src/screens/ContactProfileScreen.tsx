@@ -202,7 +202,7 @@ export function ContactProfileScreen() {
     return (
       <SafeAreaView className="flex-1 items-center justify-center bg-base px-8">
         {loading ? (
-          <ActivityIndicator color={palette.primary} />
+          <ActivityIndicator color={palette.primaryStrong} />
         ) : (
           <Text className="text-center text-sm text-ink-muted">
             {error ?? 'جهة الاتصال غير موجودة.'}
@@ -244,7 +244,7 @@ export function ContactProfileScreen() {
 
         <View className="items-center rounded-2xl border border-line bg-surface p-5">
           <View className="h-16 w-16 items-center justify-center rounded-full bg-primary/15">
-            <Text className="text-2xl font-bold text-primary">
+            <Text className="text-2xl font-bold text-primary-strong">
               {contact.full_name.trim().charAt(0)}
             </Text>
           </View>
@@ -340,7 +340,7 @@ export function ContactProfileScreen() {
             <Text className="text-right text-[11px] text-ink-muted">
               إجمالي دائن
             </Text>
-            <Text className="text-right text-base font-bold text-primary">
+            <Text className="text-right text-base font-bold text-primary-strong">
               {formatAmount(summary.totalOut, summary.currency)}
             </Text>
           </View>
@@ -388,7 +388,7 @@ export function ContactProfileScreen() {
         </View>
 
         {loading && transactions.length === 0 ? (
-          <ActivityIndicator color={palette.primary} />
+          <ActivityIndicator color={palette.primaryStrong} />
         ) : visibleTransactions.length === 0 ? (
           <View className="items-center rounded-2xl border border-line bg-surface p-6">
             <Text className="text-center text-sm text-ink-muted">
