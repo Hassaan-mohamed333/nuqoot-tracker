@@ -1,0 +1,20 @@
+{
+  "name": "الكراسة الصفرا",
+  "short_name": "الكراسة",
+  "description": "دفتر النقوط والواجبات: سجّل ما دفعته وما استلمته، واعرف ما لك وما عليك عند كل شخص.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/nuqoot-tracker/",
+  "scope": "/nuqoot-tracker/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAF8F3",
+  "theme_color": "#F59E0B",
+  "icons": [
+    {
+      "src": "/nuqoot-tracker/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}
