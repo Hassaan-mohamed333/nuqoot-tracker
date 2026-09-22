@@ -24,6 +24,7 @@ import type {
   ContactPatch,
   TransactionPatch,
 } from '@/lib/validateEntities';
+import { runLegacySeedCleanup } from '@/lib/storage';
 import { useAuth } from '@/store/AuthProvider';
 import type { SplitBillInput } from '@/lib/repository';
 import type {
@@ -110,6 +111,15 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
+      /*
+       * تنظيف ما بقي من البيانات التجريبية قبل أوّل قراءة.
+       *
+       * موضعه هنا لا في `fetchLedgerData`: القراءة تُستدعى من مواضع
+       * كثيرة، وهذه نقطة دخول الدفتر الوحيدة. والانتظار قبل القراءة لا
+       * بعدها، وإلا عُرض الدفتر القديم لحظةً ثم اختفى نصفه أمام العين.
+       */
+      await runLegacySeedCleanup();
+
       const data = await fetchLedgerData();
       setContacts(data.contacts);
       setEvents(data.events);

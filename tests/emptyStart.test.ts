@@ -41,11 +41,36 @@ describe('البداية من دفتر فارغ', () => {
     );
   });
 
-  test('لا ملف مصدر يشير إلى بذور', () => {
+  test('لا ملف مصدر يستورد وحدة البذور', () => {
     const offenders = sourceFiles().filter((file) =>
-      /SEED_|@\/data\/seed|data\/seed/.test(read(file)),
+      /from '@?\/?[\w./]*data\/seed'/.test(read(file)),
     );
     assert.deepEqual(offenders, [], 'ملفات ما زالت تستورد البذور');
+  });
+
+  test('قيم البذور لا توجد إلا في هجرة التنظيف', () => {
+    /*
+     * الهجرة تحتفظ ببصمات ما زُرع سابقاً لتعرفه فتحذفه. وهو الموضع
+     * الوحيد المسموح: أيّ ملفٍ آخر يحمل هذه القيم يعني أن الزرع عاد من
+     * باب آخر.
+     */
+    const offenders = sourceFiles().filter(
+      (file) => file !== 'src/lib/legacySeed.ts' && /SEED_\w+/.test(read(file)),
+    );
+    assert.deepEqual(offenders, [], 'قيم بذور خارج الهجرة');
+  });
+
+  test('الهجرة تقرأ البصمات ولا تكتبها', () => {
+    // الفرق بين «يعرف البذور ليحذفها» و«يزرعها»: لا قيمة منها تُكتب.
+    const migration = read('src/lib/legacySeed.ts');
+    for (const seeded of ['SEED_CONTACTS', 'SEED_EVENTS', 'SEED_TRANSACTIONS']) {
+      assert.ok(
+        !new RegExp(`write\\w*\\([^)]*${seeded}`).test(migration),
+        `${seeded} تُكتب في التخزين`,
+      );
+    }
+    // ما يُكتب هو ناتج التصفية وحده.
+    assert.match(migration, /store\.write\(KEYS\.contacts, outcome\.next\.contacts\)/);
   });
 
   test('التحميل المحلي يبدأ من قوائم فارغة', () => {
