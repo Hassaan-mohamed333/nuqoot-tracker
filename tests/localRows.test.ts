@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, test } from 'node:test';
 
-import { SEED_CONTACTS, SEED_EVENTS, SEED_TRANSACTIONS } from '../src/data/seed.ts';
 import { isRowId, isServerRowId } from '../src/lib/validation.ts';
 
 const ROOT = path.join(import.meta.dirname, '..');
@@ -63,19 +62,30 @@ describe('تمييز الصفوف المحلية من صفوف الخادم', ()
     }
   });
 
-  test('كل صفّ تجريبي يُصنَّف محليّاً — وهو مصدر العطب', () => {
-    const rows = [...SEED_CONTACTS, ...SEED_EVENTS, ...SEED_TRANSACTIONS];
-    assert.ok(rows.length > 0, 'لا بيانات تجريبية لتُفحص');
-    for (const row of rows) {
-      assert.equal(
-        isServerRowId(row.id),
-        false,
-        `صفّ تجريبي معرّفه يشبه UUID: ${row.id}`,
-      );
-      assert.equal(isRowId(row.id), true, `معرّف تجريبي غير صالح: ${row.id}`);
+  test('ما يولّده الوضع المحلي ليس معرّف خادم', () => {
+    /*
+     * البيانات التجريبية حُذفت، لكن الخطر الذي كشفته باقٍ: الوضع المحلي
+     * ما زال يولّد معرّفاته بنفسه لكل صفّ يُنشئه المستخدم بلا حساب. فلو
+     * صار أحدها يشبه UUID لعاد 22P02 من حيث لا يُتوقَّع.
+     */
+    const createId = (prefix: string) =>
+      `${prefix}_${Date.now().toString(36)}_${Math.random()
+        .toString(36)
+        .slice(2, 8)}`;
+
+    for (const prefix of ['t', 'c', 'e', 'p', 'x', 's']) {
+      const id = createId(prefix);
+      assert.equal(isRowId(id), true, `معرّف محلي غير صالح: ${id}`);
+      assert.equal(isServerRowId(id), false, `معرّف محلي يشبه UUID: ${id}`);
     }
-    // `t9` بعينه هو ما ظهر في التنبيه.
-    assert.ok(SEED_TRANSACTIONS.some((row) => row.id === 't9'));
+  });
+
+  test('صيغة المولّد هنا هي صيغته في المستودع', () => {
+    // النسخة أعلاه تُحاكي `createId`؛ انحرافها عنه يُبطل الاختبار بصمت.
+    assert.match(
+      REPO,
+      /function createId\(prefix: string\): string \{\s*return `\$\{prefix\}_\$\{Date\.now\(\)\.toString\(36\)\}_\$\{Math\.random\(\)/,
+    );
   });
 });
 

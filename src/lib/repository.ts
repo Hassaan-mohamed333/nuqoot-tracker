@@ -1,6 +1,5 @@
 import * as Crypto from 'expo-crypto';
 
-import { SEED_CONTACTS, SEED_EVENTS, SEED_TRANSACTIONS } from '@/data/seed';
 import { extensionForMime, readLocalFile } from '@/lib/files';
 import { logStepFailure, logSupabaseFailure } from '@/lib/supabaseError';
 import {
@@ -90,42 +89,23 @@ async function preferredCurrency(): Promise<string> {
 /**
  * يحمّل النسخة المحلية.
  *
- * البيانات التجريبية تُزرع فقط في الوضع المحلي (بلا Supabase). عند وجود
- * حساب حقيقي لا يجوز أن يرى المستخدم بيانات وهمية إذا فشل الطلب، لذا
- * نعيد ما هو مخزَّن فعلاً أو قوائم فارغة.
+ * دفترٌ فارغ لا دفترٌ موهوم: التخزين الخالي يعني «لم يُسجَّل شيء بعد»،
+ * وهو ما تعرضه الشاشات ببطاقة «لنبدأ من الصفر» وزرّيها.
+ *
+ * وكانت هنا بيانات تجريبية تُزرع عند أوّل فتح بلا حساب — ثمانُ جهات
+ * اتصال وعشرُ حركات. وثمنها أكبر من فائدتها: من يفتح دفتراً مالياً
+ * يريد دفتره هو، وأرصدةٌ ليست له في أوّل شاشة تُربك لا تُعرّف. وكانت
+ * تتسرّب كذلك إلى الحسابات الحقيقية حين يفشل طلب الخادم فتُعرض النسخة
+ * المحلية بما فيها.
  */
-async function loadLocal(seedWhenEmpty: boolean): Promise<LedgerData> {
+async function loadLocal(): Promise<LedgerData> {
   const [contacts, events, transactions] = await Promise.all([
-    readJson<Contact[] | null>(STORAGE_KEYS.contacts, null),
-    readJson<Event[] | null>(STORAGE_KEYS.events, null),
-    readJson<Transaction[] | null>(STORAGE_KEYS.transactions, null),
+    readJson<Contact[]>(STORAGE_KEYS.contacts, []),
+    readJson<Event[]>(STORAGE_KEYS.events, []),
+    readJson<Transaction[]>(STORAGE_KEYS.transactions, []),
   ]);
 
-  if (contacts && events && transactions) {
-    return { contacts, events, transactions, offline: true };
-  }
-
-  if (!seedWhenEmpty) {
-    return {
-      contacts: contacts ?? [],
-      events: events ?? [],
-      transactions: transactions ?? [],
-      offline: true,
-    };
-  }
-
-  await Promise.all([
-    writeJson(STORAGE_KEYS.contacts, SEED_CONTACTS),
-    writeJson(STORAGE_KEYS.events, SEED_EVENTS),
-    writeJson(STORAGE_KEYS.transactions, SEED_TRANSACTIONS),
-  ]);
-
-  return {
-    contacts: SEED_CONTACTS,
-    events: SEED_EVENTS,
-    transactions: SEED_TRANSACTIONS,
-    offline: true,
-  };
+  return { contacts, events, transactions, offline: true };
 }
 
 /**
@@ -134,7 +114,7 @@ async function loadLocal(seedWhenEmpty: boolean): Promise<LedgerData> {
  */
 export async function fetchLedgerData(): Promise<LedgerData> {
   if (!usesServerData()) {
-    return loadLocal(true);
+    return loadLocal();
   }
 
   try {
@@ -170,7 +150,7 @@ export async function fetchLedgerData(): Promise<LedgerData> {
     // تعذّر الوصول للخادم: نعرض آخر نسخة محفوظة لهذا الحساب بلا زرع بيانات.
     // نسجّل السبب أولاً، وإلا صار الرجوع الصامت يخفي أخطاء حقيقية.
     noteServerFailure('تحميل الدفتر', error);
-    return loadLocal(false);
+    return loadLocal();
   }
 }
 
