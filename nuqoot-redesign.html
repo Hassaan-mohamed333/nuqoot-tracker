@@ -1,0 +1,579 @@
+<title>nuqoot-tracker redesign</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&display=swap">
+<style>
+/* Layout concept: a studio board. Spec sections (tokens, components) sit above a grid of live RTL phone frames that consume the same tokens. */
+:root{
+  --amber-500:#F59E0B; --amber-400:#FBBF24; --amber-600:#D97706;
+  --bg:#FBF8F1; --surface:#FFFFFF; --raised:#F5F0E4; --hero:#0F172A;
+  --brand:#F59E0B; --brand-press:#D97706; --brand-soft:#FEEFC3;
+  --success-bg:#E6F6EE; --danger-bg:#FFE9ED; --warn-bg:#FFEDD5;
+  --line:#EAE3D2; --line-strong:#D8CFB9; --focus:#0F172A;
+  --text:#0F172A; --text-2:#57534E; --muted:#6B645E; --on-brand:#0F172A; --on-hero:#FBF8F1;
+  --text-brand:#92400E; --success:#047857; --danger:#BE123C; --warn:#C2410C;
+  --shadow-sm:0 1px 3px rgba(28,20,8,.06); --shadow-md:0 4px 16px rgba(28,20,8,.08); --shadow-float:0 10px 28px rgba(28,20,8,.16); --shadow-sheet:0 -8px 32px rgba(28,20,8,.14);
+  --r-xs:6px; --r-sm:10px; --r-md:14px; --r-lg:20px; --r-xl:28px;
+  color-scheme:light;
+  --font:"Readex Pro","Cairo","Tajawal",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.6;padding-inline:20px;padding-block:0}
+.page{max-width:1280px;margin-inline:auto;padding-block:40px 80px;display:flex;flex-direction:column;gap:64px}
+h1,h2,h3,h4,p{margin:0;text-wrap:balance}
+button{font-family:inherit;color:inherit}
+.num{font-variant-numeric:tabular-nums}
+.i{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.i.sm{width:16px;height:16px}.i.lg{width:24px;height:24px}
+/* ---- board chrome */
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;flex-wrap:wrap}
+.top h1{font-size:34px;line-height:1.3;font-weight:600}
+.top p{color:var(--text-2);max-width:62ch;margin-top:8px}
+.tt{display:inline-flex;gap:8px;align-items:center;height:40px;padding-inline:16px;border-radius:999px;border:1px solid var(--line-strong);background:var(--surface);cursor:pointer;font-size:13px;font-weight:500}
+.tt:focus-visible,.btn:focus-visible,.seg button:focus-visible,.chip:focus-visible,.tab:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.sec>h2{font-size:24px;font-weight:600;margin-bottom:6px}
+.sec>.lead{color:var(--text-2);margin-bottom:24px;max-width:70ch}
+.grid{display:grid;gap:16px}
+.g-auto{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th,.tbl td{padding:12px 14px;text-align:right;vertical-align:top;border-bottom:1px solid var(--line)}
+.tbl th{font-weight:600;color:var(--muted);font-size:12px}
+.tblw{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface)}
+.sw{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--text-2)}
+.sw i{display:block;height:64px;border-radius:var(--r-md);border:1px solid var(--line)}
+.sw b{font-weight:500;color:var(--text)}
+.sub{font-size:13px;font-weight:600;color:var(--muted);margin:28px 0 12px}
+.row{display:flex;flex-wrap:wrap;gap:16px;align-items:center}
+.spec{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:24px}
+.ramp{display:flex;flex-direction:column;gap:14px}
+.ramp div{display:flex;gap:24px;align-items:baseline;flex-wrap:wrap}
+.ramp small{width:160px;color:var(--muted);font-size:12px;flex:none}
+/* ---- phone frames */
+.phones{display:flex;flex-wrap:wrap;gap:40px 32px;justify-content:center}
+.fig{width:360px;max-width:100%;display:flex;flex-direction:column;gap:14px}
+.fig figcaption{font-size:13px;color:var(--text-2)}
+.fig figcaption b{display:block;color:var(--text);font-size:15px;margin-bottom:2px}
+.ph{position:relative;width:360px;max-width:100%;height:740px;border-radius:40px;background:var(--bg);border:1px solid var(--line-strong);box-shadow:var(--shadow-float);overflow:hidden;color:var(--text)}
+.ph-in{height:100%;display:flex;flex-direction:column}
+.sbar{height:34px;padding-inline:24px;display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:600;flex:none}
+.hd{display:flex;align-items:center;gap:12px;padding:6px 16px 10px;flex:none}
+.hd h3{font-size:22px;font-weight:600;flex:1;line-height:1.3}
+.hd.c h3{font-size:17px;text-align:center}
+.ib{width:44px;height:44px;border-radius:50%;border:0;background:var(--surface);box-shadow:var(--shadow-sm);display:grid;place-items:center;cursor:pointer;flex:none;border:1px solid var(--line)}
+.ib.brand{background:var(--brand);color:var(--on-brand);border-color:transparent}
+.scr{flex:1;padding:4px 16px 110px;display:flex;flex-direction:column;gap:18px;overflow:hidden}
+.scr.nb{padding-bottom:96px}
+.av{width:44px;height:44px;border-radius:50%;background:var(--brand-soft);color:var(--text-brand);display:grid;place-items:center;font-weight:600;font-size:16px;flex:none}
+.av.xl{width:84px;height:84px;font-size:32px}
+.av.sm{width:36px;height:36px;font-size:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px}
+.hero{background:var(--hero);color:var(--on-hero);border-radius:var(--r-xl);padding:22px 20px 18px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow-md);position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;inset-inline-start:-40px;top:-60px;width:180px;height:180px;border-radius:50%;background:radial-gradient(closest-side,rgba(251,191,36,.28),transparent)}
+.hero .lbl{font-size:13px;opacity:.78}
+.hero .big{font-size:36px;font-weight:600;line-height:1.2;color:var(--amber-400)}
+.hero .big small{font-size:16px;font-weight:500;color:var(--on-hero);opacity:.8;margin-inline-start:6px}
+.hero .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hero .two div{background:rgba(255,255,255,.07);border-radius:var(--r-md);padding:10px 12px;font-size:12px;display:flex;flex-direction:column;gap:2px}
+.hero .two b{font-size:15px;font-weight:600}
+.pill{display:inline-flex;align-items:center;gap:6px;height:26px;padding-inline:10px;border-radius:999px;font-size:12px;font-weight:600;width:fit-content}
+.p-s{background:var(--success-bg);color:var(--success)}.p-d{background:var(--danger-bg);color:var(--danger)}.p-b{background:var(--brand-soft);color:var(--text-brand)}.p-w{background:var(--warn-bg);color:var(--warn)}.p-n{background:var(--raised);color:var(--text-2)}
+.hero .pill{background:rgba(251,191,36,.18);color:var(--amber-400)}
+.qa{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.qa button{background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:8px;font-size:12px;font-weight:500;color:var(--text);cursor:pointer;padding:0}
+.qa span{width:56px;height:56px;border-radius:20px;background:var(--surface);border:1px solid var(--line);display:grid;place-items:center;color:var(--text-brand)}
+.qa .main span{background:var(--brand);color:var(--on-brand);border-color:transparent}
+.sh{display:flex;justify-content:space-between;align-items:baseline}
+.sh h4{font-size:17px;font-weight:600}.sh a{font-size:13px;color:var(--text-brand);font-weight:500}
+.list{display:flex;flex-direction:column}
+.li{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.li:last-child{border:0}
+.li .tx{flex:1;min-width:0}
+.li .tx b{display:block;font-size:15px;font-weight:600;line-height:1.4;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.li .tx span{display:block;font-size:12px;color:var(--muted);line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.amt{font-weight:600;font-size:15px;text-align:left;white-space:nowrap}
+.amt.in{color:var(--success)}.amt.out{color:var(--danger)}
+.ic{width:40px;height:40px;border-radius:14px;display:grid;place-items:center;flex:none}
+.ic.s{background:var(--success-bg);color:var(--success)}.ic.d{background:var(--danger-bg);color:var(--danger)}.ic.b{background:var(--brand-soft);color:var(--text-brand)}
+.tabbar{position:absolute;inset-inline:12px;bottom:14px;height:68px;border-radius:34px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow-float);display:grid;grid-template-columns:1fr 1fr 64px 1fr 1fr;align-items:center;padding-inline:6px}
+.tab{background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;color:var(--muted);cursor:pointer;font-weight:500;padding:0}
+.tab.on{color:var(--text)}.tab.on .i{color:var(--text-brand)}
+.tab.on::before{content:"";width:22px;height:3px;border-radius:2px;background:var(--brand);margin-bottom:1px}
+.tab:not(.on)::before{content:"";height:3px;margin-bottom:1px}
+.fab{width:56px;height:56px;border-radius:50%;background:var(--brand);color:var(--on-brand);display:grid;place-items:center;margin:-22px auto 0;box-shadow:var(--shadow-float);border:4px solid var(--bg);border-width:4px}
+.banner{display:flex;gap:10px;align-items:center;background:var(--warn-bg);color:var(--warn);border-radius:var(--r-md);padding:10px 12px;font-size:12px;line-height:1.5}
+/* ---- controls */
+.btn{height:52px;padding-inline:22px;border-radius:var(--r-md);border:1px solid transparent;font-weight:600;font-size:15px;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:transform .12s ease,background .15s ease}
+.btn:active{transform:scale(.98)}
+.btn.primary{background:var(--brand);color:var(--on-brand)}.btn.primary:hover{background:var(--brand-press)}
+.btn.secondary{background:var(--surface);border-color:var(--line-strong);color:var(--text)}
+.btn.ghost{background:transparent;color:var(--text-brand)}
+.btn.soft{background:var(--brand-soft);color:var(--text-brand)}
+.btn.danger{background:var(--danger-bg);color:var(--danger)}
+.btn.sm{height:40px;padding-inline:16px;font-size:13px;border-radius:12px}
+.btn.block{width:100%}
+.btn[disabled]{background:var(--raised);color:var(--muted);cursor:not-allowed}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:13px;font-weight:600}
+.field label em{font-style:normal;color:var(--muted);font-weight:400}
+.inp{height:52px;border-radius:var(--r-md);background:var(--surface);border:1px solid var(--line-strong);padding-inline:16px;display:flex;align-items:center;gap:10px;font-size:15px;color:var(--text);width:100%}
+.inp.ph-t{color:var(--muted)}
+.inp.focus{border-color:var(--focus);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 35%,transparent)}
+.inp.err{border-color:var(--danger)}
+.inp.dis{background:var(--raised);color:var(--muted)}
+.inp.area{height:104px;align-items:flex-start;padding-block:14px}
+.help{font-size:12px;color:var(--muted)}.help.err{color:var(--danger)}
+.seg{display:flex;background:var(--raised);border-radius:var(--r-md);padding:4px;gap:4px}
+.seg button{flex:1;height:40px;border:0;border-radius:11px;background:transparent;font-size:13px;font-weight:500;color:var(--text-2);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+.seg button.on{background:var(--surface);color:var(--text);box-shadow:var(--shadow-sm);font-weight:600}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{height:38px;padding-inline:14px;border-radius:999px;border:1px solid var(--line-strong);background:var(--surface);font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:var(--text)}
+.chip.on{background:var(--text);color:var(--bg);border-color:var(--text)}
+.chip small{opacity:.7;font-size:12px}
+.chips.scroll{flex-wrap:nowrap;overflow:hidden}
+.toggle{width:48px;height:28px;border-radius:14px;background:var(--line-strong);position:relative;flex:none}
+.toggle::after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:var(--shadow-sm)}
+.toggle.on{background:var(--brand)}.toggle.on::after{inset-inline-start:23px}
+.toast{display:flex;align-items:center;gap:10px;background:var(--text);color:var(--bg);padding:12px 16px;border-radius:var(--r-md);font-size:14px;width:fit-content;box-shadow:var(--shadow-float)}
+.empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:20px 12px}
+.empty .eb{width:72px;height:72px;border-radius:26px;background:var(--brand-soft);color:var(--text-brand);display:grid;place-items:center}
+.empty p{color:var(--text-2);font-size:14px;max-width:26ch}
+.cta{position:absolute;inset-inline:0;bottom:0;padding:12px 16px 20px;background:linear-gradient(to top,var(--bg) 70%,transparent);display:flex;flex-direction:column;gap:8px}
+.cta .help{text-align:center}
+.sheetbg{position:absolute;inset:0;background:rgba(15,10,3,.45)}
+.sheet{position:absolute;inset-inline:0;bottom:0;background:var(--surface);border-radius:28px 28px 0 0;box-shadow:var(--shadow-sheet);padding:10px 16px 20px;display:flex;flex-direction:column;gap:14px}
+.sheet .grab{width:40px;height:5px;border-radius:3px;background:var(--line-strong);margin:0 auto}
+.sheet h3{font-size:20px;font-weight:600}
+.bubble{max-width:82%;padding:12px 14px;border-radius:18px;font-size:14px;line-height:1.6}
+.bubble.bot{background:var(--raised);border-end-start-radius:6px;align-self:flex-start}
+.bubble.me{background:var(--brand);color:var(--on-brand);border-end-end-radius:6px;align-self:flex-end}
+.dtbox{width:52px;height:60px;border-radius:16px;background:var(--brand-soft);color:var(--text-brand);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.2;flex:none}
+.dtbox b{font-size:20px;font-weight:600}.dtbox span{font-size:11px}
+.bar{height:8px;border-radius:4px;background:var(--raised);overflow:hidden;direction:rtl}
+.bar i{display:block;height:100%;border-radius:4px}
+.alpha{position:absolute;inset-inline-start:2px;top:210px;display:flex;flex-direction:column;gap:2px;font-size:10px;color:var(--muted);line-height:1.2}
+.letter{font-size:12px;font-weight:600;color:var(--text-brand);padding:6px 0 0}
+.mot{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+.mot .spec h4{font-size:15px;margin-bottom:4px}.mot .spec p{font-size:13px;color:var(--text-2)}.mot code{font-family:ui-monospace,monospace;font-size:12px;color:var(--text-brand);direction:ltr;display:inline-block}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.3 2.9-6 6.5-6s6.5 2.7 6.5 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16.5 14.2c2.8.3 5 2.5 5 5.3"/></symbol>
+<symbol id="cal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+<symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4-4"/></symbol>
+<symbol id="spark" viewBox="0 0 24 24"><path d="M11 3l1.8 5.2L18 10l-5.2 1.8L11 17l-1.8-5.2L4 10l5.2-1.8z"/><path d="M19 15l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></symbol>
+<symbol id="scan" viewBox="0 0 24 24"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M4 12h16"/></symbol>
+<symbol id="mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
+<symbol id="back" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+<symbol id="chev" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol>
+<symbol id="check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7"/></symbol>
+<symbol id="x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+<symbol id="user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></symbol>
+<symbol id="phone" viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></symbol>
+<symbol id="send" viewBox="0 0 24 24"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4z"/></symbol>
+<symbol id="up" viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9"/></symbol>
+<symbol id="down" viewBox="0 0 24 24"><path d="M17 7 7 17M16 17H7V8"/></symbol>
+<symbol id="dots" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></symbol>
+<symbol id="trend" viewBox="0 0 24 24"><path d="m3 17 6-6 4 4 8-8M15 7h6v6"/></symbol>
+<symbol id="lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+<symbol id="cam" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13.5" r="3.5"/></symbol>
+<symbol id="img" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.5"/><path d="m21 16-5-5-8 9"/></symbol>
+<symbol id="trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+<symbol id="edit" viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16z"/></symbol>
+<symbol id="swap" viewBox="0 0 24 24"><path d="M7 7h13l-3-3M17 17H4l3 3"/></symbol>
+<symbol id="info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+<symbol id="split" viewBox="0 0 24 24"><path d="M12 21v-8M12 13 6 5M12 13l6-8M4 9V5h4M16 5h4v4"/></symbol>
+<symbol id="pin" viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
+<symbol id="gift" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v8h14v-8M12 8v12M12 8c-2.5 0-4-1-4-2.5S9.5 3 12 8zm0 0c2.5 0 4-1 4-2.5S14.5 3 12 8z"/></symbol>
+<symbol id="arch" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11h14V8M10 12h4"/></symbol>
+</defs></svg>
+
+<div class="page" dir="rtl" lang="ar">
+
+<header class="top">
+  <div>
+    <h1>nuqoot-tracker redesign</h1>
+    <p>إعادة تصميم «الكراسة الصفرا» (دفتر النقوط والواجبات): تصميم عصري بحس ورقي دافئ، RTL عربي أولاً. كل الشاشات هنا حيّة وبتقرا من نفس الـ tokens اللي في ملف Figma، فينقل بدون ترجمة.</p>
+  </div>
+</header>
+
+<section class="sec">
+  <h2>الاتجاه والمشاكل اللي اتحلّت</h2>
+  <p class="lead">الفكرة: دفتر حسابات ورقي حديث. أرضية ورقية دافئة، حبر داكن للنصوص، وكهرماني للإجراء الرئيسي بس. الرصيد الصافي في بطاقة داكنة واحدة في أول الشاشة بدل شريط ثابت بياخد نص الشاشة.</p>
+  <div class="tblw"><table class="tbl">
+    <thead><tr><th>اللي لقيته في التجربة</th><th>الأولوية</th><th>الحل في التصميم الجديد</th></tr></thead>
+    <tbody>
+      <tr><td>شريط الملخص السفلي ثابت فوق الـ tab bar وبياخد حوالي نص الشاشة</td><td>High</td><td>الرصيد الصافي بقى بطاقة Hero في أعلى الرئيسية، والشريط اتشال من باقي الشاشات</td></tr>
+      <tr><td>زرار المساعد العائم بيغطي المحتوى في كل شاشة</td><td>High</td><td>المساعد في الـ tab bar، وزرار «+» مركزي لإضافة حركة</td></tr>
+      <tr><td>زرار الحفظ disabled من غير سبب (جهة اتصال، مصروف جماعي، حركة)</td><td>High</td><td>سطر توضيح تحت الزرار: «اختر جهة اتصال لإكمال الحفظ»</td></tr>
+      <tr><td>الفهرس الأبجدي بيقطع كروت جهات الاتصال على الحافة</td><td>Medium</td><td>الفهرس في عمود جانبي منفصل بهامش، والكروت بتاخد عرض كامل جوّه الـ gutter</td></tr>
+      <tr><td>مناسبة بتاريخ النهارده بتظهر فوراً في «سابقة»</td><td>Medium</td><td>سلوك: اليوم = قادمة. التصميم بيعرض شارة «النهارده» (محتاج تعديل منطق، مش تصميم)</td></tr>
+      <tr><td>اسم طويل (٤ كلمات+) بينقطع أو بيكسر الكارت، ومبلغ بـ ٨ خانات بيتزاحم</td><td>Medium</td><td>سطر واحد مع قطع (ellipsis) والمبلغ بأرقام tabular وعمود ثابت</td></tr>
+      <tr><td>خانة المبلغ فيها إطار مزدوج وحواف مقطوعة</td><td>Medium</td><td>حقل مبلغ كبير بإطار واحد وحلقة تركيز واضحة (3px)</td></tr>
+      <tr><td>أزرار «حذف الحساب» حمراء بجوار الأساسي في ملف جهة الاتصال</td><td>Medium</td><td>الإجراءات الخطرة (أرشفة، حذف) في قايمة «⋯» وتأكيد في sheet</td></tr>
+      <tr><td>العدّاد ملصوق بالتسمية في الفلاتر («الكل4»)</td><td>Low</td><td>chips بمسافة ثابتة وعدّاد خافت</td></tr>
+    </tbody></table></div>
+</section>
+
+<section class="sec">
+  <h2>1 · Design tokens</h2>
+  <p class="lead">نفس أسماء الـ variables في Figma (Primitives، Color، Spacing، Radius، Typography). الوضع: لايت مود فقط.</p>
+  <div class="sub">الألوان الدلالية</div>
+  <div class="grid g-auto" id="sw"></div>
+  <div class="sub">الخطوط · Readex Pro (عربي ولاتيني)، fallback: Cairo ثم Tajawal</div>
+  <div class="spec ramp">
+    <div><small>Display · 32/44</small><span style="font-size:32px;font-weight:600;line-height:1.4">دفتر النقوط والواجبات</span></div>
+    <div><small>Title/XL · 26/38</small><span style="font-size:26px;font-weight:600">مرحباً بك في الكراسة</span></div>
+    <div><small>Title/L · 20/30</small><span style="font-size:20px;font-weight:600">آخر الحركات</span></div>
+    <div><small>Title/M · 17/26</small><span style="font-size:17px;font-weight:600">أحمد محمد عبد الرحمن</span></div>
+    <div><small>Body/M · 15/24</small><span>نقوط فرح أخيه · ٥ أكتوبر ٢٠٢٦</span></div>
+    <div><small>Body/S · 13/20</small><span style="font-size:13px">تُعرض نسخة محفوظة على الجهاز</span></div>
+    <div><small>Caption · 12/16</small><span style="font-size:12px;color:var(--muted)">٤ جهات اتصال · ٤ حركات</span></div>
+    <div><small>Numeric/Hero · 38/48</small><span class="num" style="font-size:38px;font-weight:600">١٠٬٠٠١٬٤٩٩ <span style="font-size:17px">ج.م</span></span></div>
+  </div>
+  <div class="sub">Spacing · Radius · Elevation</div>
+  <div class="row">
+    <div class="spec" style="display:flex;gap:10px;align-items:flex-end">
+      <div style="text-align:center;font-size:11px"><div style="width:4px;height:4px;background:var(--brand);margin:auto"></div>xs 4</div>
+      <div style="text-align:center;font-size:11px"><div style="width:8px;height:8px;background:var(--brand);margin:auto"></div>sm 8</div>
+      <div style="text-align:center;font-size:11px"><div style="width:12px;height:12px;background:var(--brand);margin:auto"></div>md 12</div>
+      <div style="text-align:center;font-size:11px"><div style="width:16px;height:16px;background:var(--brand);margin:auto"></div>lg 16</div>
+      <div style="text-align:center;font-size:11px"><div style="width:24px;height:24px;background:var(--brand);margin:auto"></div>2xl 24</div>
+      <div style="text-align:center;font-size:11px"><div style="width:32px;height:32px;background:var(--brand);margin:auto"></div>3xl 32</div>
+    </div>
+    <div class="spec" style="display:flex;gap:12px;align-items:flex-end;font-size:11px;text-align:center">
+      <div><div style="width:56px;height:56px;border:2px solid var(--text-brand);border-radius:6px;background:var(--brand-soft)"></div>xs 6</div>
+      <div><div style="width:56px;height:56px;border:2px solid var(--text-brand);border-radius:10px;background:var(--brand-soft)"></div>sm 10</div>
+      <div><div style="width:56px;height:56px;border:2px solid var(--text-brand);border-radius:14px;background:var(--brand-soft)"></div>md 14</div>
+      <div><div style="width:56px;height:56px;border:2px solid var(--text-brand);border-radius:20px;background:var(--brand-soft)"></div>lg 20</div>
+      <div><div style="width:56px;height:56px;border:2px solid var(--text-brand);border-radius:28px;background:var(--brand-soft)"></div>xl 28</div>
+    </div>
+    <div class="row">
+      <div class="spec" style="box-shadow:var(--shadow-sm);font-size:12px;padding:16px">shadow/sm</div>
+      <div class="spec" style="box-shadow:var(--shadow-md);font-size:12px;padding:16px">shadow/md</div>
+      <div class="spec" style="box-shadow:var(--shadow-float);font-size:12px;padding:16px">shadow/float</div>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>2 · Components</h2>
+  <p class="lead">الأساسيات اللي كل الشاشات بتتبني منها. أهداف اللمس 44px أو أكتر، وحلقة تركيز ظاهرة، وحالات disabled بتشرح السبب.</p>
+
+  <div class="sub">Buttons</div>
+  <div class="row">
+    <button class="btn primary" type="button">حفظ الحركة</button>
+    <button class="btn secondary" type="button"><svg class="i"><use href="#edit"/></svg>تعديل</button>
+    <button class="btn soft" type="button"><svg class="i"><use href="#plus"/></svg>إضافة حركة</button>
+    <button class="btn ghost" type="button">عرض الكل</button>
+    <button class="btn danger" type="button"><svg class="i"><use href="#trash"/></svg>حذف</button>
+    <button class="btn primary" type="button" disabled>حفظ</button>
+    <button class="btn primary sm" type="button">صغير</button>
+    <button class="ib brand" type="button" aria-label="إضافة"><svg class="i"><use href="#plus"/></svg></button>
+    <button class="ib" type="button" aria-label="المساعد"><svg class="i"><use href="#spark"/></svg></button>
+  </div>
+
+  <div class="sub">Inputs</div>
+  <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">
+    <div class="field"><label>الاسم</label><div class="inp ph-t">الاسم كاملاً</div></div>
+    <div class="field"><label>الاسم</label><div class="inp focus">أحمد محمد</div><span class="help">حالة التركيز</span></div>
+    <div class="field"><label>المبلغ</label><div class="inp err num">٠</div><span class="help err">أدخل مبلغاً أكبر من صفر</span></div>
+    <div class="field"><label>الهاتف <em>(اختياري)</em></label><div class="inp dis">غير متاح</div></div>
+    <div class="field"><label>ملاحظات <em>(اختياري)</em></label><div class="inp area ph-t">أي تفاصيل تساعدك على تذكّره</div></div>
+  </div>
+
+  <div class="sub">Selection · Segmented · Chips · Toggle · Badges</div>
+  <div class="row" style="align-items:flex-start">
+    <div class="seg" style="width:300px"><button class="on" type="button">بالتساوي</button><button type="button">نسبة</button><button type="button">مبلغ</button></div>
+    <div class="chips"><span class="chip on">الكل <small>٤</small></span><span class="chip">لك عندهم <small>٢</small></span><span class="chip">عليك لهم <small>٢</small></span></div>
+    <span class="toggle on" role="switch" aria-checked="true"></span><span class="toggle" role="switch" aria-checked="false"></span>
+    <span class="pill p-s">دائن</span><span class="pill p-d">مدين</span><span class="pill p-b">فرح</span><span class="pill p-w">وضع محلي</span><span class="pill p-n">مؤرشف</span>
+  </div>
+
+  <div class="sub">Cards · List rows · Toast · Empty state</div>
+  <div class="row" style="align-items:flex-start">
+    <div class="card" style="width:320px"><div class="list">
+      <div class="li"><div class="av">أ</div><div class="tx"><b>أحمد محمد عبد الرحمن</b><span>قريب · ٠١٠١٢٣٤٥٦٧٨</span></div><div class="amt in num">+١٬٥٠٠ ج.م</div></div>
+      <div class="li"><div class="av">ع</div><div class="tx"><b>عبد الرحمن إبراهيم السيد الشناوي أبو العزم</b><span>جار · ١ حركة</span></div><div class="amt out num">−٣٬٢٠٠ ج.م</div></div>
+    </div></div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="toast"><svg class="i"><use href="#check"/></svg>تم حفظ الحركة</div>
+      <div class="toast" style="background:var(--danger-bg);color:var(--danger)"><svg class="i"><use href="#info"/></svg>تعذّر الحفظ. جرّب مرة تانية</div>
+    </div>
+    <div class="card" style="width:300px"><div class="empty"><div class="eb"><svg class="i lg"><use href="#cal"/></svg></div><b>لا توجد مناسبات قادمة</b><p>أضف فرحاً أو عزاءً وسجّل النقوط حواليه.</p><button class="btn primary sm" type="button">إضافة مناسبة</button></div></div>
+  </div>
+
+  <div class="sub">Navigation · Tab bar بزرار مركزي</div>
+  <div style="position:relative;width:340px;height:96px">
+    <div class="tabbar" style="inset-inline:0;bottom:12px">
+      <button class="tab on" type="button"><svg class="i"><use href="#home"/></svg>الرئيسية</button>
+      <button class="tab" type="button"><svg class="i"><use href="#users"/></svg>جهات الاتصال</button>
+      <div class="fab"><svg class="i lg"><use href="#plus"/></svg></div>
+      <button class="tab" type="button"><svg class="i"><use href="#cal"/></svg>المناسبات</button>
+      <button class="tab" type="button"><svg class="i"><use href="#spark"/></svg>المساعد</button>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>3 · الشاشات</h2>
+  <p class="lead">12 شاشة بعرض 360px، RTL. الأرقام بالهندي مع tabular-nums، والعملة ج.م.</p>
+  <div class="phones" id="phones">
+
+  <!-- 1 HOME -->
+  <figure class="fig"><div class="ph" dir="rtl"><div class="ph-in">
+    <div class="sbar"><span>٩:٤١</span><span>● ● ●</span></div>
+    <div class="hd"><div class="av">م</div><div style="flex:1"><div style="font-size:12px;color:var(--muted)">صباح الخير</div><h3 style="font-size:20px">مرحباً، مستخدم</h3></div><button class="ib" type="button" aria-label="المساعد"><svg class="i"><use href="#spark"/></svg></button></div>
+    <div class="scr">
+      <div class="hero">
+        <div class="lbl">صافي رصيدك</div>
+        <div class="big num">+٩٬٩٩٨٬٠٤٩<small>ج.م</small></div>
+        <span class="pill"><svg class="i sm"><use href="#trend"/></svg>لك عند الآخرين</span>
+        <div class="two"><div><span style="opacity:.75">دفعت</span><b class="num">١٠٬٠٠١٬٤٩٩</b></div><div><span style="opacity:.75">استلمت</span><b class="num">٣٬٤٥٠</b></div></div>
+      </div>
+      <div class="qa">
+        <button class="main" type="button"><span><svg class="i lg"><use href="#plus"/></svg></span>حركة</button>
+        <button type="button"><span><svg class="i lg"><use href="#spark"/></svg></span>إدخال ذكي</button>
+        <button type="button"><span><svg class="i lg"><use href="#scan"/></svg></span>إيصال</button>
+        <button type="button"><span><svg class="i lg"><use href="#cal"/></svg></span>مناسبة</button>
+      </div>
+      <div class="sh"><h4>مناسبات قادمة</h4><a>الكل</a></div>
+      <div class="card" style="display:flex;gap:12px;align-items:center;padding:12px"><div class="dtbox"><b>٨</b><span>أكتوبر</span></div><div style="flex:1;min-width:0"><b>فرح أحمد ومنى</b><div class="help">بعد ٣ أيام · القاهرة الجديدة</div></div><span class="pill p-b">فرح</span></div>
+      <div class="sh"><h4>آخر الحركات</h4><a>الكل</a></div>
+      <div class="list" style="margin-top:-8px">
+        <div class="li"><span class="ic d"><svg class="i"><use href="#down"/></svg></span><div class="tx"><b>عبد الرحمن إبراهيم السيد الشناوي أبو العزم</b><span>استلمت · ملاحظة طويلة جداً لاختبار النص</span></div><div class="amt out num">−٣٬٢٠٠</div></div>
+        <div class="li"><span class="ic s"><svg class="i"><use href="#up"/></svg></span><div class="tx"><b>Mahmoud Hassan</b><span>دفعت · رقم كبير للاختبار</span></div><div class="amt in num">+٩٬٩٩٩٬٩٩٩</div></div>
+      </div>
+    </div>
+    <nav class="tabbar" aria-label="التنقل"><button class="tab on" type="button"><svg class="i"><use href="#home"/></svg>الرئيسية</button><button class="tab" type="button"><svg class="i"><use href="#users"/></svg>جهات الاتصال</button><div class="fab"><svg class="i lg"><use href="#plus"/></svg></div><button class="tab" type="button"><svg class="i"><use href="#cal"/></svg>المناسبات</button><button class="tab" type="button"><svg class="i"><use href="#spark"/></svg>المساعد</button></nav>
+  </div></div><figcaption><b>الرئيسية</b>بطاقة رصيد واحدة بدل الشريط الثابت، إجراءات سريعة، والمساعد في الـ tab bar.</figcaption></figure>
+
+  <!-- 2 HOME EMPTY -->
+  <figure class="fig"><div class="ph" dir="rtl"><div class="ph-in">
+    <div class="sbar"><span>٩:٤١</span><span>● ● ●</span></div>
+    <div class="hd"><div class="av">م</div><div style="flex:1"><div style="font-size:12px;color:var(--muted)">أهلاً</div><h3 style="font-size:20px">مرحباً، مستخدم</h3></div><button class="ib" type="button"><svg class="i"><use href="#spark"/></svg></button></div>
+    <div class="scr">
+      <div class="banner"><svg class="i sm"><use href="#info"/></svg><span>وضع محلي: البيانات محفوظة على جهازك. اربط Supabase للمزامنة.</span></div>
+      <div class="hero"><div class="lbl">صافي رصيدك</div><div class="big num">٠<small>ج.م</small></div><span class="pill">متعادل</span></div>
+      <div class="card"><div class="empty"><div class="eb"><svg class="i lg"><use href="#users"/></svg></div><b style="font-size:17px">لنبدأ من الصفر</b><p>أضف جهة اتصال، وبعدها سجّل أول نقوط أو واجب بينكم.</p><button class="btn primary block" type="button"><svg class="i"><use href="#plus"/></svg>إضافة جهة اتصال</button><button class="btn secondary block" type="button">إضافة مناسبة</button></div></div>
+    </div>
+    <nav class="tabbar"><button class="tab on" type="button"><svg class="i"><use href="#home"/></svg>الرئيسية</button><button class="tab" type="button"><svg class="i"><use href="#users"/></svg>جهات الاتصال</button><div class="fab"><svg class="i lg"><use href="#plus"/></svg></div><button class="tab" type="button"><svg class="i"><use href="#cal"/></svg>المناسبات</button><button class="tab" type="button"><svg class="i"><use href="#spark"/></svg>المساعد</button></nav>
+  </div></div><figcaption><b>الرئيسية · حالة فاضية</b>أول دقيقة للمستخدم: رسالة واحدة وزرار واحد واضح.</figcaption></figure>
+
+  <!-- 3 CONTACTS -->
+  <figure class="fig"><div class="ph" dir="rtl"><div class="ph-in">
+    <div class="sbar"><span>٩:٤١</span><span>● ● ●</span></div>
+    <div class="hd"><h3>جهات الاتصال</h3><button class="ib brand" type="button" aria-label="جهة جديدة"><svg class="i"><use href="#plus"/></svg></button></div>
+    <div class="scr" style="padding-inline-end:34px;gap:14px">
+      <div class="inp ph-t"><svg class="i" style="color:var(--muted)"><use href="#search"/></svg>ابحث بالاسم أو الهاتف</div>
+      <div class="chips scroll"><span class="chip on">الكل <small>٤</small></span><span class="chip">لك عندهم <small>٢</small></span><span class="chip">عليك لهم <small>٢</small></span><span class="chip">مؤرشفة <small>٠</small></span></div>
+      <div class="letter">ا</div>
+      <div class="li" style="padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg)"><div class="av">أ</div><div class="tx"><b>أحمد محمد عبد الرحمن</b><span>٠١٠١٢٣٤٥٦٧٨ · ١ حركة</span></div><div style="text-align:left"><div class="amt in num">+١٬٥٠٠</div><span class="pill p-s" style="height:20px;font-size:11px">دائن</span></div></div>
+      <div class="letter">ع</div>
+      <div class="li" style="padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg)"><div class="av">ع</div><div class="tx"><b>عبد الرحمن إبراهيم السيد الشناوي أبو العزم</b><span>٠١١٩٨٧٦٥٤٣٢ · ١ حركة</span></div><div style="text-align:left"><div class="amt out num">−٣٬٢٠٠</div><span class="pill p-d" style="height:20px;font-size:11px">مدين</span></div></div>
+      <div class="letter">م</div>
+      <div class="li" style="padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg)"><div class="av">م</div><div class="tx"><b>منى</b><span>صديق · ١ حركة</span></div><div style="text-align:left"><div class="amt out num">−٢٥٠</div><span class="pill p-d" style="height:20px;font-size:11px">مدين</span></div></div>
+      <div class="letter">M</div>
+      <div class="li" style="padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg)"><div class="av">M</div><div class="tx"><b>Mahmoud Hassan</b><span>زميل · ١ حركة</span></div><div style="text-align:left"><div class="amt in num">+٩٬٩٩٩٬٩٩٩</div><span class="pill p-s" style="height:20px;font-size:11px">دائن</span></div></div>
+    </div>
+    <div class="alpha" style="top:190px"><span>ا</span><span>ب</span><span>ت</span><span>ج</span><span>ح</span><span>د</span><span>ر</span><span>س</span><span>ع</span><span>م</span><span>ن</span><span>ه</span><span>ي</span><span>A</span><span>M</span><span>#</span></div>
+    <nav class="tabbar"><button class="tab" type="button"><svg class="i"><use href="#home"/></svg>الرئيسية</button><button class="tab on" type="button"><svg class="i"><use href="#users"/></svg>جهات الاتصال</button><div class="fab"><svg class="i lg"><use href="#plus"/></svg></div><button class="tab" type="button"><svg class="i"><use href="#cal"/></svg>المناسبات</button><button class="tab" type="button"><svg class="i"><use href="#spark"/></svg>المساعد</button></nav>
+  </div></div><figcaption><b>جهات الاتصال</b>الفهرس الأبجدي في عمود جانبي، الكروت بتاخد العرض كله من غير قطع، واسم طويل بسطر واحد.</figcaption></figure>
+
+  <!-- 4 CONTACT PROFILE -->
+  <figure class="fig"><div class="ph" dir="rtl"><div class="ph-in">
+    <div class="sbar"><span>٩:٤١</span><span>● ● ●</span></div>
+    <div class="hd c"><button class="ib" type="button" aria-label="رجوع"><svg class="i"><use href="#back"/></svg></button><h3>ملف جهة الاتصال</h3><button class="ib" type="button" aria-label="المزيد"><svg class="i"><use href="#dots"/></svg></button></div>
+    <div class="scr nb" style="align-items:stretch">
+      <div class="card" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px">
+        <div class="av xl">أ</div><h3 style="font-size:20px;font-weight:600">أحمد محمد عبد الرحمن</h3>
+        <div class="help">قريب · ٠١٠١٢٣٤٥٦٧٨</div>
+        <div class="num" style="font-size:30px;font-weight:600;color:var(--success);margin-top:6px">+١٬٥٠٠ <span style="font-size:15px">ج.م</span></div>
+        <span class="pill p-s">دائن · لك عنده</span>
+        <div style="display:flex;gap:8px;width:100%;margin-top:10px"><button class="btn primary" style="flex:1" type="button"><svg class="i"><use href="#plus"/></svg>إضافة حركة</button><button class="btn secondary" type="button"><svg class="i"><use href="#edit"/></svg>تعديل</button></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="card" style="padding:12px 14px"><div class="help">إجمالي دائن</div><b class="num" style="color:var(--success)">١٬٥٠٠</b></div><div class="card" style="padding:12px 14px"><div class="help">إجمالي مدين</div><b class="num" style="color:var(--danger)">٠</b></div></div>
+      <div class="sh"><h4>سجل الحركات</h4></div>
+      <div class="seg"><button class="on" type="button">الكل</button><button type="button">دفعت</button><button type="button">استلمت</button></div>
+      <div class="li" style="margin-top:-6px"><span class="ic s"><svg class="i"><use href="#up"/></svg></span><div class="tx"><b>نقوط فرح أخيه</b><span>٥ أكتوبر ٢٠٢٦ · دفعت</span></div><div class="amt in num">+١٬٥٠٠</div></div>
+    </div>
+    <div class="sheetbg" style="display:none"></div>
+  </div></div><figcaption><b>ملف جهة الاتصال</b>إجراء رئيسي واحد. الأرشفة والحذف في قايمة «⋯» مع تأكيد.</figcaption></figure>
+
+  <!-- 5 ADD TX -->
+  <figure class="fig"><div class="ph" dir="rtl"><div class="ph-in">
+    <div class="sbar"><span>٩:٤١</span><span>● ● ●</span></div>
+    <div class="hd c"><button class="ib" type="button"><svg class="i"><use href="#x"/></svg></button><h3>إضافة حركة</h3><span style="width:44px"></span></div>
+    <div class="scr nb" style="gap:16px">
+      <div class="seg" style="padding:5px"><button class="on" style="height:48px;background:var(--success);color:#fff" type="button"><svg class="i sm"><use href="#up"/></svg>دفعت نقوط</button><button style="height:48px" type="button"><svg class="i sm"><use href="#down"/></svg>استلمت نقوط</button></div>
+      <div style="text-align:center"><div class="help">المبلغ</div><div class="num" style="font-size:48px;font-weight:600;line-height:1.3;color:var(--success)">١٬٥٠٠<span style="font-size:18px;color:var(--muted);margin-inline-start:6px">ج.م</span></div><div class="help">يزيد ما لك عند هذا الشخص</div></div>
+      <div class="field"><label>جهة الاتصال</label>
+        <div class="chips scroll"><span class="chip" style="background:var(--brand-soft);border-style:dashed;color:var(--text-brand)"><svg class="i sm"><use href="#plus"/></svg>جديدة</span><span class="chip">أحمد محمد</span><span class="chip">عبد الرحمن إبراهيم…</span><span class="chip">منى</span></div></div>
+      <div class="field"><label>المناسبة <em>(اختياري)</em></label><div class="inp">بدون مناسبة<svg class="i sm" style="margin-inline-start:auto;color:var(--muted)"><use href="#chev"/></svg></div></div>
+      <div class="field"><label>ملاحظة <em>(اختياري)</em></label><div class="inp ph-t">مثال: نقوط فرح أخيه</div></div>
+      <div class="card" style="display:flex;gap:12px;align-items:center;padding:12px 14px"><span class="ic b"><svg class="i"><use href="#split"/></svg></span><div style="flex:1"><b style="font-size:14px">قسّم الفاتورة</b><div class="help">على عدة أشخاص بالتساوي أو بنسبة</div></div><svg class="i sm" style="color:var(--muted)"><use href="#chev"/></svg></div>
+    </div>
+    <div class="cta"><button class="btn primary block" type="button" disabled>حفظ الحركة</button><div class="help">اختر جهة اتصال لإكمال الحفظ</div></div>
+  </div></div><figcaption><b>إضافة حركة</b>المبلغ هو بطل الشاشة. الزرار المعطّل بيقول السبب. جهات الاتصال chips أفقية بدل قايمة طويلة.</figcaption></figure>
+
+  <!-- 6 BILL SPLIT -->
+  <figure class="fig"><div class="ph" dir="rtl"><div class="ph-in">
+    <div class="sbar"><span>٩:٤١</span><span>● ● ●</span></div>
+    <div class="hd c"><span style="width:44px"></span><h3>إضافة حركة</h3><span style="width:44px"></span></div>
+    <div class="scr" style="opacity:.5"><div class="seg"><button class="on" type="button">دفعت</button><button type="button">استلمت</button></div></div>
+    <div class="sheetbg"></div>
+    <div class="sheet">
+      <div class="grab"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center"><h3>تقسيم الفاتورة</h3><button class="ib" type="button" aria-label="إغلاق"><svg class="i"><use href="#x"/></svg></button></div>
+      <div class="help">الفاتورة <b class="num" style="color:var(--text)">١٬٥٠٠ ج.م</b> · اختر من تقسمها معهم</div>
+      <div class="seg"><button class="on" type="button">بالتساوي</button><button type="button">نسبة مئوية</button><button type="button">مبلغ محدد</button></div>
+      <div class="list" style="gap:0">
+        <div class="li"><span class="ic b" style="background:var(--brand);color:var(--on-brand)"><svg class="i"><use href="#check"/></svg></span><div class="tx"><b>أنا</b><span>حصّتك</span></div><div class="amt num">٥٠٠ ج.م</div></div>
+        <div class="li"><span class="ic b" style="background:var(--brand);color:var(--on-brand)"><svg class="i"><use href="#check"/></svg></span><div class="tx"><b>أحمد محمد عبد الرحمن</b></div><div class="amt num">٥٠٠ ج.م</div></div>
+        <div class="li"><span class="ic" style="border:1.5px solid var(--line-strong)"></span><div class="tx"><b>منى</b></div><div class="amt num" style="color:var(--muted)">—</div></div>
+        <div class="li"><span class="ic b" style="background:var(--brand);color:var(--on-brand)"><svg class="i"><use href="#check"/></svg></span><div class="tx"><b>Mahmoud Hassan</b></div><div class="amt num">٥٠٠ ج.م</div></div>
+      </div>
+      <div class="banner" style="background:var(--success-bg);color:var(--success)"><svg class="i sm"><use href="#check"/></svg>مجموع الحصص ١٬٥٠٠ ج.م. هتتسجل ٢ حركة دائن.</div>
+      <div style="display:flex;gap:8px"><button class="btn primary" style="flex:1" type="button">تأكيد القسمة</button><button class="btn secondary" type="button">إلغاء</button></div>
+    </div>
+  </div></div><figcaption><b>تقسيم الفاتورة</b>Bottom sheet بملخص حي. رسالة التحقق خضرا لما المجموع مضبوط وحمرا لما ناقص.</figcaption></figure>
+
+  <!-- 7 EVENTS -->
+  <figure class="fig"><div class="ph" dir="rtl"><div class="ph-in">
+    <div class="sbar"><span>٩:٤١</span><span>● ● ●</span></div>
+    <div class="hd"><h3>المناسبات</h3><button class="ib brand" type="button"><svg class="i"><use href="#plus"/></svg></button></div>
+    <div class="scr">
+      <div class="seg"><button class="on" type="button">قادمة</button><button type="button">سابقة</button></div>
+      <div class="card" style="display:flex;gap:12px;align-items:center"><div class="dtbox"><b>٥</b><span>أكتوبر</span></div><div style="flex:1;min-width:0"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>فرح أحمد ومنى</b><span class="pill p-w" style="height:22px">النهارده</span></div><div class="help" style="display:flex;gap:4px;align-items:center"><svg class="i sm"><use href="#pin"/></svg>قاعة النيل الكبرى للأفراح…</div></div><span class="pill p-b">فرح</span></div>
+      <div class="card" style="display:flex;gap:12px;align-items:center"><div class="dtbox" style="background:var(--raised);color:var(--text-2)"><b>١٢</b><span>أكتوبر</span></div><div style="flex:1"><b>عزاء الحاج محمود</b><div class="help">بعد ٧ أيام</div></div><span class="pill p-n">عزاء</span></div>
+      <div class="card" style="display:flex;gap:12px;align-items:center"><div class="dtbox" style="background:var(--raised);color:var(--text-2)"><b>٢٠</b><span>أكتوبر</span></div><div style="flex:1"><b>مولود جديد: سلمى</b><div class="help">بعد ١٥ يوم</div></div><span class="pill p-n">مولود</span></div>
+    </div>
+    <nav class="tabbar"><button class="tab" type="button"><svg class="i"><use href="#home"/></svg>الرئيسية</button><button class="tab" type="button"><svg class="i"><use href="#users"/></svg>جهات الاتصال</button><div class="fab"><svg class="i lg"><use href="#plus"/></svg></div><button class="tab on" type="button"><svg class="i"><use href="#cal"/></svg>المناسبات</button><button class="tab" type="button"><svg class="i"><use href="#spark"/></svg>المساعد</button></nav>
+  </div></div><figcaption><b>المناسبات</b>كارت بصندوق تاريخ وشارة النوع. مناسبة النهارده بتفضل في «قادمة» مع شارة «النهارده».</figcaption></figure>
+
+  <!-- 8 NEW EVENT -->
+  <figure class="fig"><div class="ph" dir="rtl"><div class="ph-in">
+    <div class="sbar"><span>٩:٤١</span><span>● ● ●</span></div>
+    <div class="hd c"><button class="ib" type="button"><svg class="i"><use href="#x"/></svg></button><h3>مناسبة جديدة</h3><span style="width:44px"></span></div>
+    <div class="scr nb" style="gap:14px">
+      <div class="field"><label>عنوان المناسبة</label><div class="inp focus">فرح أحمد ومنى</div></div>
+      <div class="field"><label>النوع</label><div class="chips"><span class="chip on"><svg class="i sm"><use href="#gift"/></svg>فرح</span><span class="chip">خطوبة</span><span class="chip">مولود</span><span class="chip">تخرج</span><span class="chip">عزاء</span><span class="chip">أخرى</span></div></div>
+      <div class="field"><label>التاريخ</label><div class="inp num"><svg class="i" style="color:var(--text-brand)"><use href="#cal"/></svg>٥ أكتوبر ٢٠٢٦</div></div>
+      <div class="field"><label>صاحب المناسبة <em>(اختياري)</em></label><div class="chips scroll"><span class="chip on">بدون تحديد</span><span class="chip">أحمد محمد</span><span class="chip">منى</span></div></div>
+      <div class="field"><label>المكان <em>(اختياري)</em></label><div class="inp ph-t"><svg class="i" style="color:var(--muted)"><use href="#pin"/></svg>مثال: قاعة النيل</div></div>
+    </div>
+    <div class="cta"><button class="btn primary block" type="button">حفظ المناسبة</button></div>
+  </div></div><figcaption><b>مناسبة جديدة</b>أنواع المناسبة chips، التاريخ بحقل واضح، وتركيز بحلقة مرئية.</figcaption></figure>
+
+  <!-- 9 EVENT LEDGER -->
+  <figure class="fig"><div class="ph" dir="rtl"><div class="ph-in">
+    <div class="sbar"><span>٩:٤١</span><span>● ● ●</span></div>
+    <div class="hd c"><button class="ib" type="button"><svg class="i"><use href="#back"/></svg></button><h3>دفتر المناسبة</h3><button class="ib" type="button"><svg class="i"><use href="#users"/></svg></button></div>
+    <div class="scr nb" style="gap:14px">
+      <div class="hero" style="padding:18px"><div style="font-size:18px;font-weight:600">فرح أحمد ومنى</div><div class="lbl">٥ أكتوبر ٢٠٢٦ · ٤ مشاركين</div><div class="big num" style="font-size:30px">٢٬٤٠٠<small>ج.م إجمالي المصروف</small></div></div>
+      <div class="sh"><h4>التسوية: من يدفع لمن</h4></div>
+      <div class="card" style="padding:4px 14px"><div class="li"><span class="ic d"><svg class="i"><use href="#swap"/></svg></span><div class="tx"><b>منى ← أنا</b><span>تسوية كاملة</span></div><div class="amt num">٦٠٠</div></div><div class="li"><span class="ic d"><svg class="i"><use href="#swap"/></svg></span><div class="tx"><b>Mahmoud ← أنا</b><span>تسوية كاملة</span></div><div class="amt num">٦٠٠</div></div></div>
+      <div class="sh"><h4>أرصدة المشاركين</h4></div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div><div style="display:flex;justify-content:space-between;font-size:13px"><b>أنا</b><span class="num" style="color:var(--success)">+١٬٨٠٠</span></div><div class="bar"><i style="width:80%;background:var(--success)"></i></div></div>
+        <div><div style="display:flex;justify-content:space-between;font-size:13px"><b>منى</b><span class="num" style="color:var(--danger)">−٦٠٠</span></div><div class="bar"><i style="width:27%;background:var(--danger)"></i></div></div>
+        <div><div style="display:flex;justify-content:space-between;font-size:13px"><b>أحمد</b><span class="num" style="color:var(--muted)">٠</span></div><div class="bar"><i style="width:2%;background:var(--line-strong)"></i></div></div>
+      </div>
+    </div>
+    <div class="cta"><button class="btn primary block" type="button"><svg class="i"><use href="#plus"/></svg>مصروف جماعي</button></div>
+  </div></div><figcaption><b>دفتر المناسبة</b>بطاقة إجمالي، قايمة تسوية واضحة بالأسماء، وأشرطة أرصدة بدل أرقام جافة.</figcaption></figure>
+
+  <!-- 10 SMART INPUT -->
+  <figure class="fig"><div class="ph" dir="rtl"><div class="ph-in">
+    <div class="sbar"><span>٩:٤١</span><span>● ● ●</span></div>
+    <div class="hd c"><button class="ib" type="button"><svg class="i"><use href="#x"/></svg></button><h3>إدخال ذكي</h3><span style="width:44px"></span></div>
+    <div class="scr nb" style="gap:14px">
+      <div class="field"><label style="display:flex;gap:6px;align-items:center"><svg class="i sm" style="color:var(--text-brand)"><use href="#spark"/></svg>اكتب أو تكلّم</label><div class="inp area" style="height:96px">دفعت ٧٥٠ جنيه لأحمد نقوط الفرح</div></div>
+      <div style="display:flex;gap:8px"><button class="btn primary" style="flex:1" type="button"><svg class="i"><use href="#send"/></svg>تحليل</button><button class="btn secondary" style="width:52px;padding:0" type="button" aria-label="تسجيل صوتي"><svg class="i"><use href="#mic"/></svg></button></div>
+      <div class="help">أمثلة: «استلمت ٣٠٠ من منى»، «عزاء الحاج محمود ٥٠٠»</div>
+      <div class="card" style="border-color:var(--brand);display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center"><b>فهمت كده</b><span class="pill p-b">تم التحليل</span></div>
+        <div class="li" style="border:0;padding:4px 0"><span class="ic s"><svg class="i"><use href="#up"/></svg></span><div class="tx"><b>دفعت نقوط · أحمد محمد</b><span>نقوط الفرح · اليوم</span></div><div class="amt in num">٧٥٠ ج.م</div></div>
+        <div style="display:flex;gap:8px"><button class="btn primary sm" style="flex:1" type="button">تأكيد وحفظ</button><button class="btn secondary sm" type="button">تعديل</button></div>
+      </div>
+    </div>
+  </div></div><figcaption><b>إدخال ذكي</b>النتيجة بتظهر كبطاقة تأكيد قابلة للتعديل قبل الحفظ.</figcaption></figure>
+
+  <!-- 11 SCAN -->
+  <figure class="fig"><div class="ph" dir="rtl"><div class="ph-in">
+    <div class="sbar"><span>٩:٤١</span><span>● ● ●</span></div>
+    <div class="hd c"><button class="ib" type="button"><svg class="i"><use href="#x"/></svg></button><h3>قراءة إيصال</h3><span style="width:44px"></span></div>
+    <div class="scr nb" style="gap:16px">
+      <div style="flex:1;border-radius:var(--r-xl);background:var(--hero);position:relative;display:grid;place-items:center;min-height:300px">
+        <div style="width:210px;height:270px;border:2px dashed var(--amber-400);border-radius:18px;display:grid;place-items:center;color:var(--on-hero);opacity:.9;text-align:center;font-size:13px;padding:16px"><div><svg class="i lg" style="color:var(--amber-400)"><use href="#scan"/></svg><p style="margin-top:8px">ضع الإيصال داخل الإطار<br>في إضاءة كويسة</p></div></div>
+      </div>
+      <div style="display:flex;gap:10px"><button class="btn primary" style="flex:1" type="button"><svg class="i"><use href="#cam"/></svg>تصوير إيصال</button><button class="btn secondary" style="flex:1" type="button"><svg class="i"><use href="#img"/></svg>من المعرض</button></div>
+    </div>
+  </div></div><figcaption><b>قراءة إيصال</b>إطار مرشد بدل شاشة فاضية، وزرّين واضحين.</figcaption></figure>
+
+  <!-- 12 PROFILE -->
+  <figure class="fig"><div class="ph" dir="rtl"><div class="ph-in">
+    <div class="sbar"><span>٩:٤١</span><span>● ● ●</span></div>
+    <div class="hd c"><button class="ib" type="button"><svg class="i"><use href="#back"/></svg></button><h3>الملف الشخصي</h3><span style="width:44px"></span></div>
+    <div class="scr nb" style="gap:14px">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px"><div class="av xl">م</div><button class="btn soft sm" type="button"><svg class="i sm"><use href="#img"/></svg>اختيار صورة</button></div>
+      <div class="field"><label>الاسم الكامل</label><div class="inp ph-t">اكتب اسمك</div></div>
+      <div class="field"><label>العملة الافتراضية</label><div class="seg"><button class="on" type="button">ج.م</button><button type="button">ر.س</button><button type="button">د.إ</button><button type="button">$</button></div></div>
+      <div class="sh"><h4>الأمان</h4></div>
+      <div class="card" style="padding:4px 14px"><div class="li"><span class="ic b"><svg class="i"><use href="#phone"/></svg></span><div class="tx"><b>رقم الهاتف</b><span>لم يُربط بعد. الربط بيسهّل استعادة حسابك</span></div><button class="btn soft sm" type="button">ربط</button></div><div class="li"><span class="ic b"><svg class="i"><use href="#lock"/></svg></span><div class="tx"><b>قفل بالبصمة</b><span>غير مدعوم على هذا الجهاز</span></div><span class="toggle" style="opacity:.5"></span></div></div>
+    </div>
+    <div class="cta"><button class="btn primary block" type="button">حفظ التغييرات</button></div>
+  </div></div><figcaption><b>الملف الشخصي</b>أقسام قصيرة وبطاقة أمان واحدة. الإعدادات غير المتاحة بتقول السبب.</figcaption></figure>
+
+  <!-- 13 ASSISTANT -->
+  <figure class="fig"><div class="ph" dir="rtl"><div class="ph-in">
+    <div class="sbar"><span>٩:٤١</span><span>● ● ●</span></div>
+    <div class="hd"><div class="av">م</div><div style="flex:1"><div style="font-size:12px;color:var(--muted)">صباح الخير</div><h3 style="font-size:20px">مرحباً، مستخدم</h3></div></div>
+    <div class="scr" style="opacity:.45"><div class="hero" style="height:140px"></div></div>
+    <div class="sheetbg"></div>
+    <div class="sheet" style="height:470px">
+      <div class="grab"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center"><h3 style="display:flex;gap:8px;align-items:center"><svg class="i" style="color:var(--text-brand)"><use href="#spark"/></svg>المساعد</h3><button class="ib" type="button"><svg class="i"><use href="#x"/></svg></button></div>
+      <div style="display:flex;flex-direction:column;gap:10px;flex:1">
+        <div class="bubble bot">أهلاً! اطلب اللي عايزه، مثلاً «سجّل ٥٠٠ لسامي» أو «افتح جهات الاتصال».</div>
+        <div class="bubble me">استلمت ٣٠٠ من سارة</div>
+        <div class="bubble bot">سجّلت استلمت ٣٠٠ ج.م من سارة. تحب تضيف ملاحظة؟</div>
+        <div class="chips"><span class="chip">أضف ملاحظة</span><span class="chip">تراجع</span></div>
+      </div>
+      <div class="inp ph-t" style="padding-inline-end:6px">اكتب طلبك…<span class="ib brand" style="margin-inline-start:auto;width:40px;height:40px"><svg class="i"><use href="#send"/></svg></span></div>
+    </div>
+  </div></div><figcaption><b>المساعد</b>Sheet بدل زرار عايم دايم، وفيه ردود سريعة للإجراءات.</figcaption></figure>
+
+  </div>
+</section>
+
+<section class="sec">
+  <h2>4 · الحركة</h2>
+  <p class="lead">كلها بـ transform وopacity بس (UI thread)، وبتتوقف مع prefers-reduced-motion.</p>
+  <div class="mot">
+    <div class="spec"><h4>ضغط الأزرار</h4><p>scale 0.98 عند اللمس.</p><code>120ms · ease-out</code></div>
+    <div class="spec"><h4>فتح الـ bottom sheet</h4><p>translateY من 100% مع تعتيم الخلفية.</p><code>320ms · cubic-bezier(.2,.8,.2,1)</code></div>
+    <div class="spec"><h4>مؤشر الـ tab bar</h4><p>الخط الكهرماني بينزلق للتبويب الجديد.</p><code>220ms · ease-in-out</code></div>
+    <div class="spec"><h4>عدّاد الرصيد</h4><p>الرقم بيعدّ من القيمة القديمة للجديدة بعد الحفظ.</p><code>600ms · ease-out</code></div>
+    <div class="spec"><h4>ظهور الحركة الجديدة</h4><p>الصف بيدخل بـ fade وtranslateY 8px.</p><code>240ms · ease-out</code></div>
+    <div class="spec"><h4>Toast</h4><p>بيطلع من تحت وبيختفي بعد 3 ثواني.</p><code>200ms · ease-out</code></div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>5 · ملاحظات التنفيذ</h2>
+  <p class="lead">لما نبدأ التنفيذ في الكود: الـ tokens تتحط في <code style="direction:ltr">global.css</code> و<code style="direction:ltr">palette.ts</code> (نفس الأسماء). بعدها الـ components، وبعدين شاشة شاشة. مفيش dependencies جديدة مطلوبة غير الخط Readex Pro (<code style="direction:ltr">expo-font</code> + <code style="direction:ltr">@expo-google-fonts/readex-pro</code>). التعديلات اللي محتاجة منطق مش تصميم: حساب «قادمة/سابقة» للمناسبة بتاريخ النهارده، ورسالة سبب تعطيل أزرار الحفظ.</p>
+</section>
+
+</div>
+
+<script>
+(function(){
+  var S=[["bg","--bg","خلفية الصفحة"],["surface","--surface","سطح"],["raised","--raised","سطح مرتفع"],["hero","--hero","بطاقة الرصيد"],["brand","--brand","كهرماني (إجراء)"],["brand-soft","--brand-soft","كهرماني فاتح"],["text","--text","نص أساسي"],["text-2","--text-2","نص ثانوي"],["muted","--muted","نص خافت"],["text-brand","--text-brand","نص كهرماني"],["success","--success","دائن"],["danger","--danger","مدين"],["warn","--warn","تحذير"],["line","--line","حد"],["line-strong","--line-strong","حد قوي"]];
+  var g=document.getElementById("sw");
+  S.forEach(function(s){var d=document.createElement("div");d.className="sw";d.innerHTML='<i style="background:var('+s[1]+')"></i><b>color/'+s[0]+'</b><span>'+s[2]+'</span>';g.appendChild(d)});
+  document.querySelectorAll(".seg").forEach(function(seg){seg.addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;seg.querySelectorAll("button").forEach(function(x){x.classList.remove("on")});b.classList.add("on")})});
+  document.querySelectorAll(".chips:not(.scroll) .chip").forEach(function(c){c.addEventListener("click",function(){var p=c.parentNode;p.querySelectorAll(".chip").forEach(function(x){x.classList.remove("on")});c.classList.add("on")})});
+})();
+</script>
