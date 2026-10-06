@@ -4,12 +4,14 @@ import {
   NavigationContainer,
 } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { CalendarDays, Home, Users } from 'lucide-react-native';
+import { CalendarDays, Home, Plus, Sparkles, Users } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AssistantLauncher } from '@/components/Assistant';
+import { AssistantLauncher, openAssistant } from '@/components/Assistant';
+import { PressableScale } from '@/components/motion';
+import { isAssistantAvailable } from '@/lib/gemini';
 import { lazyScreen } from '@/navigation/LazyScreen';
 import { navigationRef } from '@/navigation/navigationRef';
 import type { RootStackParamList, TabParamList } from '@/navigation/types';
@@ -48,6 +50,9 @@ const ProfileScreen = lazyScreen(() =>
 );
 
 const Tab = createBottomTabNavigator<TabParamList>();
+
+/** تبويبات تُنفّذ إجراءً ولا تعرض شاشة. */
+const NoScreen = () => null;
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 /** حبّة ذهبية خلف أيقونة التبويب النشط، وشفافة فيما عداه. */
@@ -141,6 +146,25 @@ function TabsNavigator() {
         }}
       />
       <Tab.Screen
+        name="Add"
+        component={NoScreen}
+        options={{
+          title: 'إضافة حركة',
+          tabBarButton: () => (
+            <View className="flex-1 items-center justify-center">
+              <PressableScale
+                onPress={() => navigationRef.isReady() && navigationRef.navigate('AddTransaction')}
+                accessibilityRole="button"
+                accessibilityLabel="إضافة حركة جديدة"
+                activeScale={0.92}
+                className="h-14 w-14 items-center justify-center rounded-full bg-primary shadow-float">
+                <Plus size={26} color={palette.onPrimary} />
+              </PressableScale>
+            </View>
+          ),
+        }}
+      />
+      <Tab.Screen
         name="Events"
         component={EventsScreen}
         options={{
@@ -152,6 +176,26 @@ function TabsNavigator() {
           ),
         }}
       />
+      {isAssistantAvailable() ? (
+        <Tab.Screen
+          name="Assistant"
+          component={NoScreen}
+          listeners={{
+            tabPress: (event) => {
+              event.preventDefault();
+              openAssistant();
+            },
+          }}
+          options={{
+            title: 'المساعد',
+            tabBarIcon: ({ color, size }) => (
+              <TabIcon focused={false}>
+                <Sparkles size={size} color={color} />
+              </TabIcon>
+            ),
+          }}
+        />
+      ) : null}
     </Tab.Navigator>
   );
 }

@@ -39,6 +39,10 @@ export const palette = {
   onPrimary: '#0F172A',
   onSecondary: '#FFFFFF',
   onAccent: '#0F172A',
+  /** بطاقة الرصيد: كحلي داكن، نصّه فاتح، ورقمه كهرماني. */
+  hero: '#0F172A',
+  onHero: '#FBF8F1',
+  heroAccent: '#FBBF24',
 } as const;
 
 export type Palette = typeof palette;

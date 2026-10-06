@@ -7,73 +7,86 @@ import { describeNet, formatAmount, formatNet, getStatusTheme } from '@/utils/le
 
 interface LedgerSummaryBarProps {
   summary: LedgerSummary;
-  /** يُستخدم كشريط ثابت أسفل الشاشة. */
-  floating?: boolean;
   /**
-   * يرفع الشريط فوق شريط التبويبات العائم.
+   * `hero`: بطاقة الرصيد الكبيرة في أول الرئيسية.
+   * `compact`: سطر واحد داخل الشاشة (قائمة جهات الاتصال).
    *
-   * شريط التبويبات مطلق أيضاً ويعلو هذا الشريط، فكان الصافي يختفي خلفه
-   * في شاشات التبويبات. الشاشات التي لا تحمل تبويبات تتركه `false`.
+   * كان الملخص شريطاً ثابتاً أسفل كل شاشة يأخذ نحو نصف ارتفاعها فوق
+   * شريط التبويبات؛ صار جزءاً من المحتوى يمرّ مع التمرير.
    */
-  aboveTabBar?: boolean;
+  variant?: 'hero' | 'compact';
 }
 
-/**
- * الشريط الثابت أسفل الشاشة: يعرض الصافي وحالته (دائن / مدين / متعادل)
- * مع تفصيل ما دُفع وما استُلم.
- */
+function statusIcon(status: LedgerSummary['status']) {
+  return status === 'credit' ? TrendingUp : status === 'debit' ? TrendingDown : Scale;
+}
+
+/** يعرض الصافي وحالته (دائن / مدين / متعادل) مع تفصيل ما دُفع وما استُلم. */
 export function LedgerSummaryBar({
   summary,
-  floating = true,
-  aboveTabBar = false,
+  variant = 'hero',
 }: LedgerSummaryBarProps) {
   const theme = getStatusTheme(summary.status);
-  const StatusIcon =
-    summary.status === 'credit'
-      ? TrendingUp
-      : summary.status === 'debit'
-        ? TrendingDown
-        : Scale;
+  const StatusIcon = statusIcon(summary.status);
 
-  return (
-    <View
-      className={`border-t border-line bg-accent-soft px-4 pt-3 ${
-        aboveTabBar ? 'pb-28' : 'pb-6'
-      } ${floating ? 'absolute inset-x-0 bottom-0' : ''}`}>
-      <View className="flex-row-reverse items-center justify-between">
+  if (variant === 'compact') {
+    return (
+      <View
+        accessible
+        accessibilityLabel={`${formatNet(summary.net, summary.currency)}، ${describeNet(summary)}`}
+        className="flex-row-reverse items-center justify-between rounded-2xl border border-line bg-surface px-4 py-3">
         <View className="flex-row-reverse items-center">
           <View
             className={`h-9 w-9 items-center justify-center rounded-full ${theme.bgClass}`}>
             <StatusIcon size={18} color={theme.color} />
           </View>
-          <View className="mr-2">
-            <Text className={`text-right text-lg font-bold ${theme.textClass}`}>
+          <View className="mr-3">
+            <Text className={`text-right text-base font-bold ${theme.textClass}`}>
               {formatNet(summary.net, summary.currency)}
             </Text>
-            <Text className="text-right text-[11px] text-ink-muted">
+            <Text className="text-right text-caption text-ink-muted">
               {describeNet(summary)}
             </Text>
           </View>
         </View>
-
         <View className={`rounded-full px-3 py-1 ${theme.bgClass}`}>
-          <Text className={`text-xs font-bold ${theme.textClass}`}>
+          <Text className={`text-xs font-bold ${theme.textClass}`}>{theme.label}</Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View className="overflow-hidden rounded-3xl bg-hero p-5 shadow-card">
+      <Text className="text-right text-caption text-hero-fg/75">صافي رصيدك</Text>
+      <Text
+        className="mt-1 text-right text-[34px] font-bold leading-[44px] text-hero-accent"
+        adjustsFontSizeToFit
+        numberOfLines={1}>
+        {formatNet(summary.net, summary.currency)}
+      </Text>
+
+      <View className="mt-2 flex-row-reverse items-center self-start">
+        <View className="flex-row-reverse items-center rounded-full bg-hero-accent/20 px-3 py-1">
+          <StatusIcon size={14} color="#FBBF24" />
+          <Text className="mr-1.5 text-xs font-bold text-hero-accent">
             {theme.label}
           </Text>
         </View>
+        <Text className="mr-2 text-caption text-hero-fg/75">{describeNet(summary)}</Text>
       </View>
 
-      <View className="mt-3 flex-row-reverse justify-between">
-        <View className="flex-1 items-center rounded-xl bg-primary/10 py-2">
-          <Text className="text-[11px] text-ink-muted">إجمالي دائن (دفعت)</Text>
-          <Text className="text-sm font-bold text-primary-strong">
+      <View className="mt-4 flex-row-reverse">
+        <View className="flex-1 rounded-2xl bg-hero-fg/10 px-3 py-2.5">
+          <Text className="text-right text-caption text-hero-fg/75">دفعت</Text>
+          <Text className="text-right text-base font-bold text-hero-fg">
             {formatAmount(summary.totalOut, summary.currency)}
           </Text>
         </View>
-        <View className="mx-2 w-2" />
-        <View className="flex-1 items-center rounded-xl bg-danger-soft py-2">
-          <Text className="text-[11px] text-ink-muted">إجمالي مدين (استلمت)</Text>
-          <Text className="text-sm font-bold text-danger">
+        <View className="w-2.5" />
+        <View className="flex-1 rounded-2xl bg-hero-fg/10 px-3 py-2.5">
+          <Text className="text-right text-caption text-hero-fg/75">استلمت</Text>
+          <Text className="text-right text-base font-bold text-hero-fg">
             {formatAmount(summary.totalIn, summary.currency)}
           </Text>
         </View>

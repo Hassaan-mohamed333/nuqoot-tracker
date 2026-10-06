@@ -6,7 +6,11 @@ import type { TransactionDirection } from '@/types';
 export type TabParamList = {
   Home: undefined;
   Contacts: undefined;
+  /** زرّ مركزي لا شاشة: يفتح إضافة حركة. */
+  Add: undefined;
   Events: undefined;
+  /** تبويب يفتح نافذة المساعد لا شاشة. */
+  Assistant: undefined;
 };
 
 /** المكدس الرئيسي. */

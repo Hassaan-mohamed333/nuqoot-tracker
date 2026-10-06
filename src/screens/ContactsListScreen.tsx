@@ -149,6 +149,10 @@ export function ContactsListScreen() {
         ) : null}
       </View>
 
+      <View className="mt-3 px-4">
+        <LedgerSummaryBar summary={visibleSummary} variant="compact" />
+      </View>
+
       {/* أفقي قابل للتمرير: أربع شرائح لا تتّسع لها الشاشات الضيّقة. */}
       <ScrollView
         horizontal
@@ -196,7 +200,7 @@ export function ContactsListScreen() {
         <SectionList
           ref={listRef}
           className="flex-1"
-          contentContainerClassName="px-4 pb-56"
+          contentContainerClassName="px-4 pb-36"
           sections={sections}
           keyExtractor={(item) => item.id}
           refreshing={loading}
@@ -267,7 +271,6 @@ export function ContactsListScreen() {
         />
       </View>
 
-      <LedgerSummaryBar summary={visibleSummary} aboveTabBar />
     </SafeAreaView>
   );
 }

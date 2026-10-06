@@ -67,6 +67,11 @@ module.exports = {
           line: token('glass-border'),
         },
         overlay: token('overlay'),
+        hero: {
+          DEFAULT: token('hero'),
+          fg: token('on-hero'),
+          accent: token('hero-accent'),
+        },
 
         // دلالات الدفتر، مربوطة بنفس الرموز حتى لا تتفرّع الهوية.
         credit: token('success'),

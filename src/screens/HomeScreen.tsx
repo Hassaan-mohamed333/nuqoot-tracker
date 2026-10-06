@@ -39,6 +39,14 @@ import { formatAmount } from '@/utils/ledger';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 
+/** الإجراءات السريعة تحت بطاقة الرصيد. «حركة» هي الأساسية. */
+const QUICK_ACTIONS = [
+  { route: 'AddTransaction', label: 'حركة', Icon: Plus, main: true },
+  { route: 'SmartInput', label: 'إدخال ذكي', Icon: Sparkles, main: false },
+  { route: 'ScanReceipt', label: 'إيصال', Icon: ScanLine, main: false },
+  { route: 'AddEvent', label: 'مناسبة', Icon: CalendarPlus, main: false },
+] as const;
+
 /** الشاشة الرئيسية: نظرة عامة على الواجبات، آخر الحركات، والمناسبات القادمة. */
 export function HomeScreen() {
   const navigation = useNavigation<Navigation>();
@@ -114,7 +122,7 @@ export function HomeScreen() {
     <SafeAreaView className="flex-1 bg-base" edges={['top']}>
       <ScrollView
         className="flex-1"
-        contentContainerClassName="p-4 pb-56"
+        contentContainerClassName="p-4 pb-36"
         refreshControl={
           <RefreshControl refreshing={loading} onRefresh={() => void refresh()} />
         }>
@@ -175,16 +183,6 @@ export function HomeScreen() {
                 accessibilityLabel="صورتك الشخصية"
               />
             </PressableScale>
-
-            <PressableScale
-              onPress={() => navigation.navigate('AddTransaction')}
-              accessibilityRole="button"
-              accessibilityLabel="إضافة حركة جديدة"
-              activeScale={0.9}
-              className="h-11 w-11 items-center justify-center rounded-full bg-primary">
-              <Plus size={22} color={palette.onPrimary} />
-            </PressableScale>
-
           </View>
         </View>
 
@@ -230,39 +228,33 @@ export function HomeScreen() {
           </View>
         ) : null}
 
-        <View className="mt-4 flex-row-reverse">
-          <Pressable
-            onPress={() => navigation.navigate('SmartInput')}
-            accessibilityRole="button"
-            className="flex-1 flex-row-reverse items-center justify-center rounded-full bg-primary py-3">
-            <Sparkles size={18} color={palette.onPrimary} />
-            <Text className="mr-2 text-sm font-bold text-primary-fg">إدخال ذكي</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => navigation.navigate('ScanReceipt')}
-            accessibilityRole="button"
-            className="mr-2 flex-1 flex-row-reverse items-center justify-center rounded-full border border-line bg-surface py-3">
-            <ScanLine size={18} color={palette.primaryStrong} />
-            <Text className="mr-2 text-sm font-bold text-primary-strong">
-              قراءة إيصال
-            </Text>
-          </Pressable>
+        <View className="mt-4">
+          <LedgerSummaryBar summary={totals} />
         </View>
 
-        <View className="mt-3 flex-row-reverse">
-          <View className="flex-1 rounded-2xl border border-line bg-surface p-4">
-            <Text className="text-right text-xs text-ink-muted">إجمالي ما دفعت</Text>
-            <Text className="text-right text-lg font-bold text-primary-strong">
-              {formatAmount(totals.totalOut, totals.currency)}
-            </Text>
-          </View>
-          <View className="w-3" />
-          <View className="flex-1 rounded-2xl border border-line bg-surface p-4">
-            <Text className="text-right text-xs text-ink-muted">إجمالي ما استلمت</Text>
-            <Text className="text-right text-lg font-bold text-danger">
-              {formatAmount(totals.totalIn, totals.currency)}
-            </Text>
-          </View>
+        <View className="mt-5 flex-row-reverse justify-between">
+          {QUICK_ACTIONS.map((action) => (
+            <PressableScale
+              key={action.route}
+              onPress={() => navigation.navigate(action.route)}
+              accessibilityRole="button"
+              accessibilityLabel={action.label}
+              activeScale={0.94}
+              className="w-[22%] items-center">
+              <View
+                className={`h-14 w-14 items-center justify-center rounded-[20px] ${
+                  action.main ? 'bg-primary' : 'border border-line bg-surface'
+                }`}>
+                <action.Icon
+                  size={24}
+                  color={action.main ? palette.onPrimary : palette.primaryStrong}
+                />
+              </View>
+              <Text className="mt-2 text-center text-caption font-bold text-ink">
+                {action.label}
+              </Text>
+            </PressableScale>
+          ))}
         </View>
 
         <Text className="mb-2 mt-6 text-right text-base font-bold text-ink">
@@ -312,8 +304,6 @@ export function HomeScreen() {
           ))
         )}
       </ScrollView>
-
-      <LedgerSummaryBar summary={totals} aboveTabBar />
 
       <TransactionEditSheet
         transaction={editing}

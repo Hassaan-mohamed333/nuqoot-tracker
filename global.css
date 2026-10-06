@@ -96,6 +96,15 @@
   --color-text-muted: 87 83 78; /* #57534E — Stone 600 */
   --color-text-subtle: 120 113 108; /* #78716C — Stone 500 */
 
+  /*
+   * بطاقة الرصيد: كحلي داكن واحدة في أول الرئيسية.
+   * نصّها `on-hero` فاتح، والرقم الكبير بكهرماني `hero-accent` (تباينه
+   * فوق الكحلي ‎10:1‎ تقريباً، فيصلح نصّاً هنا بعكس السطح الفاتح).
+   */
+  --color-hero: 15 23 42; /* #0F172A */
+  --color-on-hero: 251 248 241; /* #FBF8F1 */
+  --color-hero-accent: 251 191 36; /* #FBBF24 */
+
   --color-glass: 255 255 255;
   --color-glass-border: 255 255 255;
   --color-overlay: 28 25 23; /* #1C1917 — Stone 900 */

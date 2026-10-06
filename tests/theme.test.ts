@@ -180,6 +180,13 @@ describe('تباين اللوحة', () => {
  * لما لا يقبل صنفاً (أيقونات lucide، مؤشّر التحميل، سمة التنقّل).
  * انحرافُ أحدهما يظهر أيقونةً بلونٍ لا يشبه ما حولها.
  */
+describe('بطاقة الرصيد', () => {
+  test('النصّ والرقم الكهرماني مقروءان فوق الكحلي', () => {
+    assert.ok(contrast(palette.hero, palette.onHero) >= AA_TEXT);
+    assert.ok(contrast(palette.hero, palette.heroAccent) >= AA_TEXT);
+  });
+});
+
 describe('تطابق اللوحتين', () => {
   const css = read('global.css');
 
@@ -209,6 +216,9 @@ describe('تطابق اللوحتين', () => {
     ['text', palette.text],
     ['text-muted', palette.muted],
     ['text-subtle', palette.subtle],
+    ['hero', palette.hero],
+    ['on-hero', palette.onHero],
+    ['hero-accent', palette.heroAccent],
   ];
 
   for (const [token, value] of PAIRS) {

@@ -25,7 +25,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { confirmAction, reportError } from '@/lib/alerts';
 import { ContactEditSheet } from '@/components/ContactEditSheet';
 import { EventCard } from '@/components/EventCard';
-import { LedgerSummaryBar } from '@/components/LedgerSummaryBar';
 import { NetBalanceBadge } from '@/components/NetBalanceBadge';
 import { TransactionCard } from '@/components/TransactionCard';
 import { TransactionEditSheet } from '@/components/TransactionEditSheet';
@@ -216,7 +215,7 @@ export function ContactProfileScreen() {
     <SafeAreaView className="flex-1 bg-base" edges={['bottom']}>
       <ScrollView
         className="flex-1"
-        contentContainerClassName="p-4 pb-56"
+        contentContainerClassName="p-4 pb-12"
         refreshControl={
           <RefreshControl refreshing={loading} onRefresh={() => void refresh()} />
         }>
@@ -441,7 +440,6 @@ export function ContactProfileScreen() {
         )}
       </ScrollView>
 
-      <LedgerSummaryBar summary={summary} />
 
       <TransactionEditSheet
         transaction={editing}
