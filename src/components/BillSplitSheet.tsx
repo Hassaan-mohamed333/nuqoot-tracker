@@ -204,7 +204,7 @@ export function BillSplitSheet({
                     placeholderTextColor={palette.subtle}
                     className="flex-1 py-2 text-center text-sm text-ink"
                   />
-                  <Text className="text-[10px] text-ink-subtle">
+                  <Text className="text-[11px] text-ink-subtle">
                     {mode === 'percent' ? '%' : currency}
                   </Text>
                 </View>

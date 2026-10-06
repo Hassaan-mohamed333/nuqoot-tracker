@@ -79,7 +79,7 @@ export function EventCard({
       <View
         className={`h-[60px] w-[54px] items-center justify-center rounded-2xl ${dateTone}`}>
         <Text className={`text-xl font-bold ${dateText}`}>{day}</Text>
-        <Text className={`text-[11px] ${dateText}`}>{month}</Text>
+        <Text className={`text-caption ${dateText}`}>{month}</Text>
       </View>
 
       <View className="mx-3 min-w-0 flex-1">
@@ -92,7 +92,7 @@ export function EventCard({
           <View
             className={`mr-2 rounded-full px-2 py-0.5 ${EVENT_CHIP_BG[event.event_type]}`}>
             <Text
-              className={`text-[11px] font-semibold ${EVENT_CHIP_TEXT[event.event_type]}`}>
+              className={`text-caption font-semibold ${EVENT_CHIP_TEXT[event.event_type]}`}>
               {EVENT_LABELS[event.event_type]}
             </Text>
           </View>

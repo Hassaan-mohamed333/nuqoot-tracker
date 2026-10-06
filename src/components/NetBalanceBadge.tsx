@@ -12,7 +12,7 @@ interface NetBalanceBadgeProps {
 }
 
 const SIZE_CLASSES = {
-  sm: { container: 'px-2 py-1', amount: 'text-sm', label: 'text-[10px]' },
+  sm: { container: 'px-2 py-1', amount: 'text-sm', label: 'text-[11px]' },
   md: { container: 'px-3 py-1.5', amount: 'text-base', label: 'text-xs' },
   lg: { container: 'px-4 py-2', amount: 'text-2xl', label: 'text-sm' },
 } as const;

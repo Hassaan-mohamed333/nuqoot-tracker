@@ -179,7 +179,7 @@ export function EventParticipantsScreen() {
         <Text className="mb-2 mt-6 text-right text-sm font-bold text-ink">
           أعضاء من خارج جهات الاتصال
         </Text>
-        <Text className="mb-2 text-right text-[11px] text-ink-muted">
+        <Text className="mb-2 text-right text-caption text-ink-muted">
           لرحلة أو مناسبة عابرة: أضف اسماً دون إنشاء جهة اتصال. أرصدة هؤلاء
           تبقى داخل هذه المناسبة ولا تدخل دفتر النقوط.
         </Text>
@@ -231,7 +231,7 @@ export function EventParticipantsScreen() {
           </View>
         ) : null}
 
-        <Text className="mt-4 text-right text-[11px] text-ink-muted">
+        <Text className="mt-4 text-right text-caption text-ink-muted">
           المجموع: {selected.size + guests.length + (includeMe ? 1 : 0)} مشارك.
         </Text>
       </ScrollView>

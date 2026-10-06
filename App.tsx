@@ -1,5 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
+import { Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import './global.css';
@@ -16,7 +17,17 @@ export default function App() {
       <AuthProvider>
         {/* أرضية فاتحة دائماً، فأيقونات الشريط داكنة دائماً. */}
         <StatusBar style="dark" />
-        <AppGate />
+        {/* على الويب الواسع يُحصر التطبيق في عمود بعرض هاتف كبير؛ بدونه
+            تتمدّد البطاقة والإجراءات على عرض الشاشة كلّه (1280px). */}
+        <View
+          className="flex-1 bg-base"
+          style={
+            Platform.OS === 'web'
+              ? { width: '100%', maxWidth: 560, alignSelf: 'center' }
+              : undefined
+          }>
+          <AppGate />
+        </View>
       </AuthProvider>
     </SafeAreaProvider>
   );

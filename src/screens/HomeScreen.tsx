@@ -159,7 +159,7 @@ export function HomeScreen() {
                 className="ml-2 h-11 w-11 items-center justify-center rounded-full border border-line bg-surface">
                 <Archive size={20} color={palette.muted} />
                 <View className="absolute -right-1 -top-1 min-w-[18px] items-center rounded-full bg-primary px-1">
-                  <Text className="text-[10px] font-bold text-primary-fg">
+                  <Text className="text-[11px] font-bold text-primary-fg">
                     {archivedTransactions.length + archivedContacts.length}
                   </Text>
                 </View>

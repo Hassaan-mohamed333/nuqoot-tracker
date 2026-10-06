@@ -220,7 +220,7 @@ export function ScanReceiptScreen() {
       ) : null}
 
       {imageUri ? (
-        <Text className="mt-2 text-center text-[11px] text-ink-muted">
+        <Text className="mt-2 text-center text-caption text-ink-muted">
           تُرفع الصورة عند حفظ الحركة، لا قبل ذلك.
         </Text>
       ) : null}

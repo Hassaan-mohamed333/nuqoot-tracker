@@ -79,7 +79,7 @@ export function TransactionCard({
           {isIncoming ? '−' : '+'}
           {formatAmount(transaction.amount, transaction.currency)}
         </Text>
-        <Text className="text-[10px] text-ink-subtle">
+        <Text className="text-[11px] text-ink-subtle">
           {isIncoming ? 'استلمت' : 'دفعت'}
         </Text>
       </View>

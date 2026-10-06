@@ -179,7 +179,7 @@ export function ContactsListScreen() {
                 {chip.label}
               </Text>
               <Text
-                className={`text-[11px] font-bold ${
+                className={`text-caption font-bold ${
                   isActive ? 'text-primary-fg/70' : 'text-ink-subtle'
                 }`}>
                 {chip.count}

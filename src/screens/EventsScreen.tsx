@@ -63,7 +63,7 @@ export function EventsScreen() {
             onPress={() => navigation.navigate('AddEvent')}
             accessibilityRole="button"
             accessibilityLabel="إضافة مناسبة"
-            className="h-10 w-10 items-center justify-center rounded-full bg-primary">
+            className="h-11 w-11 items-center justify-center rounded-full bg-primary">
             <Plus size={20} color={palette.onPrimary} />
           </Pressable>
         </View>
@@ -81,7 +81,7 @@ export function EventsScreen() {
                 key={item.key}
                 onPress={() => setTab(item.key)}
                 accessibilityRole="button"
-                className={`ml-2 rounded-full px-4 py-1.5 ${
+                className={`ml-2 h-10 items-center justify-center rounded-full px-5 ${
                   isActive ? 'bg-primary' : 'bg-surface border border-line'
                 }`}>
                 <Text

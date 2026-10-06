@@ -198,7 +198,7 @@ export function AuthScreen() {
                   المتابعة في الوضع التجريبي
                 </Text>
               </Pressable>
-              <Text className="mt-2 text-center text-[11px] text-ink-subtle">
+              <Text className="mt-2 text-center text-caption text-ink-subtle">
                 الوضع التجريبي يحفظ كل شيء على هذا الجهاز فقط، بلا مزامنة.
               </Text>
             </View>
@@ -266,7 +266,7 @@ export function AuthScreen() {
                   />
                 ))}
               </View>
-              <Text className="mt-1.5 text-right text-[11px] leading-4 text-ink-muted">
+              <Text className="mt-1.5 text-right text-caption leading-4 text-ink-muted">
                 {password.length === 0
                   ? `${LIMITS.passwordMin} محارف على الأقل، وثلاثة أنواع من: حروف صغيرة، كبيرة، أرقام، رموز.`
                   : strength.ok
@@ -326,7 +326,7 @@ export function AuthScreen() {
             </Text>
           </Pressable>
 
-          <Text className="mt-3 text-center text-[11px] text-ink-muted">
+          <Text className="mt-3 text-center text-caption text-ink-muted">
             حساب الضيف يحفظ بياناتك على هذا الجهاز فقط. اربطه ببريد لاحقاً
             للمزامنة.
           </Text>

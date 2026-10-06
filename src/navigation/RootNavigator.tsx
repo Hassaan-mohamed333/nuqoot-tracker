@@ -94,8 +94,8 @@ function TabsNavigator() {
          * تسمية أصغر بسطر واحد: 11 مع ارتفاع 64 كانت تقصّ الكلمات
          * ("ال ئيسية" بدل "الرئيسية")، والعربية أعرض من اللاتينية.
          */
-        tabBarLabelStyle: { fontSize: 10, marginTop: 2 },
-        tabBarIconStyle: { marginTop: 2 },
+        tabBarLabelStyle: { fontSize: 11, lineHeight: 16, marginTop: 4 },
+        tabBarIconStyle: { marginTop: 0 },
         /*
          * شريط عائم بشكل حبّة، لا شريطاً ملتصقاً بأسفل الشاشة: هذا شكله
          * في المرجعين معاً. كونه مطلقاً يعني أنه يغطّي أسفل المحتوى، لذا
@@ -105,7 +105,7 @@ function TabsNavigator() {
           position: 'absolute',
           marginHorizontal: 16,
           marginBottom: Math.max(insets.bottom, 12),
-          height: 72,
+          height: 76,
           borderRadius: 36,
           borderTopWidth: 0,
           paddingBottom: 10,
@@ -138,6 +138,8 @@ function TabsNavigator() {
         component={ContactsListScreen}
         options={{
           title: 'جهات الاتصال',
+          // اسم قصير في الشريط: «جهات الاتصال» تُقصّ على 320px.
+          tabBarLabel: 'الجهات',
           tabBarIcon: ({ color, size, focused }) => (
             <TabIcon focused={focused}>
               <Users size={size} color={focused ? palette.onAccent : color} />

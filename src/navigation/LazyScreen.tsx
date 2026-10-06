@@ -67,7 +67,7 @@ class ScreenErrorBoundary extends React.Component<
           <Text className="mt-2 text-center text-xs text-ink-muted">
             {this.state.message}
           </Text>
-          <Text className="mt-3 text-center text-[11px] text-ink-subtle">
+          <Text className="mt-3 text-center text-caption text-ink-subtle">
             الميزات التي تحتاج الكاميرا أو الميكروفون تتطلب development build،
             ولا تعمل في Expo Go.
           </Text>

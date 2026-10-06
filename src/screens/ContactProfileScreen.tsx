@@ -303,7 +303,7 @@ export function ContactProfileScreen() {
 
           {isArchived ? (
             <View className="mt-3 rounded-full bg-line/60 px-3 py-1">
-              <Text className="text-[11px] font-semibold text-ink-muted">
+              <Text className="text-caption font-semibold text-ink-muted">
                 مؤرشف — الحساب مسوّى
               </Text>
             </View>
@@ -312,7 +312,7 @@ export function ContactProfileScreen() {
 
         <View className="mt-4 flex-row-reverse">
           <View className="flex-1 rounded-2xl border border-line bg-surface p-3">
-            <Text className="text-right text-[11px] text-ink-muted">
+            <Text className="text-right text-caption text-ink-muted">
               إجمالي دائن
             </Text>
             <Text className="text-right text-base font-bold text-primary-strong">
@@ -321,7 +321,7 @@ export function ContactProfileScreen() {
           </View>
           <View className="w-3" />
           <View className="flex-1 rounded-2xl border border-line bg-surface p-3">
-            <Text className="text-right text-[11px] text-ink-muted">
+            <Text className="text-right text-caption text-ink-muted">
               إجمالي مدين
             </Text>
             <Text className="text-right text-base font-bold text-danger">
@@ -348,7 +348,7 @@ export function ContactProfileScreen() {
                 key={item.key}
                 onPress={() => setFilter(item.key)}
                 accessibilityRole="button"
-                className={`ml-2 rounded-full px-3 py-1 ${
+                className={`ml-2 h-10 items-center justify-center rounded-full px-4 ${
                   isActive ? 'bg-primary' : 'bg-surface border border-line'
                 }`}>
                 <Text

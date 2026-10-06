@@ -1,10 +1,8 @@
-import { ChevronLeft } from 'lucide-react-native';
 import React from 'react';
 import { Text, View } from 'react-native';
 
 import { PressableScale } from '@/components/motion';
 import { NetBalanceBadge } from '@/components/NetBalanceBadge';
-import { palette } from '@/lib/palette';
 import type { ContactWithSummary } from '@/types';
 
 interface ContactRowProps {
@@ -47,7 +45,6 @@ export function ContactRow({ contact, onPress }: ContactRowProps) {
       </View>
 
       <NetBalanceBadge summary={contact.summary} size="sm" />
-      <ChevronLeft size={18} color={palette.muted} />
     </PressableScale>
   );
 }

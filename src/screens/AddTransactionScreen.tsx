@@ -540,7 +540,7 @@ function PillAction({
       accessibilityRole="button"
       accessibilityLabel={label}
       activeScale={0.94}
-      className="flex-row-reverse items-center rounded-full border border-accent/50 bg-accent-soft px-3 py-1">
+      className="h-10 flex-row-reverse items-center rounded-full border border-accent/50 bg-accent-soft px-4">
       {icon}
       <Text className="mr-1 text-caption font-bold text-ink">{label}</Text>
     </PressableScale>

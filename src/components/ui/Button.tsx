@@ -55,7 +55,7 @@ const label = sv({
       contrast: 'text-ink',
       glass: 'text-ink',
       ghost: 'text-primary-strong',
-      muted: 'text-ink-subtle',
+      muted: 'text-ink-muted',
     },
     size: { sm: 'text-xs', md: 'text-sm', lg: 'text-base' },
   },

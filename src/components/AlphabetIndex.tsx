@@ -36,17 +36,17 @@ export function AlphabetIndex({
             key={letter}
             disabled={!isActive}
             onPress={() => onSelectLetter(letter)}
-            hitSlop={4}
+            hitSlop={6}
             accessibilityRole="button"
             accessibilityLabel={`الانتقال إلى حرف ${letter}`}
-            className="py-[1px]">
+            className="min-w-[24px] items-center py-[2px]">
             <Text
               className={
                 isSelected
-                  ? 'text-[11px] font-bold text-primary-strong'
+                  ? 'text-caption font-bold text-primary-strong'
                   : isActive
-                    ? 'text-[11px] font-semibold text-ink'
-                    : 'text-[11px] text-ink-subtle'
+                    ? 'text-caption font-semibold text-ink'
+                    : 'text-caption text-ink-subtle'
               }>
               {letter}
             </Text>

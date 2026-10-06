@@ -269,7 +269,7 @@ export function SmartInputScreen() {
             <Row label="الملاحظة" value={result.note ?? '—'} />
 
             {result.contactName && !matchedContact ? (
-              <Text className="mt-2 text-right text-[11px] text-ink-muted">
+              <Text className="mt-2 text-right text-caption text-ink-muted">
                 لا توجد جهة اتصال بهذا الاسم — ستحتاج لاختيارها أو إضافتها.
               </Text>
             ) : null}
@@ -282,7 +282,7 @@ export function SmartInputScreen() {
                 مراجعة في النموذج
               </Text>
             </Pressable>
-            <Text className="mt-2 text-center text-[11px] text-ink-muted">
+            <Text className="mt-2 text-center text-caption text-ink-muted">
               لا يُحفظ شيء قبل مراجعتك.
             </Text>
           </View>

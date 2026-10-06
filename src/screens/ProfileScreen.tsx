@@ -443,7 +443,7 @@ export function ProfileScreen() {
           {verifiedPhone ? (
             <View className="flex-row-reverse items-center rounded-full bg-success/15 px-2 py-0.5">
               <ShieldCheck size={12} color={palette.success} />
-              <Text className="mr-1 text-[10px] font-bold text-success">
+              <Text className="mr-1 text-[11px] font-bold text-success">
                 موثَّق
               </Text>
             </View>
