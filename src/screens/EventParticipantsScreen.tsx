@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 
 import { reportError } from '@/lib/alerts';
+import { Button, CheckRow, Field } from '@/components/ui';
 import { palette } from '@/lib/palette';
 import { fetchEventLedger, setEventParticipants } from '@/lib/repository';
 import { logStepFailure, userMessage } from '@/lib/supabaseError';
@@ -153,17 +154,11 @@ export function EventParticipantsScreen() {
         ) : null}
 
         <View className="rounded-2xl border border-line bg-surface p-2">
-          <Pressable
-            onPress={() => setIncludeMe((current) => !current)}
-            accessibilityRole="button"
-            className={`mb-1 flex-row-reverse items-center justify-between rounded-xl px-3 py-2 ${
-              includeMe ? 'bg-primary/10' : ''
-            }`}>
-            <Text className="text-right text-sm font-semibold text-ink">
-              {ME_LABEL}
-            </Text>
-            {includeMe ? <Check size={16} color={palette.primaryStrong} /> : null}
-          </Pressable>
+          <CheckRow
+            label={ME_LABEL}
+            checked={includeMe}
+            onToggle={() => setIncludeMe((current) => !current)}
+          />
 
           {sortedContacts.length === 0 ? (
             <Text className="p-3 text-right text-xs text-ink-muted">
@@ -171,20 +166,12 @@ export function EventParticipantsScreen() {
             </Text>
           ) : (
             sortedContacts.map((contact) => (
-              <Pressable
+              <CheckRow
                 key={contact.id}
-                onPress={() => toggle(contact.id)}
-                accessibilityRole="button"
-                className={`mb-1 flex-row-reverse items-center justify-between rounded-xl px-3 py-2 ${
-                  selected.has(contact.id) ? 'bg-primary/10' : ''
-                }`}>
-                <Text className="text-right text-sm text-ink">
-                  {contact.full_name}
-                </Text>
-                {selected.has(contact.id) ? (
-                  <Check size={16} color={palette.primaryStrong} />
-                ) : null}
-              </Pressable>
+                label={contact.full_name}
+                checked={selected.has(contact.id)}
+                onToggle={() => toggle(contact.id)}
+              />
             ))
           )}
         </View>
@@ -197,25 +184,29 @@ export function EventParticipantsScreen() {
           تبقى داخل هذه المناسبة ولا تدخل دفتر النقوط.
         </Text>
 
-        <View className="flex-row-reverse">
-          <TextInput
+        <View className="flex-row-reverse items-start">
+          <Field
+            className="flex-1"
             value={guestDraft}
             onChangeText={setGuestDraft}
             onSubmitEditing={addGuest}
             returnKeyType="done"
             placeholder="اسم العضو"
-            placeholderTextColor={palette.muted}
-            className="flex-1 rounded-xl border border-line bg-surface px-4 py-3 text-right text-sm text-ink"
           />
           <Pressable
             onPress={addGuest}
             disabled={guestDraft.trim().length === 0}
             accessibilityRole="button"
             accessibilityLabel="إضافة عضو"
-            className={`mr-2 h-12 w-12 items-center justify-center rounded-xl ${
-              guestDraft.trim().length === 0 ? 'bg-line-strong' : 'bg-primary'
+            className={`mr-2 h-[52px] w-[52px] items-center justify-center rounded-full ${
+              guestDraft.trim().length === 0
+                ? 'bg-surface-raised'
+                : 'border border-primary-strong/70 bg-primary'
             }`}>
-            <UserPlus size={20} color={palette.onPrimary} />
+            <UserPlus
+              size={20}
+              color={guestDraft.trim().length === 0 ? palette.subtle : palette.onPrimary}
+            />
           </Pressable>
         </View>
 
@@ -246,19 +237,12 @@ export function EventParticipantsScreen() {
       </ScrollView>
 
       <View className="absolute inset-x-0 bottom-0 border-t border-line bg-surface p-4 pb-6">
-        <Pressable
+        <Button
+          title="حفظ المشاركين"
           onPress={() => void handleSave()}
-          disabled={saving}
-          accessibilityRole="button"
-          className={`items-center rounded-full py-3 ${
-            saving ? 'bg-line-strong' : 'bg-primary'
-          }`}>
-          {saving ? (
-            <ActivityIndicator color={palette.onPrimary} />
-          ) : (
-            <Text className="text-base font-bold text-primary-fg">حفظ المشاركين</Text>
-          )}
-        </Pressable>
+          loading={saving}
+          size="lg"
+        />
       </View>
     </View>
   );

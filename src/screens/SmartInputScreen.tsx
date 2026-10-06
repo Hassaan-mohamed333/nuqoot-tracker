@@ -22,6 +22,7 @@ import {
 import { notify, reportError } from '@/lib/alerts';
 import { smartParse } from '@/lib/ai';
 import { readLocalFile } from '@/lib/files';
+import { Button, Field } from '@/components/ui';
 import { palette } from '@/lib/palette';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
@@ -163,34 +164,41 @@ export function SmartInputScreen() {
           مثال: {EXAMPLES[0]}
         </Text>
 
-        <TextInput
+        <Field
+          className="mt-3"
           value={text}
           onChangeText={setText}
           multiline
           placeholder="اكتب ما حدث بلغتك…"
-          placeholderTextColor={palette.muted}
-          className="mt-3 min-h-24 rounded-2xl border border-line bg-surface px-4 py-3 text-right text-base text-ink"
+          inputClassName="min-h-24 text-ink"
         />
 
+        {/* أمثلة بنقرة واحدة: تملأ الحقل فتُظهر ما يفهمه التحليل. */}
+        <View className="mt-3 flex-row-reverse flex-wrap">
+          {EXAMPLES.slice(0, 3).map((example) => (
+            <Pressable
+              key={example}
+              onPress={() => setText(example)}
+              accessibilityRole="button"
+              className="mb-2 ml-2 rounded-full border border-line-strong bg-surface px-3 py-2">
+              <Text className="text-caption font-semibold text-ink-muted">
+                {example}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
         <View className="mt-3 flex-row-reverse">
-          <Pressable
+          <Button
+            title="تحليل"
             onPress={() => void runParse({ text })}
             disabled={busy || recording || text.trim().length === 0}
-            accessibilityRole="button"
-            className={`flex-1 flex-row-reverse items-center justify-center rounded-full py-3 ${
-              busy || recording || text.trim().length === 0
-                ? 'bg-line-strong'
-                : 'bg-primary'
-            }`}>
-            {busy ? (
-              <ActivityIndicator color={palette.onPrimary} />
-            ) : (
-              <>
-                <Send size={18} color={palette.onPrimary} />
-                <Text className="mr-2 text-base font-bold text-primary-fg">تحليل</Text>
-              </>
-            )}
-          </Pressable>
+            loading={busy}
+            icon={<Send size={18} color={palette.onPrimary} />}
+            block={false}
+            size="lg"
+            className="flex-1"
+          />
 
           <Pressable
             onPress={() =>
@@ -199,8 +207,8 @@ export function SmartInputScreen() {
             disabled={busy}
             accessibilityRole="button"
             accessibilityLabel={recording ? 'إيقاف التسجيل' : 'تسجيل صوتي'}
-            className={`mr-2 h-12 w-12 items-center justify-center rounded-2xl ${
-              recording ? 'bg-danger' : 'border border-line bg-surface'
+            className={`mr-2 h-14 w-14 items-center justify-center rounded-full ${
+              recording ? 'bg-danger' : 'border border-line-strong bg-surface'
             }`}>
             {recording ? (
               <Square size={18} color="#ffffff" />

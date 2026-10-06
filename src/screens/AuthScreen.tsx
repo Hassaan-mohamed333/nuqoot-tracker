@@ -21,6 +21,7 @@ import Svg, { Path } from 'react-native-svg';
 import { AppLogo } from '@/components/brand/AppLogo';
 import { notify, reportError } from '@/lib/alerts';
 import { APP_NAME } from '@/lib/brand';
+import { Button, Field, SegmentedControl } from '@/components/ui';
 import { palette } from '@/lib/palette';
 import { SUPABASE_CONFIG_MESSAGES } from '@/lib/supabase';
 import { userMessage } from '@/lib/supabaseError';
@@ -212,54 +213,31 @@ export function AuthScreen() {
             </View>
           ) : null}
 
-          <View className="mt-8 flex-row-reverse">
-            {(
-              [
-                { key: 'signIn', label: 'دخول' },
-                { key: 'signUp', label: 'حساب جديد' },
-              ] as const
-            ).map((item) => {
-              const isActive = mode === item.key;
-              return (
-                <Pressable
-                  key={item.key}
-                  onPress={() => setMode(item.key)}
-                  accessibilityRole="button"
-                  className={`ml-2 rounded-full px-4 py-1.5 ${
-                    isActive ? 'bg-primary' : 'border border-line bg-surface'
-                  }`}>
-                  <Text
-                    className={`text-xs font-semibold ${
-                      isActive ? 'text-primary-fg' : 'text-ink-muted'
-                    }`}>
-                    {item.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <SegmentedControl
+            className="mt-8"
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: 'signIn', label: 'دخول' },
+              { value: 'signUp', label: 'حساب جديد' },
+            ]}
+          />
 
-          <Text className="mb-2 mt-6 text-right text-sm font-bold text-ink">
-            البريد الإلكتروني
-          </Text>
-          <View className="flex-row-reverse items-center rounded-xl border border-line bg-surface px-3">
-            <Mail size={16} color={palette.muted} />
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              autoComplete="email"
-              keyboardType="email-address"
-              placeholder="name@example.com"
-              placeholderTextColor={palette.muted}
-              className="mx-2 flex-1 py-3 text-right text-sm text-ink"
-            />
-          </View>
+          <Field
+            className="mt-6"
+            label="البريد الإلكتروني"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            autoComplete="email"
+            keyboardType="email-address"
+            placeholder="name@example.com"
+            icon={<Mail size={16} color={palette.muted} />}
+          />
 
-          <Text className="mb-2 mt-4 text-right text-sm font-bold text-ink">
-            كلمة المرور
-          </Text>
-          <TextInput
+          <Field
+            className="mt-4"
+            label="كلمة المرور"
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -270,8 +248,6 @@ export function AuthScreen() {
                 ? `${LIMITS.passwordMin} محارف على الأقل`
                 : 'كلمة المرور'
             }
-            placeholderTextColor={palette.muted}
-            className="rounded-xl border border-line bg-surface px-4 py-3 text-right text-sm text-ink"
           />
 
           {mode === 'signUp' ? (
@@ -300,24 +276,20 @@ export function AuthScreen() {
             </View>
           ) : null}
 
-          <Pressable
+          <Button
+            title={mode === 'signIn' ? 'تسجيل الدخول' : 'إنشاء الحساب'}
             onPress={() => void handleEmailSubmit()}
             disabled={!isValid || busy}
-            accessibilityRole="button"
-            className={`mt-6 flex-row-reverse items-center justify-center rounded-full py-3 ${
-              isValid && !busy ? 'bg-primary' : 'bg-line-strong'
-            }`}>
-            {busy ? (
-              <ActivityIndicator color={palette.onPrimary} />
-            ) : (
-              <>
-                <LogIn size={18} color={palette.onPrimary} />
-                <Text className="mr-2 text-base font-bold text-primary-fg">
-                  {mode === 'signIn' ? 'تسجيل الدخول' : 'إنشاء الحساب'}
-                </Text>
-              </>
-            )}
-          </Pressable>
+            loading={busy}
+            disabledReason={
+              !isValid
+                ? 'أدخل بريداً صحيحاً وكلمة مرور مقبولة لإكمال الدخول'
+                : undefined
+            }
+            icon={<LogIn size={18} color={palette.onPrimary} />}
+            size="lg"
+            className="mt-6"
+          />
 
           <View className="my-5 flex-row items-center">
             <View className="h-px flex-1 bg-line/60" />

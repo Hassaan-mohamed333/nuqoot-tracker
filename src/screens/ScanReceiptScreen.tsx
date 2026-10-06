@@ -4,6 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import {
   Camera,
   Image as ImageIcon,
+  ScanLine,
   Split,
   TriangleAlert,
 } from 'lucide-react-native';
@@ -19,6 +20,7 @@ import {
 
 import { notify } from '@/lib/alerts';
 import { scanReceipt, type ReceiptScan } from '@/lib/ai';
+import { Button } from '@/components/ui';
 import { palette } from '@/lib/palette';
 import type { RootStackParamList } from '@/navigation/types';
 import { formatAmount, formatDate } from '@/utils/ledger';
@@ -29,6 +31,13 @@ type Navigation = NativeStackNavigationProp<RootStackParamList>;
  * قارئ الإيصالات: التقاط أو اختيار صورة، استخراج المبلغ والتاريخ والمتجر،
  * ثم متابعة في نموذج الحركة. الصورة تُرفع عند الحفظ لا قبله.
  */
+/** نصائح تظهر قبل التصوير. */
+const RECEIPT_TIPS = [
+  'إضاءة كافية وبدون ظلّ على الورقة',
+  'الإيصال كاملاً وبدون ثنيات',
+  'ثبّت الهاتف قبل الالتقاط',
+];
+
 export function ScanReceiptScreen() {
   const navigation = useNavigation<Navigation>();
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -131,7 +140,26 @@ export function ScanReceiptScreen() {
           className="mt-4 h-64 w-full rounded-2xl"
           resizeMode="contain"
         />
-      ) : null}
+      ) : (
+        // بدل صفحة فاضية: إطار مرشد وثلاث نصائح تُحسّن القراءة.
+        <View className="mt-4 items-center rounded-3xl bg-hero p-6">
+          <View className="h-52 w-44 items-center justify-center rounded-2xl border-2 border-dashed border-hero-accent">
+            <ScanLine size={36} color={palette.heroAccent} />
+            <Text className="mt-3 text-center text-sm text-hero-fg">
+              ضع الإيصال داخل الإطار
+            </Text>
+          </View>
+          <View className="mt-5 w-full">
+            {RECEIPT_TIPS.map((tip) => (
+              <Text
+                key={tip}
+                className="mt-1 text-right text-caption text-hero-fg/80">
+                • {tip}
+              </Text>
+            ))}
+          </View>
+        </View>
+      )}
 
       {busy ? (
         <View className="mt-4 items-center">
@@ -169,14 +197,12 @@ export function ScanReceiptScreen() {
       ) : null}
 
       {imageUri && !busy ? (
-        <Pressable
+        <Button
+          title="متابعة في النموذج"
           onPress={() => continueToForm()}
-          accessibilityRole="button"
-          className="mt-6 items-center rounded-full bg-primary py-3">
-          <Text className="text-base font-bold text-primary-fg">
-            متابعة في النموذج
-          </Text>
-        </Pressable>
+          size="lg"
+          className="mt-6"
+        />
       ) : null}
 
       {/* فاتورةٌ بين عدّة أشخاص: نذهب إلى النموذج وورقة القسمة مفتوحة على

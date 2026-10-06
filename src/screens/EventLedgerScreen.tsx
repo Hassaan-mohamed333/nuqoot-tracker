@@ -13,7 +13,7 @@ import React, { useMemo } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BalanceBar, FadeSlideIn, staggerDelay } from '@/components/motion';
+import { BalanceBar, FadeSlideIn, PressableScale, staggerDelay } from '@/components/motion';
 import { Button, Card, SectionTitle } from '@/components/ui';
 import { useEventLedger } from '@/hooks/useEventLedger';
 import { palette } from '@/lib/palette';
@@ -120,26 +120,32 @@ export function EventLedgerScreen() {
           </Card>
         ) : null}
 
-        {/* بطاقة المناسبة: البنفسجي هوية المناسبات والمصاريف المشتركة. */}
-        <Card variant="secondary" index={0}>
-          <Text className="text-right text-display text-ink">{event.title}</Text>
-          <Text className="mt-1 text-right text-caption text-ink-muted">
+        {/* بطاقة المناسبة: نفس بطاقة الرصيد الداكنة في الرئيسية، فالدفتر
+            الجماعي يُقرأ كأنه امتداد لها. */}
+        <View className="rounded-3xl bg-hero p-5 shadow-card">
+          <Text numberOfLines={2} className="text-right text-display text-hero-fg">
+            {event.title}
+          </Text>
+          <Text className="mt-1 text-right text-caption text-hero-fg/75">
             {formatDate(event.event_date)}
             {event.location ? ` · ${event.location}` : ''}
           </Text>
 
           <View className="mt-4 flex-row-reverse items-end justify-between">
-            <View>
-              <Text className="text-right text-caption text-ink-muted">
+            <View className="flex-1">
+              <Text className="text-right text-caption text-hero-fg/75">
                 إجمالي المصروف
               </Text>
-              <Text className="text-right text-display-lg text-ink">
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                className="text-right text-[32px] font-bold leading-[42px] text-hero-accent">
                 {formatAmount(total, currency)}
               </Text>
             </View>
-            <View className="flex-row-reverse items-center rounded-full bg-secondary/15 px-3 py-1.5">
-              <Users size={14} color={palette.secondary} />
-              <Text className="mr-1.5 text-caption font-bold text-secondary">
+            <View className="flex-row-reverse items-center rounded-full bg-hero-fg/10 px-3 py-1.5">
+              <Users size={14} color={palette.onHero} />
+              <Text className="mr-1.5 text-caption font-bold text-hero-fg">
                 {participants.length} مشارك
               </Text>
             </View>
@@ -148,29 +154,30 @@ export function EventLedgerScreen() {
           <View className="mt-4 flex-row-reverse">
             <Button
               title="مصروف جماعي"
-              variant="secondary"
               size="sm"
               block={false}
               disabled={noParticipants}
               onPress={() =>
                 navigation.navigate('AddSharedExpense', { eventId: event.id })
               }
-              icon={<Plus size={16} color={palette.onSecondary} />}
+              icon={<Plus size={16} color={palette.onPrimary} />}
               className="flex-1"
             />
-            <Button
-              title="المشاركون"
-              variant="outline"
-              size="sm"
-              block={false}
+            <PressableScale
               onPress={() =>
                 navigation.navigate('EventParticipants', { eventId: event.id })
               }
-              icon={<Users size={16} color={palette.text} />}
-              className="mr-2 flex-1"
-            />
+              accessibilityRole="button"
+              accessibilityLabel="المشاركون"
+              activeScale={0.955}
+              className="mr-2 flex-1 flex-row-reverse items-center justify-center rounded-full border border-hero-fg/25 px-4 py-2.5">
+              <Users size={16} color={palette.onHero} />
+              <Text className="mr-2 text-center text-xs font-bold text-hero-fg">
+                المشاركون
+              </Text>
+            </PressableScale>
           </View>
-        </Card>
+        </View>
 
         {noParticipants ? (
           <Card variant="surface" className="mt-4 items-center" index={1}>

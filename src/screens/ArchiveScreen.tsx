@@ -146,7 +146,9 @@ export function ArchiveScreen() {
     return (
       <Screen scroll={false}>
         <View className="flex-1 items-center justify-center px-6">
-          <ArchiveRestore size={40} color={palette.subtle} />
+          <View className="h-20 w-20 items-center justify-center rounded-3xl bg-primary/15">
+            <ArchiveRestore size={34} color={palette.primaryStrong} />
+          </View>
           <Text className="mt-4 text-center text-base font-bold text-ink">
             الأرشيف فارغ
           </Text>
@@ -233,11 +235,13 @@ function ArchiveRow({
 }) {
   return (
     <View className="mb-2 flex-row-reverse items-center rounded-2xl border border-line bg-surface p-3">
-      <View className="flex-1">
-        <Text className="text-right text-base font-semibold text-ink">
+      <View className="min-w-0 flex-1">
+        <Text numberOfLines={1} className="text-right text-base font-semibold text-ink">
           {title}
         </Text>
-        <Text className="text-right text-xs text-ink-muted">{subtitle}</Text>
+        <Text numberOfLines={1} className="text-right text-xs text-ink-muted">
+          {subtitle}
+        </Text>
       </View>
 
       {busy ? (
@@ -249,19 +253,19 @@ function ArchiveRow({
             accessibilityRole="button"
             accessibilityLabel={`استعادة ${title}`}
             activeScale={0.9}
-            className="flex-row-reverse items-center rounded-full bg-primary/15 px-3 py-1.5">
+            className="h-9 flex-row-reverse items-center rounded-full bg-primary/15 px-3">
             <Undo2 size={14} color={palette.primaryStrong} />
             <Text className="mr-1 text-xs font-bold text-primary-strong">استعادة</Text>
           </PressableScale>
 
+          {/* الحذف النهائي أيقونة صغيرة منفصلة: لا يُضغط بالخطأ بجوار الاستعادة. */}
           <PressableScale
             onPress={onPurge}
             accessibilityRole="button"
             accessibilityLabel={`حذف ${title} نهائياً`}
             activeScale={0.9}
-            className="mr-2 flex-row-reverse items-center rounded-full bg-danger-soft px-3 py-1.5">
-            <Trash2 size={14} color={palette.danger} />
-            <Text className="mr-1 text-xs font-bold text-danger">حذف نهائي</Text>
+            className="mr-2 h-9 w-9 items-center justify-center rounded-full bg-danger-soft">
+            <Trash2 size={16} color={palette.danger} />
           </PressableScale>
         </View>
       )}
