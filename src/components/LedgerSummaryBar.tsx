@@ -68,7 +68,7 @@ export function LedgerSummaryBar({
 
       <View className="mt-2 flex-row-reverse items-center self-start">
         <View className="flex-row-reverse items-center rounded-full bg-hero-accent/20 px-3 py-1">
-          <StatusIcon size={14} color="#FBBF24" />
+          <StatusIcon size={14} color="#FACC15" />
           <Text className="mr-1.5 text-xs font-bold text-hero-accent">
             {theme.label}
           </Text>

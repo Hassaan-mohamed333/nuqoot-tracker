@@ -17,14 +17,14 @@ export const palette = {
   /**
    * الكهرماني يحمل الإجراء الرئيسي، و`primaryStrong` نصُّه وأيقوناته.
    *
-   * الفصل ليس ترفاً: #F59E0B فوق الأبيض تباينه ‎2.1:1‎، فلا يصلح لوناً
+   * الفصل ليس ترفاً: #FACC15 فوق الأبيض تباينه ‎1.5:1‎، فلا يصلح لوناً
    * لأيقونةٍ ولا لنصّ. وكل ما كان يستعمل `primary` لوناً لعنصر فوق سطح
-   * فاتح صار يستعمل `primaryStrong` (‎7.0:1‎ فوق الأبيض، ‎6.2:1‎ فوق
+   * فاتح صار يستعمل `primaryStrong` (‎8.7:1‎ فوق الأبيض، ‎7.8:1‎ فوق
    * السطح المرتفع الدافئ).
    */
-  primary: '#F59E0B',
-  primaryStrong: '#92400E',
-  accent: '#D97706',
+  primary: '#FACC15',
+  primaryStrong: '#713F12',
+  accent: '#C48603',
   secondary: '#003566',
   success: '#047857',
   danger: '#BE123C',
@@ -42,7 +42,7 @@ export const palette = {
   /** بطاقة الرصيد: كحلي داكن، نصّه فاتح، ورقمه كهرماني. */
   hero: '#0F172A',
   onHero: '#FBF8F1',
-  heroAccent: '#FBBF24',
+  heroAccent: '#FACC15',
 } as const;
 
 export type Palette = typeof palette;
@@ -59,8 +59,8 @@ export type Palette = typeof palette;
  */
 export const BRAND = {
   /** تدرّج اللوح: من الكهرماني الفاتح إلى العميق. */
-  badgeFrom: '#FBBF24',
-  badgeTo: '#D97706',
+  badgeFrom: '#FDE047',
+  badgeTo: '#EAB308',
   /** الرسم فوق اللوح: داكن، فالرسم الفاتح فوق الكهرماني لا يُرى. */
   badgeMark: '#0F172A',
 } as const;
