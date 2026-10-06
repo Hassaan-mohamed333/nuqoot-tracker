@@ -234,6 +234,15 @@ export function AddSharedExpenseScreen() {
           title="حفظ المصروف"
           onPress={() => void handleSave()}
           disabled={!isValid}
+          disabledReason={
+            description.trim().length === 0
+              ? 'اكتب وصف المصروف لإكمال الحفظ'
+              : !amountValid
+                ? 'أدخل المبلغ الإجمالي لإكمال الحفظ'
+                : payerId === ''
+                  ? 'اختر من دفع لإكمال الحفظ'
+                  : 'اختر من تُقسم عليهم ليتطابق مجموع الحصص مع المبلغ'
+          }
           loading={saving}
           size="lg"
         />

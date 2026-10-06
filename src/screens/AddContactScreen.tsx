@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 
+import { Button } from '@/components/ui';
 import { reportError } from '@/lib/alerts';
 import { palette } from '@/lib/palette';
 import type { RootStackParamList } from '@/navigation/types';
@@ -138,19 +139,15 @@ export function AddContactScreen() {
           className="rounded-xl border border-line bg-surface px-4 py-3 text-right text-sm text-ink"
         />
 
-        <Pressable
+        <Button
+          title="حفظ جهة الاتصال"
           onPress={() => void handleSave()}
           disabled={!isValid || saving}
-          accessibilityRole="button"
-          className={`mt-8 items-center rounded-full py-3 ${
-            isValid && !saving ? 'bg-primary' : 'bg-line-strong'
-          }`}>
-          {saving ? (
-            <ActivityIndicator color={palette.onPrimary} />
-          ) : (
-            <Text className="text-base font-bold text-primary-fg">حفظ جهة الاتصال</Text>
-          )}
-        </Pressable>
+          loading={saving}
+          disabledReason={!isValid ? 'اكتب اسماً من حرفين على الأقل لإكمال الحفظ' : undefined}
+          size="lg"
+          className="mt-8"
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   );

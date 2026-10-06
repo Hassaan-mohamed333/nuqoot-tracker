@@ -176,6 +176,11 @@ export function AddTransactionScreen() {
           }
           onPress={() => void handleSave()}
           disabled={!isValid}
+          disabledReason={
+            !amountValid
+              ? 'أدخل مبلغاً أكبر من صفر لإكمال الحفظ'
+              : 'اختر جهة اتصال لإكمال الحفظ'
+          }
           loading={saving}
           size="lg"
         />

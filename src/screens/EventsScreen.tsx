@@ -98,7 +98,7 @@ export function EventsScreen() {
 
       <FlatList
         className="mt-3 flex-1"
-        contentContainerClassName="px-4 pb-32"
+        contentContainerClassName="px-4 pb-36"
         data={visibleEvents}
         keyExtractor={(item) => item.id}
         refreshing={loading}

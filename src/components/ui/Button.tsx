@@ -28,6 +28,8 @@ const button = sv({
       // لمسة زجاجية: تعبئة شبه شفّافة فوق السطح مع حدّ فاتح.
       glass: 'border border-glass-line/40 bg-glass/15',
       ghost: 'bg-transparent',
+      /** حالة التعطيل: رمادي ورقي. الشفافية وحدها لا تظهر على الويب. */
+      muted: 'border border-line bg-surface-raised',
     },
     size: {
       // المرجع سخيّ في الحشوة الأفقية، فتبدو الحبّة ممتلئة لا ضيّقة.
@@ -36,7 +38,7 @@ const button = sv({
       lg: 'px-6 py-4',
     },
     block: { true: 'w-full', false: 'self-start' },
-    disabled: { true: 'opacity-45', false: '' },
+    disabled: { true: 'opacity-40', false: '' },
   },
   defaultVariants: { variant: 'primary', size: 'md', block: true },
 });
@@ -53,6 +55,7 @@ const label = sv({
       contrast: 'text-ink',
       glass: 'text-ink',
       ghost: 'text-primary-strong',
+      muted: 'text-ink-subtle',
     },
     size: { sm: 'text-xs', md: 'text-sm', lg: 'text-base' },
   },
@@ -67,7 +70,8 @@ export type ButtonVariant =
   | 'outline'
   | 'contrast'
   | 'glass'
-  | 'ghost';
+  | 'ghost'
+  | 'muted';
 
 interface ButtonProps {
   title: string;
@@ -82,6 +86,13 @@ interface ButtonProps {
   icon?: React.ReactNode;
   className?: string;
   accessibilityLabel?: string;
+  /**
+   * سبب تعطيل الزرّ، يُعرض تحته ما دام معطّلاً.
+   *
+   * كان الزرّ المعطّل يبهت فقط، فلا يعرف المستخدم ما الناقص. ولا يظهر
+   * السبب أثناء `loading` لأن التعطيل حينها ليس نقصاً في المدخلات.
+   */
+  disabledReason?: string;
 }
 
 /** الزرّ الأساسي: نغمات الهوية، وانكماش ملموس عند الضغط. */
@@ -96,13 +107,19 @@ export function Button({
   icon,
   className,
   accessibilityLabel,
+  disabledReason,
 }: ButtonProps) {
   const inactive = disabled || loading;
+  // المعطّل (لا الجاري تحميله) يُرى رمادياً: الكهرماني الساطع يوحي بأنه يعمل.
+  const shownVariant: ButtonVariant =
+    disabled && !loading && variant === 'primary' ? 'muted' : variant;
 
   // لون المؤشّر يتبع لون النص، وإلا اختفى فوق التعبئة.
   const spinnerColor = SPINNER_TONE[variant](palette);
 
-  return (
+  const showReason = disabled && !loading && Boolean(disabledReason);
+
+  const pressable = (
     <PressableScale
       onPress={inactive ? undefined : onPress}
       disabled={inactive}
@@ -110,16 +127,33 @@ export function Button({
       accessibilityState={{ disabled: inactive, busy: loading }}
       accessibilityLabel={accessibilityLabel ?? title}
       activeScale={size === 'lg' ? 0.975 : 0.955}
-      className={button({ variant, size, block, disabled: inactive, className })}>
+      className={button({
+        variant: shownVariant,
+        size,
+        block,
+        disabled: inactive,
+        className,
+      })}>
       {loading ? (
         <ActivityIndicator color={spinnerColor} size="small" />
       ) : (
         <>
           {icon ? <View className="ml-2">{icon}</View> : null}
-          <Text className={label({ variant, size })}>{title}</Text>
+          <Text className={label({ variant: shownVariant, size })}>{title}</Text>
         </>
       )}
     </PressableScale>
+  );
+
+  if (!showReason) return pressable;
+
+  return (
+    <View className={block ? 'w-full' : 'self-start'}>
+      {pressable}
+      <Text className="mt-2 text-center text-caption text-ink-muted">
+        {disabledReason}
+      </Text>
+    </View>
   );
 }
 
@@ -133,4 +167,5 @@ const SPINNER_TONE: Record<ButtonVariant, (palette: Palette) => string> = {
   contrast: (palette) => palette.text,
   glass: (palette) => palette.text,
   ghost: (palette) => palette.primaryStrong,
+  muted: (palette) => palette.subtle,
 };

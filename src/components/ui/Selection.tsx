@@ -35,7 +35,7 @@ export function CheckRow({
       activeScale={0.985}
       className={`mb-1 flex-row-reverse items-center rounded-tile px-3 py-2.5 ${
         checked ? 'bg-primary/10' : 'bg-transparent'
-      } ${disabled ? 'opacity-45' : ''}`}>
+      } ${disabled ? 'opacity-40' : ''}`}>
       <AnimatedCheck
         checked={checked}
         activeColor={palette.primary}

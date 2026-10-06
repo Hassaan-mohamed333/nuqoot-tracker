@@ -62,7 +62,7 @@ export function IconButton({
       className={iconButton({
         variant,
         size,
-        className: disabled ? `opacity-45 ${className ?? ''}` : className,
+        className: disabled ? `opacity-40 ${className ?? ''}` : className,
       })}>
       {children}
     </PressableScale>
