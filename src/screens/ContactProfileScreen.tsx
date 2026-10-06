@@ -3,6 +3,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   Archive,
+  MoreHorizontal,
   ArchiveRestore,
   CloudOff,
   Pencil,
@@ -29,6 +30,7 @@ import { NetBalanceBadge } from '@/components/NetBalanceBadge';
 import { TransactionCard } from '@/components/TransactionCard';
 import { TransactionEditSheet } from '@/components/TransactionEditSheet';
 import { useContactLedger } from '@/hooks/useContactLedger';
+import { Sheet } from '@/components/ui';
 import { palette } from '@/lib/palette';
 import type { RootStackParamList } from '@/navigation/types';
 import { useLedger } from '@/store/LedgerProvider';
@@ -54,6 +56,7 @@ export function ContactProfileScreen() {
 
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [editingContact, setEditingContact] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // استعلام مباشر مُرشَّح على الخادم بـ contact_id.
   const {
@@ -265,63 +268,36 @@ export function ContactProfileScreen() {
             <NetBalanceBadge summary={summary} size="lg" />
           </View>
 
-          <View className="mt-4 flex-row-reverse items-center">
+          {/* إجراء رئيسي واحد وثانوي واحد؛ الباقي (تسوية، أرشفة، استعادة)
+              في قائمة «⋯». الأزرار الحمراء بجوار الرئيسي كانت تُضغط بالخطأ. */}
+          <View className="mt-4 w-full flex-row-reverse items-center">
             <Pressable
               onPress={() =>
                 navigation.navigate('AddTransaction', { contactId: contact.id })
               }
               accessibilityRole="button"
-              className="flex-row-reverse items-center rounded-full bg-primary px-4 py-2">
-              <Plus size={16} color={palette.onPrimary} />
-              <Text className="mr-1 text-sm font-semibold text-primary-fg">
+              className="h-12 flex-1 flex-row-reverse items-center justify-center rounded-full border border-primary-strong/70 bg-primary">
+              <Plus size={18} color={palette.onPrimary} />
+              <Text className="mr-1.5 text-sm font-bold text-primary-fg">
                 إضافة حركة
               </Text>
             </Pressable>
 
-            {canSettle ? (
-              <Pressable
-                onPress={() => void confirmArchive()}
-                accessibilityRole="button"
-                className="mr-2 flex-row-reverse items-center rounded-xl border border-line-strong bg-surface px-4 py-2">
-                <Archive size={16} color={palette.text} />
-                <Text className="mr-1 text-sm font-semibold text-ink">
-                  تسوية وأرشفة
-                </Text>
-              </Pressable>
-            ) : null}
-
-            {isArchived ? (
-              <Pressable
-                onPress={() => void restore()}
-                accessibilityRole="button"
-                className="mr-2 flex-row-reverse items-center rounded-xl border border-line-strong bg-surface px-4 py-2">
-                <ArchiveRestore size={16} color={palette.text} />
-                <Text className="mr-1 text-sm font-semibold text-ink">
-                  استعادة
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
-
-          <View className="mt-3 flex-row-reverse items-center">
             <Pressable
               onPress={() => setEditingContact(true)}
               accessibilityRole="button"
               accessibilityLabel="تعديل بيانات جهة الاتصال"
-              className="flex-row-reverse items-center rounded-xl border border-line-strong bg-surface px-4 py-2">
+              className="mr-2 h-12 flex-row-reverse items-center rounded-full border border-line-strong bg-surface px-4">
               <Pencil size={15} color={palette.text} />
-              <Text className="mr-1 text-sm font-semibold text-ink">تعديل</Text>
+              <Text className="mr-1.5 text-sm font-semibold text-ink">تعديل</Text>
             </Pressable>
 
             <Pressable
-              onPress={() => void confirmArchiveContact()}
+              onPress={() => setMenuOpen(true)}
               accessibilityRole="button"
-              accessibilityLabel="نقل الحساب إلى الأرشيف"
-              className="mr-2 flex-row-reverse items-center rounded-xl bg-danger-soft px-4 py-2">
-              <Trash2 size={15} color={palette.danger} />
-              <Text className="mr-1 text-sm font-semibold text-danger">
-                حذف الحساب
-              </Text>
+              accessibilityLabel="المزيد من الإجراءات"
+              className="mr-2 h-12 w-12 items-center justify-center rounded-full border border-line-strong bg-surface">
+              <MoreHorizontal size={20} color={palette.text} />
             </Pressable>
           </View>
 
@@ -452,6 +428,79 @@ export function ContactProfileScreen() {
         onClose={() => setEditingContact(false)}
         onSave={saveContact}
       />
+
+      <Sheet visible={menuOpen} onClose={() => setMenuOpen(false)} title="إجراءات الحساب">
+        {canSettle ? (
+          <MenuRow
+            icon={<Archive size={20} color={palette.text} />}
+            label="تسوية وأرشفة"
+            hint="الرصيد صفر: انقل الحساب إلى الأرشيف"
+            onPress={() => {
+              setMenuOpen(false);
+              void confirmArchive();
+            }}
+          />
+        ) : null}
+        {isArchived ? (
+          <MenuRow
+            icon={<ArchiveRestore size={20} color={palette.text} />}
+            label="استعادة"
+            hint="أعد الحساب إلى القائمة"
+            onPress={() => {
+              setMenuOpen(false);
+              void restore();
+            }}
+          />
+        ) : null}
+        <MenuRow
+          icon={<Trash2 size={20} color={palette.danger} />}
+          label="نقل الحساب إلى الأرشيف"
+          hint="يخرج من القوائم ويمكن استعادته لاحقاً"
+          danger
+          onPress={() => {
+            setMenuOpen(false);
+            void confirmArchiveContact();
+          }}
+        />
+      </Sheet>
     </SafeAreaView>
+  );
+}
+
+/** صفّ في قائمة الإجراءات: أيقونة وعنوان وسطر توضيحي. */
+function MenuRow({
+  icon,
+  label,
+  hint,
+  danger = false,
+  onPress,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  hint: string;
+  danger?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      className="flex-row-reverse items-center border-b border-line py-3">
+      <View
+        className={`h-11 w-11 items-center justify-center rounded-2xl ${
+          danger ? 'bg-danger-soft' : 'bg-surface-raised'
+        }`}>
+        {icon}
+      </View>
+      <View className="mr-3 flex-1">
+        <Text
+          className={`text-right text-body font-bold ${
+            danger ? 'text-danger' : 'text-ink'
+          }`}>
+          {label}
+        </Text>
+        <Text className="text-right text-caption text-ink-muted">{hint}</Text>
+      </View>
+    </Pressable>
   );
 }

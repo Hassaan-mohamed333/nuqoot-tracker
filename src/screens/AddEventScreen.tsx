@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 
-import { Button, DateField } from '@/components/ui';
+import { Button, DateField, Field } from '@/components/ui';
 import { reportError } from '@/lib/alerts';
 import { palette } from '@/lib/palette';
 import type { RootStackParamList } from '@/navigation/types';
@@ -87,15 +87,11 @@ export function AddEventScreen() {
       className="flex-1 bg-base"
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView className="flex-1" contentContainerClassName="p-4 pb-10">
-        <Text className="mb-2 text-right text-sm font-bold text-ink">
-          عنوان المناسبة
-        </Text>
-        <TextInput
+        <Field
+          label="عنوان المناسبة"
           value={title}
           onChangeText={setTitle}
           placeholder="مثال: فرح أحمد"
-          placeholderTextColor={palette.muted}
-          className="rounded-xl border border-line bg-surface px-4 py-3 text-right text-base text-ink"
         />
 
         <Text className="mb-2 mt-6 text-right text-sm font-bold text-ink">
@@ -109,11 +105,11 @@ export function AddEventScreen() {
                 key={item.key}
                 onPress={() => setEventType(item.key)}
                 accessibilityRole="button"
-                className={`mb-2 ml-2 rounded-full px-4 py-1.5 ${
+                className={`mb-2 ml-2 h-10 items-center justify-center rounded-full px-4 ${
                   isActive ? 'bg-primary' : 'border border-line bg-surface'
                 }`}>
                 <Text
-                  className={`text-xs font-semibold ${
+                  className={`text-sm font-semibold ${
                     isActive ? 'text-primary-fg' : 'text-ink-muted'
                   }`}>
                   {item.label}
@@ -169,26 +165,19 @@ export function AddEventScreen() {
           )}
         </View>
 
-        <Text className="mb-2 mt-6 text-right text-sm font-bold text-ink">
-          المكان (اختياري)
-        </Text>
-        <TextInput
+        <Field
+          className="mt-6"
+          label="المكان (اختياري)"
           value={location}
           onChangeText={setLocation}
           placeholder="مثال: قاعة النيل"
-          placeholderTextColor={palette.muted}
-          className="rounded-xl border border-line bg-surface px-4 py-3 text-right text-sm text-ink"
         />
-
-        <Text className="mb-2 mt-6 text-right text-sm font-bold text-ink">
-          ملاحظات (اختياري)
-        </Text>
-        <TextInput
+        <Field
+          className="mt-4"
+          label="ملاحظات (اختياري)"
           value={notes}
           onChangeText={setNotes}
           placeholder="أي تفاصيل تخص المناسبة"
-          placeholderTextColor={palette.muted}
-          className="rounded-xl border border-line bg-surface px-4 py-3 text-right text-sm text-ink"
         />
 
         <Button

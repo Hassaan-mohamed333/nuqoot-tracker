@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 
-import { Button } from '@/components/ui';
+import { Button, Field } from '@/components/ui';
 import { reportError } from '@/lib/alerts';
 import { palette } from '@/lib/palette';
 import type { RootStackParamList } from '@/navigation/types';
@@ -74,38 +74,27 @@ export function AddContactScreen() {
       className="flex-1 bg-base"
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView className="flex-1" contentContainerClassName="p-4 pb-10">
-        <Text className="mb-2 text-right text-sm font-bold text-ink">
-          الاسم
-        </Text>
-        <TextInput
+        <Field
+          className=""
+          label="الاسم"
           value={fullName}
           onChangeText={setFullName}
           placeholder="الاسم كاملاً"
-          placeholderTextColor={palette.muted}
-          className="rounded-xl border border-line bg-surface px-4 py-3 text-right text-base text-ink"
         />
-
-        <Text className="mb-2 mt-6 text-right text-sm font-bold text-ink">
-          رقم الهاتف (اختياري)
-        </Text>
-        <TextInput
+        <Field
+          className="mt-6"
+          label="رقم الهاتف (اختياري)"
           value={phone}
           onChangeText={setPhone}
           keyboardType="phone-pad"
           placeholder="01xxxxxxxxx"
-          placeholderTextColor={palette.muted}
-          className="rounded-xl border border-line bg-surface px-4 py-3 text-right text-base text-ink"
         />
-
-        <Text className="mb-2 mt-6 text-right text-sm font-bold text-ink">
-          صلة القرابة (اختياري)
-        </Text>
-        <TextInput
+        <Field
+          className="mt-6"
+          label="صلة القرابة (اختياري)"
           value={relation}
           onChangeText={setRelation}
           placeholder="مثال: ابن العم"
-          placeholderTextColor={palette.muted}
-          className="rounded-xl border border-line bg-surface px-4 py-3 text-right text-base text-ink"
         />
         <View className="mt-2 flex-row-reverse flex-wrap">
           {RELATION_SUGGESTIONS.map((suggestion) => (
@@ -113,13 +102,13 @@ export function AddContactScreen() {
               key={suggestion}
               onPress={() => setRelation(suggestion)}
               accessibilityRole="button"
-              className={`mb-2 ml-2 rounded-full px-3 py-1 ${
+              className={`mb-2 ml-2 h-10 items-center justify-center rounded-full px-4 ${
                 relation === suggestion
                   ? 'bg-primary'
                   : 'border border-line bg-surface'
               }`}>
               <Text
-                className={`text-xs font-semibold ${
+                className={`text-sm font-semibold ${
                   relation === suggestion ? 'text-primary-fg' : 'text-ink-muted'
                 }`}>
                 {suggestion}
@@ -128,15 +117,12 @@ export function AddContactScreen() {
           ))}
         </View>
 
-        <Text className="mb-2 mt-4 text-right text-sm font-bold text-ink">
-          ملاحظات (اختياري)
-        </Text>
-        <TextInput
+        <Field
+          className="mt-4"
+          label="ملاحظات (اختياري)"
           value={notes}
           onChangeText={setNotes}
           placeholder="أي تفاصيل تساعدك على تذكّره"
-          placeholderTextColor={palette.muted}
-          className="rounded-xl border border-line bg-surface px-4 py-3 text-right text-sm text-ink"
         />
 
         <Button

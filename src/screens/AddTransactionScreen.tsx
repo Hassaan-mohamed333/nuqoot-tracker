@@ -4,6 +4,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   ArrowDownLeft,
   ArrowUpRight,
+  Check,
   Paperclip,
   Plus,
   Split,
@@ -337,14 +338,38 @@ export function AddTransactionScreen() {
               />
             </View>
           ) : (
-            sortedContacts.map((contact) => (
-              <RadioRow
-                key={contact.id}
-                label={contact.full_name}
-                selected={contactId === contact.id}
-                onSelect={() => setContactId(contact.id)}
-              />
-            ))
+            // شرائح تلتفّ على أكثر من سطر بدل قايمة طويلة بأزرار اختيار:
+            // الاسم الطويل يُقطع بسطر، والمحدّد يمتلئ بالكهرماني.
+            <View className="flex-row-reverse flex-wrap p-1">
+              {sortedContacts.map((contact) => {
+                const selected = contactId === contact.id;
+                return (
+                  <PressableScale
+                    key={contact.id}
+                    onPress={() => setContactId(contact.id)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={contact.full_name}
+                    activeScale={0.95}
+                    className={`mb-2 ml-2 h-11 max-w-full flex-row-reverse items-center rounded-full border px-4 ${
+                      selected
+                        ? 'border-primary-strong/70 bg-primary'
+                        : 'border-line-strong bg-surface'
+                    }`}>
+                    {selected ? (
+                      <Check size={16} color={palette.onPrimary} />
+                    ) : null}
+                    <Text
+                      numberOfLines={1}
+                      className={`text-sm font-bold ${
+                        selected ? 'mr-1.5 text-primary-fg' : 'text-ink'
+                      }`}>
+                      {contact.full_name}
+                    </Text>
+                  </PressableScale>
+                );
+              })}
+            </View>
           )}
         </Card>
       </FadeSlideIn>

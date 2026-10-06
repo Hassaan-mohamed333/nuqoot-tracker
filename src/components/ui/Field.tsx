@@ -1,6 +1,6 @@
 import React from 'react';
 import type { TextInputProps } from 'react-native';
-import { Text, TextInput, View } from 'react-native';
+import { Platform, Text, TextInput, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -97,6 +97,9 @@ export function Field({
             onBlur?.(event);
           }}
           placeholderTextColor={palette.subtle}
+          // الويب يرسم إطار تركيز افتراضياً داخل الإطار الذي نرسمه، فيظهر
+          // حدّان متداخلان (خاصة في حقل المبلغ الكبير). الحلقة لنا وحدها.
+          style={Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : undefined}
           className={`flex-1 py-3 text-right ${
             emphasis ? 'text-xl font-bold' : 'text-base'
           } ${inputClassName ?? 'text-ink'}`}

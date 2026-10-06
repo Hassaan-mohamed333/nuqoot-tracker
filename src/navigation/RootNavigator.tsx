@@ -241,6 +241,8 @@ export function RootNavigator() {
       <Stack.Navigator
         screenOptions={{
           headerTitleAlign: 'center',
+          headerShadowVisible: false,
+          headerTitleStyle: { fontWeight: '700', fontSize: 17, color: palette.text },
           headerStyle: { backgroundColor: palette.surface },
           headerTintColor: palette.text,
           contentStyle: { backgroundColor: palette.base },
