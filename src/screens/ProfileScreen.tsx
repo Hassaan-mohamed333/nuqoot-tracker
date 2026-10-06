@@ -20,6 +20,7 @@ import {
 
 import { PressableScale } from '@/components/motion';
 import { PhoneLinkSheet } from '@/components/PhoneLinkSheet';
+import { PolicyReviewSheet } from '@/components/PolicyConsent';
 import {
   Avatar,
   Button,
@@ -93,6 +94,7 @@ export function ProfileScreen() {
     useState<CompressedImage | null>(null);
   const [phoneSheet, setPhoneSheet] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [policySheet, setPolicySheet] = useState(false);
   const [currency, setCurrency] = useState<string>(DEFAULT_CURRENCY);
   /** الرقم الموثَّق، من الجلسة أو من ربطٍ تمّ للتوّ. */
   const [linkedPhone, setLinkedPhone] = useState<string | null>(null);
@@ -512,6 +514,24 @@ export function ProfileScreen() {
           ) : null}
         </View>
       ) : null}
+
+      <SectionTitle className="mt-8">الخصوصية</SectionTitle>
+
+      <PressableScale
+        onPress={() => setPolicySheet(true)}
+        accessibilityRole="button"
+        accessibilityLabel="مراجعة سياسة الاستخدام"
+        activeScale={0.985}
+        className="min-h-[44px] flex-row-reverse items-center justify-between rounded-2xl border border-line bg-surface p-4">
+        <Text className="text-right text-sm font-bold text-ink">
+          مراجعة سياسة الاستخدام
+        </Text>
+      </PressableScale>
+
+      <PolicyReviewSheet
+        visible={policySheet}
+        onClose={() => setPolicySheet(false)}
+      />
 
       <SectionTitle className="mt-8">الحساب</SectionTitle>
 

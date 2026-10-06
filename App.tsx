@@ -8,6 +8,7 @@ import './global.css';
 // يسجّل مكوّنات Reanimated لدى NativeWind قبل رسم أي شاشة، وإلا أُهمل
 // `className` على أوّل عنصر متحرّك يُركَّب.
 import '@/components/motion/animated';
+import { PolicyGate } from '@/components/PolicyConsent';
 import { AppGate } from '@/navigation/AppGate';
 import { AuthProvider } from '@/store/AuthProvider';
 
@@ -26,7 +27,9 @@ export default function App() {
               ? { width: '100%', maxWidth: 560, alignSelf: 'center' }
               : undefined
           }>
-          <AppGate />
+          <PolicyGate>
+            <AppGate />
+          </PolicyGate>
         </View>
       </AuthProvider>
     </SafeAreaProvider>

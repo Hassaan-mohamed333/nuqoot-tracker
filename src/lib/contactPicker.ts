@@ -26,6 +26,12 @@ function webContacts(): WebContactsManager | null {
   return manager && typeof manager.select === 'function' ? manager : null;
 }
 
+/** إغلاق المنتقي بلا اختيار يصل من المتصفح كـ AbortError (أو NotAllowedError عند رفض الإذن). */
+export function isUserDismissal(error: unknown): boolean {
+  const name = (error as { name?: unknown } | null)?.name;
+  return name === 'AbortError' || name === 'NotAllowedError';
+}
+
 /**
  * هل يمكن اختيار جهة من الهاتف هنا؟
  *
@@ -48,7 +54,14 @@ export function isContactPickerSupported(): boolean {
 export async function pickDeviceContact(): Promise<PickedContact | null> {
   const web = webContacts();
   if (web) {
-    const picked = await web.select(['name', 'tel'], { multiple: false });
+    let picked: Array<{ name?: string[]; tel?: string[] }>;
+    try {
+      picked = await web.select(['name', 'tel'], { multiple: false });
+    } catch (error) {
+      // إلغاء المستخدم أو رفضه الإذن ليس خطأً: لا شيء يُعبّأ.
+      if (isUserDismissal(error)) return null;
+      throw error;
+    }
     const first = picked[0];
     if (!first) return null;
     return {
