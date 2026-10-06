@@ -1,0 +1,274 @@
+/**
+ * وصف أخطاء Supabase، بوجهين: وجهٌ للمطوّر ووجهٌ للمستخدم.
+ *
+ * الفرق مقصود وأمنيّ. PostgrestError يحمل `details` و`hint`، وتوثيق
+ * PostgREST نفسه ينصّ على أن `hint` قد يحمل جملة SQL جاهزة أو اسم عمود
+ * أو قيداً — وهي بنيةُ قاعدة البيانات، لا شأن للمستخدم النهائي بها
+ * ولا يجوز أن تُعرض له. لذلك:
+ *
+ *   - describeSupabaseError: كل الحقول، للسجل في التطوير فقط.
+ *   - userMessage: رسالة عربية مفهومة، بلا أي تفصيل داخلي.
+ */
+
+import { logger, redactText } from '@/lib/logger';
+import { ValidationError } from '@/lib/validation';
+
+interface SupabaseErrorShape {
+  message?: unknown;
+  details?: unknown;
+  hint?: unknown;
+  code?: unknown;
+  status?: unknown;
+  statusCode?: unknown;
+  error?: unknown;
+  name?: unknown;
+}
+
+function asText(value: unknown): string | null {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (typeof value === 'number') return String(value);
+  return null;
+}
+
+/** سطر تشخيصي كامل. للمطوّر: لا يُعرض للمستخدم في الإنتاج. */
+export function describeSupabaseError(error: unknown): string {
+  if (!error || typeof error !== 'object') {
+    return typeof error === 'string' && error.trim()
+      ? error
+      : 'حدث خطأ غير متوقع.';
+  }
+
+  const shape = error as SupabaseErrorShape;
+  const parts: string[] = [];
+
+  const message =
+    asText(shape.message) ??
+    asText(shape.error) ??
+    (error instanceof Error ? error.message : null);
+  parts.push(message ?? 'حدث خطأ غير متوقع.');
+
+  const code = asText(shape.code) ?? asText(shape.statusCode);
+  if (code) parts.push(`[${code}]`);
+
+  const status = asText(shape.status);
+  if (status && status !== code) parts.push(`(HTTP ${status})`);
+
+  const details = asText(shape.details);
+  if (details) parts.push(`— ${details}`);
+
+  const hint = asText(shape.hint);
+  if (hint) parts.push(`— ${hint}`);
+
+  return parts.join(' ');
+}
+
+/** رموز تعني أن المخطّط لا يطابق ما يرسله التطبيق. */
+const SCHEMA_CODES: ReadonlySet<string> = new Set([
+  'PGRST204',
+  'PGRST205',
+  '42703',
+  '42P01',
+]);
+
+const SCHEMA_HINT =
+  'شغّل supabase/schema.sql على مشروعك، ' +
+  // خزن PostgREST للمخطّط يتأخّر أحياناً بعد الهجرة، فيردّ الرمز نفسه
+  // رغم أن العمود صار موجوداً. إعادة التحميل أسرع من مطاردة الوهم.
+  'وإن كنت شغّلته للتوّ فأعد تحميل مخطّط الـ API من إعدادات المشروع.';
+
+/**
+ * ترجمة الأسباب المعروفة إلى رسائل صالحة للعرض.
+ *
+ * المفتاح رمز الخطأ لا نصّه: النصوص تتغيّر بين إصدارات Supabase، والرموز
+ * مستقرّة وموثّقة.
+ */
+const BY_CODE: Record<string, string> = {
+  invalid_credentials: 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
+  invalid_login_credentials: 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
+  email_not_confirmed: 'فعّل بريدك من رسالة التأكيد قبل تسجيل الدخول.',
+  user_already_exists: 'هذا البريد مسجَّل بالفعل. سجّل الدخول بدل إنشاء حساب.',
+  email_exists: 'هذا البريد مسجَّل بالفعل. سجّل الدخول بدل إنشاء حساب.',
+  weak_password: 'كلمة المرور ضعيفة. اخترها أطول وأكثر تنوّعاً.',
+  over_request_rate_limit: 'محاولات كثيرة في وقت قصير. انتظر قليلاً ثم أعد المحاولة.',
+  over_email_send_rate_limit: 'أُرسلت رسائل كثيرة إلى هذا البريد. انتظر قليلاً.',
+  signup_disabled: 'إنشاء الحسابات معطّل في هذا المشروع حالياً.',
+  anonymous_provider_disabled: 'الدخول كضيف غير مفعّل في إعدادات المشروع.',
+  captcha_failed: 'فشل التحقّق من أنك لست روبوتاً. أعد المحاولة.',
+  session_expired: 'انتهت جلستك. سجّل الدخول من جديد.',
+  session_not_found: 'انتهت جلستك. سجّل الدخول من جديد.',
+  // PostgREST / PostgreSQL
+  '23505': 'هذا السجل موجود مسبقاً.',
+  '23503': 'العنصر المرتبط غير موجود أو حُذف.',
+  '23514': 'إحدى القيم غير مقبولة. راجع المبلغ والتاريخ.',
+  '23502': 'حقل مطلوب ناقص.',
+  '42501': 'لا تملك صلاحية لهذا الإجراء.',
+  PGRST301: 'انتهت جلستك. سجّل الدخول من جديد.',
+  PGRST116: 'لم يُعثر على السجل المطلوب، أو لا تملك صلاحية تعديله.',
+  /*
+   * مخطّط ناقص: العمود أو الجدول غير موجود في قاعدة بياناتك.
+   *
+   * هذه هي الحالة التي أوقعت «تعذّر إتمام العملية» عند الأرشفة: ميزةٌ
+   * أُضيفت في الشيفرة وأُضيف عمودها في `schema.sql`، ولم يُشغَّل الملف
+   * على المشروع. PostgREST يردّ PGRST204 وPostgres يردّ 42703، ولم
+   * يكن أيٌّ منهما مترجَماً — فظهرت الرسالة العامّة ولم تقل ما ينقص.
+   */
+};
+
+/**
+ * أخطاء التخزين تحمل `statusCode` نصّاً لا `code`.
+ *
+ * وثلاثتها تعني أشياء مختلفة تماماً: 404 دلوٌ غير موجود، و403 سياسةٌ
+ * تمنع الكتابة، و413 ملفٌ أكبر من الحدّ. وكانت كلّها تُقرأ رسالةً واحدة.
+ */
+const BY_STORAGE_STATUS: Record<string, string> = {
+  '404': 'دلو التخزين غير موجود. شغّل supabase/schema.sql لإنشاء دلو avatars.',
+  '403':
+    'سياسة التخزين تمنع الرفع. تأكّد أن سياسات دلو avatars تسمح للمستخدم ' +
+    'بالكتابة في مجلده (auth.uid()).',
+  '413': 'الصورة أكبر من الحدّ المسموح في الدلو (٢ ميغابايت).',
+  '415': 'نوع الملف غير مسموح في الدلو. المسموح: JPEG و PNG و WebP.',
+};
+
+const GENERIC = 'تعذّر إتمام العملية. حاول مرّة أخرى.';
+const NETWORK = 'تعذّر الاتصال بالخادم. تحقّق من الشبكة ثم أعد المحاولة.';
+
+function looksLikeNetworkFailure(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const shape = error as SupabaseErrorShape;
+  const name = asText(shape.name) ?? '';
+  const message = (asText(shape.message) ?? '').toLowerCase();
+  return (
+    name === 'AbortError' ||
+    name === 'TimeoutError' ||
+    message.includes('network request failed') ||
+    message.includes('fetch failed') ||
+    message.includes('failed to fetch')
+  );
+}
+
+/**
+ * الرسالة الوحيدة التي يجوز عرضها للمستخدم.
+ *
+ * أخطاء التحقّق تمرّ كما هي: نحن كتبناها، وهي موجَّهة للمستخدم أصلاً
+ * ولا تحمل شيئاً من بنية الخادم.
+ */
+export function userMessage(error: unknown): string {
+  if (error instanceof ValidationError) return error.message;
+
+  if (looksLikeNetworkFailure(error)) return NETWORK;
+
+  if (error && typeof error === 'object') {
+    const shape = error as SupabaseErrorShape;
+    const code = asText(shape.code) ?? asText(shape.statusCode);
+
+    /*
+     * خلل المخطّط: رسالة الخادم أولى من أي نصّ نكتبه.
+     *
+     * كانت تُستبدل بجملة عامّة «قاعدة بياناتك أقدم من التطبيق» — وهي
+     * صحيحة ولا تفيد: من شغّل الهجرة وقرأها ظنّها خطأً في التطبيق.
+     * ورسالة PostgREST تسمّي **العمود** المفقود بالحرف
+     * (`Could not find the 'birth_date' column…`) وهي ما يحسم الأمر
+     * في سطر: عمودٌ باسمٍ آخر، أو جدولٌ قديم لم تلمسه الهجرة.
+     */
+    if (code && SCHEMA_CODES.has(code)) {
+      const detail = asText(shape.message) ?? asText(shape.error);
+      return detail
+        ? `${redactText(detail).slice(0, 200)} — ${SCHEMA_HINT}`
+        : `عمود أو جدول مفقود. ${SCHEMA_HINT}`;
+    }
+
+    if (code && BY_CODE[code]) return BY_CODE[code];
+
+    // `statusCode` حقل التخزين، وقد يصل نصّاً ('404') أو رقماً.
+    const storageStatus = asText(shape.statusCode);
+    if (storageStatus && BY_STORAGE_STATUS[storageStatus]) {
+      return BY_STORAGE_STATUS[storageStatus];
+    }
+
+    const status = Number(asText(shape.status) ?? NaN);
+    if (status === 401 || status === 403) {
+      return 'انتهت صلاحية جلستك أو لا تملك صلاحية لهذا الإجراء.';
+    }
+    if (status === 429) return BY_CODE.over_request_rate_limit;
+    if (status >= 500) return 'الخدمة غير متاحة مؤقتاً. أعد المحاولة بعد قليل.';
+  }
+
+  // ما لا نعرفه نقوله كما ورد، لا نستبدله برسالة عامّة.
+  return `${GENERIC} ${technicalNote(error)}`.trim();
+}
+
+/**
+ * سطر تقني موجز يُلحَق بالرسالة حين لا نعرف السبب.
+ *
+ * ---------------------------------------------------------------------
+ * مقايضةٌ مقصودة. كان هذا الملف يمنع كل تفصيل عن المستخدم، لأن `hint`
+ * في PostgREST قد يحمل جملة SQL أو اسم قيد — بنية قاعدة البيانات. وبقي
+ * `hint` ممنوعاً هنا. لكن حجب **كل شيء** جعل كل عطب مجهول جملةً واحدة
+ * لا تدلّ على شيء، فلا المستخدم يفهم ولا صاحب التطبيق يستطيع مساعدته.
+ *
+ * فالوسط: الرمز والرسالة فقط — وهما ما يميّز «العمود مفقود» عن «الشبكة
+ * مقطوعة» — بعد تنقيتهما وقصّهما. لا `hint` ولا `details`، فهما أكثر
+ * ما يحمل بنية المخطّط.
+ * ---------------------------------------------------------------------
+ */
+function technicalNote(error: unknown): string {
+  if (!error || typeof error !== 'object') return '';
+  const shape = error as SupabaseErrorShape;
+
+  const code = asText(shape.code) ?? asText(shape.statusCode);
+  const message = asText(shape.message) ?? asText(shape.error);
+  if (!code && !message) return '';
+
+  // `redactText` يمسح ما يشبه المفاتيح والرموز من النصّ قبل عرضه.
+  const clean = message ? redactText(message).slice(0, 160) : '';
+  const parts = [code ? `[${code}]` : '', clean].filter(Boolean);
+  return parts.length ? `(${parts.join(' ')})` : '';
+}
+
+/**
+ * يسجّل فشل خطوة.
+ *
+ * الكائن الكامل يمرّ على تنقية `redact` ولا يُطبع إلا في التطوير؛ في
+ * الإنتاج يبقى سطر واحد يقول ما الخطوة التي فشلت دون ما فشلت به.
+ */
+export function logStepFailure(step: string, error: unknown): void {
+  logger.error('nuqoot', `فشلت الخطوة: ${step}`, error);
+}
+
+/**
+ * يطبع تشخيص فشل Supabase كاملاً في الطرفية.
+ *
+ * ---------------------------------------------------------------------
+ * استثناء مقصود وضيّق من قاعدة هذا الملف.
+ *
+ * `logger.error` لا يطبع حمولةً في الإنتاج: التشخيص التفصيلي شغل
+ * المطوّر، وكل كائن يُطبع يبقى في سجلّ النظام. لكن عطباً مثل فشل حفظ
+ * الملف الشخصي لا يُشخَّص بلا `code` و`details` — وصاحب التطبيق هو من
+ * يفتح الطرفية، لا المهاجم.
+ *
+ * فالحدّ: هذه الدالّة تطبع الثلاثة في **الطرفية وحدها**، بعد تنقيتها.
+ * وما يصل إلى الواجهة يبقى ما تقرّره `userMessage` — بلا `hint` ولا
+ * `details`، فهما أكثر ما يحمل بنية المخطّط.
+ * ---------------------------------------------------------------------
+ */
+export function logSupabaseFailure(step: string, error: unknown): void {
+  const shape = (error ?? {}) as SupabaseErrorShape;
+
+  const line = (label: string, value: unknown): string | null => {
+    const text = asText(value);
+    return text ? `${label}=${redactText(text)}` : null;
+  };
+
+  const parts = [
+    line('code', shape.code ?? shape.statusCode),
+    line('status', shape.status),
+    line('message', shape.message ?? shape.error),
+    line('details', shape.details),
+    line('hint', shape.hint),
+  ].filter(Boolean);
+
+  console.error(
+    `[nuqoot] فشلت الخطوة: ${redactText(step)}`,
+    parts.length ? parts.join(' | ') : '(بلا تفاصيل)',
+  );
+}
