@@ -1,4 +1,4 @@
-import { ChevronLeft, Phone } from 'lucide-react-native';
+import { ChevronLeft } from 'lucide-react-native';
 import React from 'react';
 import { Text, View } from 'react-native';
 
@@ -30,33 +30,20 @@ export function ContactRow({ contact, onPress }: ContactRowProps) {
         <Text className="text-base font-bold text-primary-strong">{initial}</Text>
       </View>
 
-      <View className="mx-3 flex-1">
+      <View className="mx-3 min-w-0 flex-1">
         <Text
           numberOfLines={1}
           className="text-right text-body font-bold text-ink">
           {contact.full_name}
         </Text>
 
-        <View className="mt-0.5 flex-row-reverse items-center">
-          {contact.phone ? (
-            <>
-              <Phone size={11} color={palette.muted} />
-              {/* الأرقام تُقرأ يساراً حتى داخل سطر عربي. */}
-              <Text
-                numberOfLines={1}
-                className="mr-1 text-caption text-ink-muted">
-                {contact.phone}
-              </Text>
-            </>
-          ) : (
-            <Text className="text-caption text-ink-subtle">
-              {contact.relation ?? 'بدون رقم'}
-            </Text>
-          )}
-          <Text className="mr-1.5 text-caption text-ink-subtle">
-            · {count} حركة
-          </Text>
-        </View>
+        {/* نصّ واحد بقطع: الهاتف وعدد الحركات في سطرين منفصلين كان يلفّ
+            «1 حركة» على سطرين حين يضيق الصفّ بجوار الفهرس. */}
+        <Text
+          numberOfLines={1}
+          className="mt-0.5 text-right text-caption text-ink-muted">
+          {contact.phone ?? contact.relation ?? 'بدون رقم'} · {count} حركة
+        </Text>
       </View>
 
       <NetBalanceBadge summary={contact.summary} size="sm" />

@@ -169,7 +169,7 @@ export function ContactsListScreen() {
               accessibilityState={{ selected: isActive }}
               accessibilityLabel={`${chip.label}، ${chip.count}`}
               activeScale={0.94}
-              className={`ml-2 h-9 flex-row-reverse items-center rounded-full px-4 ${
+              className={`ml-2 h-10 flex-row-reverse items-center gap-1.5 rounded-full px-4 ${
                 isActive ? 'bg-primary' : 'border border-line bg-surface'
               }`}>
               <Text
@@ -179,7 +179,7 @@ export function ContactsListScreen() {
                 {chip.label}
               </Text>
               <Text
-                className={`mr-1.5 text-[11px] font-bold ${
+                className={`text-[11px] font-bold ${
                   isActive ? 'text-primary-fg/70' : 'text-ink-subtle'
                 }`}>
                 {chip.count}
@@ -200,7 +200,7 @@ export function ContactsListScreen() {
         <SectionList
           ref={listRef}
           className="flex-1"
-          contentContainerClassName="px-4 pb-36"
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 140 }}
           sections={sections}
           keyExtractor={(item) => item.id}
           refreshing={loading}

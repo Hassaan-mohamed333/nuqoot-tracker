@@ -21,10 +21,13 @@ export function AlphabetIndex({
   onSelectLetter,
 }: AlphabetIndexProps) {
   const active = new Set(activeLetters);
+  // الحروف الموجودة فعلاً فقط: عمود من أربعين حرفاً أغلبها باهت كان يطول
+  // على الشاشة ويزاحم الكروت، ولا يُقفز إلى الباهت أصلاً.
+  const visibleLetters = letters.filter((letter) => active.has(letter));
 
   return (
     <View className="w-6 items-center justify-center py-2">
-      {letters.map((letter) => {
+      {visibleLetters.map((letter) => {
         const isActive = active.has(letter);
         const isSelected = selectedLetter === letter;
 

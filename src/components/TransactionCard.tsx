@@ -44,23 +44,28 @@ export function TransactionCard({
   const iconColor = isIncoming ? palette.danger : palette.success;
 
   return (
-    <View className="mb-2 flex-row-reverse items-center rounded-2xl border border-line bg-surface p-3">
+    <View className="mb-2 rounded-2xl border border-line bg-surface p-3">
+    <View className="flex-row-reverse items-center">
       <View className={`h-10 w-10 items-center justify-center rounded-full ${chipBg}`}>
         <Icon size={20} color={iconColor} />
       </View>
 
-      <View className="mx-3 flex-1">
-        <Text className="text-right text-base font-semibold text-ink">
+      <View className="mx-3 min-w-0 flex-1">
+        {/* سطر واحد بقطع: اسمٌ من أربع كلمات كان يمدّ البطاقة إلى أربعة
+            أسطر ويدفع ما تحته خارج الشاشة. */}
+        <Text
+          numberOfLines={1}
+          className="text-right text-base font-semibold text-ink">
           {contactName ?? (isIncoming ? 'نقوط واردة' : 'نقوط صادرة')}
         </Text>
-        <Text className="text-right text-xs text-ink-muted">
+        <Text numberOfLines={1} className="text-right text-xs text-ink-muted">
           {formatDate(transaction.occurred_at)}
           {transaction.note ? ` · ${transaction.note}` : ''}
         </Text>
         {eventTitle ? (
           <View className="mt-1 flex-row-reverse items-center">
             <CalendarDays size={12} color={palette.muted} />
-            <Text className="mr-1 text-right text-xs text-ink-muted">
+            <Text numberOfLines={1} className="mr-1 text-right text-xs text-ink-muted">
               {eventTitle}
             </Text>
           </View>
@@ -68,7 +73,9 @@ export function TransactionCard({
       </View>
 
       <View className="items-start">
-        <Text className={`text-base font-bold ${accent}`}>
+        <Text
+          numberOfLines={1}
+          className={`text-base font-bold ${accent}`}>
           {isIncoming ? '−' : '+'}
           {formatAmount(transaction.amount, transaction.currency)}
         </Text>
@@ -77,16 +84,19 @@ export function TransactionCard({
         </Text>
       </View>
 
+    </View>
+
       {onEdit || onDelete ? (
-        <View className="mr-2 flex-row-reverse items-center">
+        <View className="mt-1 flex-row-reverse items-center justify-end">
           {onEdit ? (
             <Pressable
               onPress={onEdit}
               accessibilityRole="button"
               accessibilityLabel="تعديل الحركة"
               hitSlop={8}
-              className="h-8 w-8 items-center justify-center rounded-full bg-surface-raised">
-              <Pencil size={15} color={palette.muted} />
+              className="h-8 flex-row-reverse items-center rounded-full bg-surface-raised px-3">
+              <Pencil size={14} color={palette.muted} />
+              <Text className="mr-1.5 text-caption font-bold text-ink-muted">تعديل</Text>
             </Pressable>
           ) : null}
           {onDelete ? (
@@ -95,8 +105,9 @@ export function TransactionCard({
               accessibilityRole="button"
               accessibilityLabel="حذف الحركة"
               hitSlop={8}
-              className="mr-1 h-8 w-8 items-center justify-center rounded-full bg-danger-soft">
-              <Trash2 size={15} color={palette.danger} />
+              className="mr-2 h-8 flex-row-reverse items-center rounded-full bg-danger-soft px-3">
+              <Trash2 size={14} color={palette.danger} />
+              <Text className="mr-1.5 text-caption font-bold text-danger">أرشفة</Text>
             </Pressable>
           ) : null}
         </View>
