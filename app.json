@@ -32,6 +32,12 @@
         }
       ],
       [
+        "expo-contacts",
+        {
+          "contactsPermission": "نستخدم جهات هاتفك لتختار منها من تضيفه إلى الدفتر."
+        }
+      ],
+      [
         "expo-audio",
         {
           "microphonePermission": "نستخدم الميكروفون لإدخال الحركات بالصوت."

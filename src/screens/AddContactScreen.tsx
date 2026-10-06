@@ -13,7 +13,9 @@ import {
   View,
 } from 'react-native';
 
+import { BookUser } from 'lucide-react-native';
 import { Button, Field } from '@/components/ui';
+import { isContactPickerSupported, pickDeviceContact } from '@/lib/contactPicker';
 import { reportError } from '@/lib/alerts';
 import { palette } from '@/lib/palette';
 import type { RootStackParamList } from '@/navigation/types';
@@ -42,8 +44,27 @@ export function AddContactScreen() {
   const [relation, setRelation] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const [pickedFromPhone, setPickedFromPhone] = useState(false);
 
   const isValid = fullName.trim().length >= 2;
+
+  /** يفتح دفتر هاتف المستخدم ويملأ الاسم والرقم من الجهة المختارة. */
+  async function pickFromPhone() {
+    if (picking) return;
+    setPicking(true);
+    try {
+      const picked = await pickDeviceContact();
+      if (!picked) return;
+      if (picked.name) setFullName(picked.name);
+      setPhone(picked.phone);
+      setPickedFromPhone(true);
+    } catch (error) {
+      reportError('تعذّر فتح جهات الاتصال', error);
+    } finally {
+      setPicking(false);
+    }
+  }
 
   async function handleSave() {
     if (!isValid || saving) return;
@@ -74,6 +95,24 @@ export function AddContactScreen() {
       className="flex-1 bg-base"
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView className="flex-1" contentContainerClassName="p-4 pb-10">
+        {isContactPickerSupported() ? (
+          <>
+            <Button
+              title="اختيار من جهات الهاتف"
+              variant="outline"
+              onPress={() => void pickFromPhone()}
+              loading={picking}
+              icon={<BookUser size={20} color={palette.text} />}
+              className="mb-2"
+            />
+            <Text className="mb-6 text-center text-caption text-ink-muted">
+              {pickedFromPhone
+                ? 'تمّت تعبئة الاسم والرقم من هاتفك. راجعهما ثم احفظ.'
+                : 'أو اكتب البيانات بنفسك بالأسفل.'}
+            </Text>
+          </>
+        ) : null}
+
         <Field
           className=""
           label="الاسم"
