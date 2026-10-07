@@ -29,6 +29,15 @@ jobs:
 
       - run: npm run typecheck
 
+      # بدون المفتاحين يُبنى التطبيق في الوضع التجريبي بلا مزامنة، وينشر فوق
+      # الموقع الحيّ نسخة لا تسجّل دخولاً. نفشل بدل ذلك.
+      - name: Require Supabase secrets
+        run: |
+          [ -n "$URL" ] && [ -n "$KEY" ] || { echo "::error::Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY under Settings > Secrets > Actions"; exit 1; }
+        env:
+          URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+
       # المفتاحان عامّان بطبيعتهما (anon key محمي بـ RLS) لكنهما يُحقنان وقت
       # البناء. أضفهما في: Settings → Secrets and variables → Actions.
       - name: Export web bundle
