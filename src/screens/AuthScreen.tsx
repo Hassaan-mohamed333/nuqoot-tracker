@@ -20,6 +20,7 @@ import Svg, { Path } from 'react-native-svg';
 
 import { BrandLogo } from '@/components/brand/BrandLogo';
 import { notify, reportError } from '@/lib/alerts';
+import { APP_NAME } from '@/lib/brand';
 import { palette } from '@/lib/palette';
 import { SUPABASE_CONFIG_MESSAGES } from '@/lib/supabase';
 import { userMessage } from '@/lib/supabaseError';
@@ -161,7 +162,7 @@ export function AuthScreen() {
           className="flex-1"
           contentContainerClassName="flex-grow justify-center p-6">
           <View className="items-center">
-            <BrandLogo width={240} />
+            <BrandLogo width={240} label={APP_NAME} />
             <Text className="mt-3 text-center text-caption text-ink-muted">
               سجّل الدخول لحفظ نقوطك وواجباتك ومزامنتها بين أجهزتك.
             </Text>
