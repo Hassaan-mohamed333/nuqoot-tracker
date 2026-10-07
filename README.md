@@ -153,3 +153,28 @@ npm run check:supabase
   الإقلاع محكومة بمهلة أقصر، فلا تعلق شاشة البداية عند بطء الشبكة.
 - الإنشاء كله يمرّ على `persist()` في `src/lib/repository.ts`، وهي الجهة
   الوحيدة التي تبني حمولات الإدراج، فلا يتسرب `user_id` من أي شاشة.
+
+## النشر (الويب على GitHub Pages)
+
+النشر تلقائي عند كل دفع إلى `main` عبر `.github/workflows/deploy-web.yml`.
+
+إعداد لمرة واحدة:
+
+1. **GitHub → Settings → Pages → Source: GitHub Actions.**
+2. **Settings → Secrets and variables → Actions** وأضف:
+   `EXPO_PUBLIC_SUPABASE_URL` و`EXPO_PUBLIC_SUPABASE_ANON_KEY`.
+3. **Supabase → Authentication → URL Configuration:**
+   - Site URL: `https://hassaan-mohamed333.github.io/nuqoot-tracker/`
+   - Redirect URLs: الرابط نفسه، و`http://localhost:8081` و`http://localhost:8081/**` للتطوير.
+   أي رابط غير مسجّل هنا يرجّع Supabase إلى Site URL بعد Google، فيبدو أن الدخول ينقلك لموقع آخر.
+4. **Google Cloud → OAuth client:** أبقِ redirect URI هو `https://<project-ref>.supabase.co/auth/v1/callback`.
+5. دوال الذكاء الاصطناعي: انشرها كما في `supabase/functions/README.md`.
+
+بناء محلي مطابق للنشر:
+
+```bash
+EXPO_BASE_URL=/nuqoot-tracker npm run export:web
+```
+
+`EXPO_BASE_URL` يُقرأ في `app.config.js` ولا يُوضع في `app.json`، حتى لا يتحوّل
+`localhost:8081` إلى مسار فرعي أثناء التطوير.

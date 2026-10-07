@@ -20,7 +20,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppLogo } from '@/components/brand/AppLogo';
+import { BrandLogo } from '@/components/brand/BrandLogo';
 import { Avatar } from '@/components/ui';
 import { PressableScale } from '@/components/motion';
 import { confirmAction, reportError } from '@/lib/alerts';
@@ -120,7 +120,7 @@ export function HomeScreen() {
         }>
         <View className="flex-row-reverse items-center justify-between">
           <View className="flex-1 flex-row-reverse items-center">
-            <AppLogo size={44} variant="badge" />
+            <BrandLogo width={72} />
             <View className="mr-3 flex-1">
               {/* التحية بالاسم لا بالبريد: البريد معرّف حساب لا اسم —
                   يطول فيُقصّ، ويُرى ممّن ينظر إلى الشاشة. */}
