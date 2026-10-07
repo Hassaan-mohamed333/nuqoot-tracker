@@ -5,7 +5,7 @@ module.exports = function (api) {
       ['babel-preset-expo', { jsxImportSource: 'nativewind' }],
       'nativewind/babel',
     ],
-    // يجب أن يبقى مكوّن react-native-worklets آخر إضافة في القائمة
-    plugins: ['react-native-worklets/plugin'],
+    // لا نضيف react-native-worklets/plugin هنا: babel-preset-expo يضيفه
+    // تلقائيًا، وتكراره يطبّق الـ plugin مرتين فيتعطّل useAnimatedStyle.
   };
 };

@@ -18,7 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
-import { AppLogo } from '@/components/brand/AppLogo';
+import { BrandLogo } from '@/components/brand/BrandLogo';
 import { notify, reportError } from '@/lib/alerts';
 import { APP_NAME } from '@/lib/brand';
 import { Button, Field, SegmentedControl } from '@/components/ui';
@@ -163,9 +163,8 @@ export function AuthScreen() {
           className="flex-1"
           contentContainerClassName="flex-grow justify-center p-6">
           <View className="items-center">
-            <AppLogo size={72} variant="badge" animated />
-            <Text className="mt-3 text-center text-display text-ink">{APP_NAME}</Text>
-            <Text className="mt-1 text-center text-caption text-ink-muted">
+            <BrandLogo width={240} label={APP_NAME} />
+            <Text className="mt-3 text-center text-caption text-ink-muted">
               سجّل الدخول لحفظ نقوطك وواجباتك ومزامنتها بين أجهزتك.
             </Text>
           </View>
