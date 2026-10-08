@@ -19,7 +19,15 @@ import { normalizeDigits, sanitizeLine } from '@/lib/validation';
 
 /** ما يفهمه المفسّر المحلي: نداء أداة جاهز، أو لا شيء. */
 export interface LocalIntent {
-  name: 'createTransaction' | 'navigateTo' | 'archiveItem';
+  name:
+    | 'createTransaction'
+    | 'navigateTo'
+    | 'archiveItem'
+    | 'createContact'
+    | 'createEvent'
+    | 'addEventGuest'
+    | 'createEventInvite'
+    | 'getBalance';
   args: Record<string, unknown>;
   /** وصف عربي لما فُهم، للعرض في سجلّ المحادثة. */
   summary: string;
@@ -163,6 +171,10 @@ export function parseLocalCommand(raw: string): LocalIntent | null {
   const navigation = parseNavigation(folded);
   if (navigation) return navigation;
 
+  // ---- إنشاء وأسئلة: مناسبة جديدة، جهة اتصال، رصيد، دعوة ----
+  const created = parseCreation(normalizeDigits(clean));
+  if (created) return created;
+
   // ---- حذف/أرشفة ----
   // قبل مسار التسجيل: «احذف فاتورة 500 لأحمد» تحمل رقماً أيضاً، وأولوية
   // الفعل هنا تمنع تفسيرها تسجيلَ حركة جديدة.
@@ -294,6 +306,9 @@ const NAV_WORDS: { words: string[]; screen: string }[] = [
   { words: ['جهات الاتصال', 'الاشخاص', 'جهات'], screen: 'contacts' },
   { words: ['المناسبات', 'مناسبات'], screen: 'events' },
   { words: ['الرئيسيه', 'الرئيسية', 'الصفحه الرئيسيه', 'البدايه'], screen: 'home' },
+  { words: ['الملف الشخصي', 'ملفي الشخصي', 'بياناتي', 'حسابي الشخصي'], screen: 'profile' },
+  { words: ['انضمام', 'الانضمام', 'كود دعوه', 'كود الدعوه'], screen: 'joinEvent' },
+  { words: ['الادخال الذكي', 'ادخال ذكي', 'الإدخال الذكي'], screen: 'smartInput' },
 ];
 
 const OPEN_VERBS = ['افتح', 'اعرض', 'وريني', 'روح', 'انتقل', 'ودّيني', 'وديني'];
@@ -309,5 +324,149 @@ function parseNavigation(folded: string): LocalIntent | null {
       };
     }
   }
+  return null;
+}
+
+// ---------------------------------------------------------------------
+// أوامر الإنشاء والأسئلة
+// ---------------------------------------------------------------------
+
+/** يحذف التشكيل والتطويل. بعدها يصير الطيّ حرفاً بحرف فتتطابق المواضع. */
+function stripMarks(text: string): string {
+  return text.replace(/[ً-ْـ]/g, '');
+}
+
+/** طيّ يحفظ الطول (أ إ آ ← ا، ى ← ي، ة ← ه) كي تُقصّ الأسماء من النص الأصلي. */
+function foldKeepingLength(text: string): string {
+  return text
+    .replace(/[أإآٱ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .toLowerCase();
+}
+
+/** يقتطع من النص الأصلي موضع مجموعة التقطتها regex على النص المطويّ. */
+function sliceLike(original: string, key: string, group: string | undefined): string {
+  if (!group) return '';
+  const at = key.indexOf(group);
+  return at < 0 ? group : original.slice(at, at + group.length).trim();
+}
+
+const CREATE_VERBS = ['افتح', 'اعمل', 'انشئ', 'أنشئ', 'انشاء', 'إنشاء', 'اضف', 'أضف', 'ضيف', 'سجل', 'سجّل', 'ابدا', 'أبدأ', 'ابدأ', 'عايز', 'عاوز', 'اريد', 'أريد', 'اضافه', 'إضافة'];
+
+/** كلمات تُحذف قبل أخذ ما تبقّى اسماً. */
+const FILLER = ['جديد', 'جديده', 'جديدة', 'لي', 'لو سمحت', 'من فضلك', 'بسرعه', 'بسرعة'];
+
+/** ما يسبق اسم الشيء من أدوات التسمية. */
+const NAMING = /^(?:باسم|بإسم|بأسم|اسمها|اسمه|اسم|عنوانها|عنوانه)\s+/u;
+
+function removeWords(key: string, words: readonly string[]): string {
+  let rest = key;
+  for (const word of words.map((w) => foldKeepingLength(stripMarks(w)))) {
+    rest = rest.replace(new RegExp('(?:^|\\s)' + word + '(?=\\s|$)', 'gu'), ' ');
+  }
+  return rest.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * يفهم أوامر الإنشاء والأسئلة الشائعة بلا خادم.
+ *
+ * ما لا يُفهم هنا يعود null فيذهب إلى الطراز، كما في بقية الملف. وكل ما
+ * يخرج يمرّ على parseToolCall ثم بوّابة التأكيد.
+ */
+function parseCreation(raw: string): LocalIntent | null {
+  const plain = stripMarks(raw).trim();
+  const key = foldKeepingLength(plain);
+  if (!plain) return null;
+
+  const verbs = CREATE_VERBS.map((w) => foldKeepingLength(stripMarks(w)));
+  const hasVerb = verbs.some((verb) => new RegExp('(?:^|\\s)' + verb + '(?=\\s|$)', 'u').test(key));
+
+  // ---- رصيد ----
+  const totalBalance =
+    /(?:^|\s)(?:حسابي|رصيدي|اجمالي|الاجمالي|الرصيد الاجمالي|كام معايا|كام عليا|كام ليا)(?=\s|$)/u.test(key) &&
+    !/(?:^|\s)(?:ل|علي|عند)\s*\p{L}/u.test(key.replace(/(?:حسابي|رصيدي|الاجمالي|اجمالي)/gu, ''));
+  if (totalBalance) {
+    return { name: 'getBalance', args: {}, summary: 'الرصيد الإجمالي' };
+  }
+  const balanceName =
+    /(?:^|\s)(?:كام\s+(?:علي|عند|ل)|رصيد|حساب)\s+(.+?)(?:\s+كام)?\s*[؟?]?$/u.exec(key);
+  if (balanceName && !hasVerb && !/(?:احذف|امسح|ارشف|الغي|شيل)/u.test(key)) {
+    const name = sliceLike(plain, key, balanceName[1]).replace(/[؟?]+$/u, '').trim();
+    if (name.length >= 2 && !/\d/.test(name)) {
+      return {
+        name: 'getBalance',
+        args: { contactName: name },
+        summary: 'رصيد ' + name,
+      };
+    }
+  }
+
+  // ---- دعوة لمناسبة ----
+  const invite = /(?:دعو[هة]|رابط|كود)\s+(?:ل|الي)?\s*(?:مناسب[هة])?\s*(.+)$/u.exec(key);
+  if (invite && /(?:اعمل|انشئ|أنشئ|ابعت|عايز|عاوز|هات|اريد|ولد)/u.test(key)) {
+    const title = sliceLike(plain, key, invite[1]);
+    if (title.length >= 2) {
+      return {
+        name: 'createEventInvite',
+        args: { eventTitle: title },
+        summary: 'دعوة لمناسبة ' + title,
+      };
+    }
+  }
+
+  // ---- إضافة شخص إلى مناسبة: «أضف أحمد لمناسبة الفرح» ----
+  const guest = /^(?:اضف|ضيف|ضم)\s+(.+?)\s+(?:ل|الي|في)\s*(?:مناسب[هة]\s+)(.+)$/u.exec(key);
+  if (guest) {
+    const name = sliceLike(plain, key, guest[1]);
+    const title = sliceLike(plain, key, guest[2]);
+    if (name.length >= 2 && title.length >= 2) {
+      return {
+        name: 'addEventGuest',
+        args: { eventTitle: title, name },
+        summary: 'إضافة ' + name + ' إلى ' + title,
+      };
+    }
+  }
+
+  if (!hasVerb) return null;
+
+  // ---- مناسبة جديدة ----
+  if (/(?:^|\s)مناسب[هة](?=\s|$)/u.test(key)) {
+    const rest = removeWords(key, [...CREATE_VERBS, ...FILLER, 'مناسبه', 'مناسبة']);
+    const naming = rest.replace(NAMING, '').trim();
+    if (naming.length >= 2) {
+      return {
+        name: 'createEvent',
+        // العنوان يُمرَّر تلميحاً للنوع أيضاً: «فرح أحمد» ⇦ wedding.
+        args: { title: sliceLike(plain, key, naming), eventType: naming },
+        summary: 'إنشاء مناسبة ' + naming,
+      };
+    }
+    return { name: 'navigateTo', args: { screen: 'addEvent' }, summary: 'فتح مناسبة جديدة' };
+  }
+
+  // ---- جهة اتصال جديدة ----
+  if (/(?:^|\s)جه[هة]\s+اتصال(?=\s|$)/u.test(key)) {
+    const rest = removeWords(
+      key.replace(/جه[هة]\s+اتصال/gu, ' '),
+      [...CREATE_VERBS, ...FILLER],
+    );
+    const naming = rest.replace(NAMING, '').trim();
+    if (naming.length >= 2 && !/\d{5,}/.test(naming)) {
+      return {
+        name: 'createContact',
+        args: { name: sliceLike(plain, key, naming) },
+        summary: 'إضافة جهة اتصال ' + naming,
+      };
+    }
+    return { name: 'navigateTo', args: { screen: 'addContact' }, summary: 'فتح جهة اتصال جديدة' };
+  }
+
+  // ---- حركة جديدة (بلا مبلغ) ----
+  if (/(?:^|\s)(?:حرك[هة]|نقوط)\s+جديد[هة]?(?=\s|$)/u.test(key) && !/\d/.test(key)) {
+    return { name: 'navigateTo', args: { screen: 'addTransaction' }, summary: 'فتح حركة جديدة' };
+  }
+
   return null;
 }

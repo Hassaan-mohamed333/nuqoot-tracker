@@ -26,11 +26,13 @@ export { describeFunctionError } from '@/lib/assistantErrors';
 
 export {
   describeAction,
+  isQueryAction,
   parseToolCall,
   requiresConfirmation,
   SCREEN_TARGETS,
   TOOL_NAMES,
   type AssistantAction,
+  type QueryAction,
   type ScreenTarget,
   type ToolName,
 } from '@/lib/assistantTools';

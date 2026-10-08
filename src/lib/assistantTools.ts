@@ -12,6 +12,7 @@
  */
 
 import { checkAmount, sanitizeLine, textLength, LIMITS } from '@/lib/validation';
+import type { EventType } from '@/types';
 
 /** أسماء الأدوات كما يراها الطراز. مصدر واحد للاسم. */
 export const TOOL_NAMES = [
@@ -19,6 +20,14 @@ export const TOOL_NAMES = [
   'createTransaction',
   'archiveItem',
   'toggleModal',
+  'createContact',
+  'createEvent',
+  'addSharedExpense',
+  'addEventGuest',
+  'createEventInvite',
+  'restoreItem',
+  'getBalance',
+  'getEventSummary',
 ] as const;
 
 export type ToolName = (typeof TOOL_NAMES)[number];
@@ -42,6 +51,9 @@ export const SCREEN_TARGETS = {
   archive: 'الأرشيف: المحذوفات القابلة للاستعادة',
   smartInput: 'الإدخال الذكي (نصّ أو صوت)',
   scanReceipt: 'قارئ الإيصالات',
+  profile: 'الملف الشخصي',
+  joinEvent: 'الانضمام إلى مناسبة بكود دعوة',
+  eventMembers: 'أعضاء مناسبة مشتركة ودعوتهم (يلزم eventTitle)',
 } as const;
 
 export type ScreenTarget = keyof typeof SCREEN_TARGETS;
@@ -92,7 +104,45 @@ export type AssistantAction =
       target: ArchiveTarget;
       contactName: string;
     }
-  | { tool: 'toggleModal'; modal: ModalTarget; open: boolean };
+  | { tool: 'toggleModal'; modal: ModalTarget; open: boolean }
+  | {
+      tool: 'createContact';
+      name: string;
+      phone: string | null;
+      relation: string | null;
+    }
+  | {
+      tool: 'createEvent';
+      title: string;
+      eventType: EventType;
+      /** ISO؛ null = اليوم. */
+      date: string | null;
+      location: string | null;
+    }
+  | {
+      /** مصروف جماعي يُقسَم بالتساوي على كل مشاركي المناسبة. */
+      tool: 'addSharedExpense';
+      eventTitle: string;
+      description: string;
+      amount: number;
+      /** من دفع؛ null = المستخدم نفسه. */
+      payerName: string | null;
+    }
+  | { tool: 'addEventGuest'; eventTitle: string; name: string }
+  | {
+      tool: 'createEventInvite';
+      eventTitle: string;
+      role: 'editor' | 'viewer';
+    }
+  | { tool: 'restoreItem'; target: ArchiveTarget; contactName: string }
+  | { tool: 'getBalance'; contactName: string | null }
+  | { tool: 'getEventSummary'; eventTitle: string };
+
+/** أسئلة تُجاب من الدفتر، بلا كتابة. */
+export type QueryAction = Extract<
+  AssistantAction,
+  { tool: 'getBalance' | 'getEventSummary' }
+>;
 
 /** ما الذي يُؤرشف: آخر حركة لهذا الشخص، أم الشخص نفسه؟ */
 export type ArchiveTarget = 'transaction' | 'contact';
@@ -114,6 +164,29 @@ function optionalName(raw: unknown, max: number = LIMITS.name): string | null {
   const value = sanitizeLine(raw);
   if (!value) return null;
   return textLength(value) > max ? value.slice(0, max) : value;
+}
+
+/** كلمات الطراز والمستخدم لأنواع المناسبات. */
+const EVENT_TYPE_WORDS: Record<EventType, readonly string[]> = {
+  wedding: ['wedding', 'زفاف', 'فرح', 'عرس', 'جواز', 'زواج'],
+  engagement: ['engagement', 'خطوبة', 'خطوبه', 'خطبة', 'كتب كتاب', 'كتب الكتاب'],
+  newborn: ['newborn', 'سبوع', 'مولود', 'عقيقة', 'عقيقه', 'ولادة', 'ولاده'],
+  graduation: ['graduation', 'تخرج', 'تخرّج'],
+  funeral: ['funeral', 'عزاء', 'وفاة', 'وفاه'],
+  other: ['other'],
+};
+
+/** نوع غير معروف يصير other: الاسم الصحيح أهمّ من تصنيف دقيق. */
+export function normalizeEventType(raw: unknown): EventType {
+  const text = sanitizeLine(raw).toLowerCase();
+  if (!text) return 'other';
+  for (const [type, words] of Object.entries(EVENT_TYPE_WORDS) as [
+    EventType,
+    readonly string[],
+  ][]) {
+    if (words.some((word) => text === word || text.includes(word))) return type;
+  }
+  return 'other';
 }
 
 /**
@@ -238,6 +311,120 @@ export function parseToolCall(
       };
     }
 
+    case 'createContact': {
+      const contactName = optionalName(args.name ?? args.contactName);
+      if (!contactName) return fail('اذكر اسم جهة الاتصال.');
+      return {
+        ok: true,
+        action: {
+          tool: 'createContact',
+          name: contactName,
+          phone: optionalName(args.phone, LIMITS.phone),
+          relation: optionalName(args.relation, LIMITS.relation),
+        },
+      };
+    }
+
+    case 'createEvent': {
+      const title = optionalName(args.title, LIMITS.title);
+      if (!title || textLength(title) < 2) return fail('اذكر اسم المناسبة.');
+
+      let date: string | null = null;
+      const rawDate = sanitizeLine(args.date);
+      if (rawDate) {
+        const time = Date.parse(rawDate);
+        if (!Number.isFinite(time)) {
+          return fail('التاريخ غير مفهوم. استعمل صيغة 2026-12-31.');
+        }
+        date = new Date(time).toISOString();
+      }
+
+      return {
+        ok: true,
+        action: {
+          tool: 'createEvent',
+          title,
+          eventType: normalizeEventType(args.eventType ?? args.type),
+          date,
+          location: optionalName(args.location, LIMITS.location),
+        },
+      };
+    }
+
+    case 'addSharedExpense': {
+      const eventTitle = optionalName(args.eventTitle, LIMITS.title);
+      if (!eventTitle) return fail('اذكر اسم المناسبة التي يُسجَّل فيها المصروف.');
+
+      const description = optionalName(args.description, LIMITS.description);
+      if (!description || textLength(description) < 2) {
+        return fail('اذكر وصف المصروف (مثلاً: قاعة، عشاء).');
+      }
+
+      const amount = checkAmount(args.amount);
+      if (!amount.ok) return fail(amount.issues[0].message);
+
+      return {
+        ok: true,
+        action: {
+          tool: 'addSharedExpense',
+          eventTitle,
+          description,
+          amount: amount.value,
+          payerName: optionalName(args.payerName),
+        },
+      };
+    }
+
+    case 'addEventGuest': {
+      const eventTitle = optionalName(args.eventTitle, LIMITS.title);
+      if (!eventTitle) return fail('اذكر اسم المناسبة.');
+      const guest = optionalName(args.name ?? args.guestName);
+      if (!guest || textLength(guest) < 2) return fail('اذكر اسم العضو.');
+      return {
+        ok: true,
+        action: { tool: 'addEventGuest', eventTitle, name: guest },
+      };
+    }
+
+    case 'createEventInvite': {
+      const eventTitle = optionalName(args.eventTitle, LIMITS.title);
+      if (!eventTitle) return fail('اذكر اسم المناسبة المراد دعوة أعضاء إليها.');
+      const role = String(args.role ?? 'editor').trim().toLowerCase();
+      if (role !== 'editor' && role !== 'viewer') {
+        return fail('الدور editor للمحرّر أو viewer للمشاهد.');
+      }
+      return {
+        ok: true,
+        action: { tool: 'createEventInvite', eventTitle, role },
+      };
+    }
+
+    case 'restoreItem': {
+      const rawTarget = String(args.target ?? '').trim().toLowerCase();
+      const target: ArchiveTarget | null =
+        rawTarget === 'transaction'
+          ? 'transaction'
+          : rawTarget === 'contact'
+            ? 'contact'
+            : null;
+      if (!target) return fail('حدّد ما يُستعاد: transaction أو contact.');
+      const contactName = optionalName(args.contactName);
+      if (!contactName) return fail('اذكر اسم صاحب الحركة أو الحساب.');
+      return { ok: true, action: { tool: 'restoreItem', target, contactName } };
+    }
+
+    case 'getBalance':
+      return {
+        ok: true,
+        action: { tool: 'getBalance', contactName: optionalName(args.contactName) },
+      };
+
+    case 'getEventSummary': {
+      const eventTitle = optionalName(args.eventTitle, LIMITS.title);
+      if (!eventTitle) return fail('اذكر اسم المناسبة.');
+      return { ok: true, action: { tool: 'getEventSummary', eventTitle } };
+    }
+
     default:
       return fail(`أداة غير معروفة: ${sanitizeLine(name) || '(بلا اسم)'}.`);
   }
@@ -251,7 +438,29 @@ export function parseToolCall(
  * والحركة المكتوبة تبقى في الدفتر.
  */
 export function requiresConfirmation(action: AssistantAction): boolean {
-  return action.tool === 'createTransaction' || action.tool === 'archiveItem';
+  switch (action.tool) {
+    case 'createTransaction':
+    case 'archiveItem':
+    case 'createContact':
+    case 'createEvent':
+    case 'addSharedExpense':
+    case 'addEventGuest':
+    case 'createEventInvite':
+    case 'restoreItem':
+      return true;
+    default:
+      return false;
+  }
+}
+
+/**
+ * أسئلة تُجاب من الدفتر بلا كتابة ولا تنقّل.
+ *
+ * تُنفَّذ على الجهاز وتُعرض نتيجتها مباشرةً: لا حاجة لجولة ثانية إلى الطراز،
+ * وبياناتُ الدفتر لا تغادر الجهاز لتُصاغ جملةً.
+ */
+export function isQueryAction(action: AssistantAction): action is QueryAction {
+  return action.tool === 'getBalance' || action.tool === 'getEventSummary';
 }
 
 /** وصف الفعل بالعربية، لبطاقة التأكيد وسجل المحادثة. */
@@ -275,5 +484,26 @@ export function describeAction(action: AssistantAction): string {
 
     case 'toggleModal':
       return action.open ? 'فتح المساعد' : 'إغلاق المساعد';
+
+    case 'createContact':
+      return `إضافة جهة اتصال: ${action.name}${action.phone ? ` (${action.phone})` : ''}`;
+    case 'createEvent':
+      return `إنشاء مناسبة: ${action.title}`;
+    case 'addSharedExpense':
+      return `مصروف جماعي في ${action.eventTitle}: ${action.description} ${action.amount}، يُقسَم بالتساوي${action.payerName ? ` ودفعه ${action.payerName}` : ''}`;
+    case 'addEventGuest':
+      return `إضافة ${action.name} إلى مشاركي ${action.eventTitle}`;
+    case 'createEventInvite':
+      return `إنشاء دعوة ${action.role === 'viewer' ? 'مشاهد' : 'محرّر'} لمناسبة ${action.eventTitle}`;
+    case 'restoreItem':
+      return action.target === 'contact'
+        ? `استعادة حساب ${action.contactName} من الأرشيف`
+        : `استعادة آخر حركة مؤرشفة لـ${action.contactName}`;
+    case 'getBalance':
+      return action.contactName
+        ? `رصيد ${action.contactName}`
+        : 'الرصيد الإجمالي';
+    case 'getEventSummary':
+      return `ملخّص مناسبة ${action.eventTitle}`;
   }
 }

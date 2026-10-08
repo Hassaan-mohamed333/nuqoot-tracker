@@ -72,9 +72,12 @@ const TOOLS: FunctionDeclaration[] = [
             'archive',
             'smartInput',
             'scanReceipt',
+            'profile',
+            'joinEvent',
+            'eventMembers',
           ],
           description:
-            'الوجهة. contactProfile يلزمه contactName، و eventLedger يلزمه eventTitle.',
+            'الوجهة. contactProfile يلزمه contactName، و eventLedger و eventMembers يلزمهما eventTitle.',
         },
         contactName: {
           type: 'STRING',
@@ -140,6 +143,135 @@ const TOOLS: FunctionDeclaration[] = [
         },
       },
       required: ['target', 'contactName'],
+    },
+  },
+  {
+    name: 'createContact',
+    description:
+      'يضيف جهة اتصال جديدة بلا حركة. استعمله عندما يطلب المستخدم إضافة شخص ' +
+      'فقط. المستخدم سيؤكّد قبل الحفظ.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        name: { type: 'STRING', description: 'اسم الشخص كما نطقه المستخدم.' },
+        phone: { type: 'STRING', description: 'رقم الهاتف إن ذكره.' },
+        relation: { type: 'STRING', description: 'الصلة: قريب، صديق، جار…' },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'createEvent',
+    description:
+      'ينشئ مناسبة جديدة (فرح، خطوبة، سبوع، تخرج، عزاء…) ثم يفتح دفترها. ' +
+      'المستخدم سيؤكّد قبل الحفظ.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        title: { type: 'STRING', description: 'اسم المناسبة، مثل «فرح أحمد».' },
+        eventType: {
+          type: 'STRING',
+          enum: ['wedding', 'engagement', 'newborn', 'graduation', 'funeral', 'other'],
+          description: 'نوع المناسبة؛ other إن لم يتضح.',
+        },
+        date: {
+          type: 'STRING',
+          description: 'التاريخ بصيغة 2026-12-31 إن ذكره. اتركه فارغاً لليوم.',
+        },
+        location: { type: 'STRING', description: 'المكان إن ذكره.' },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'addSharedExpense',
+    description:
+      'يسجّل مصروفاً جماعياً داخل مناسبة ويقسمه بالتساوي على كل مشاركيها. ' +
+      'استعمله لتكاليف مشتركة (قاعة، عشاء، هدية جماعية). ليس لنقوط شخص بعينه.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        eventTitle: { type: 'STRING', description: 'اسم المناسبة من قائمة السياق.' },
+        description: { type: 'STRING', description: 'ما صُرف عليه، مثل «قاعة».' },
+        amount: { type: 'NUMBER', description: 'المبلغ موجباً.' },
+        payerName: {
+          type: 'STRING',
+          description: 'من دفع، إن لم يكن المستخدم نفسه.',
+        },
+      },
+      required: ['eventTitle', 'description', 'amount'],
+    },
+  },
+  {
+    name: 'addEventGuest',
+    description:
+      'يضيف شخصاً باسمه إلى مشاركي مناسبة، حتى لو لم يكن لديه حساب ولا جهة اتصال.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        eventTitle: { type: 'STRING', description: 'اسم المناسبة من قائمة السياق.' },
+        name: { type: 'STRING', description: 'اسم المشارك.' },
+      },
+      required: ['eventTitle', 'name'],
+    },
+  },
+  {
+    name: 'createEventInvite',
+    description:
+      'ينشئ رابط دعوة وكوداً ليشترك آخرون في مناسبة ويشاركوا في دفترها. ' +
+      'لصاحب المناسبة فقط. المستخدم سيؤكّد قبل الإنشاء.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        eventTitle: { type: 'STRING', description: 'اسم المناسبة من قائمة السياق.' },
+        role: {
+          type: 'STRING',
+          enum: ['editor', 'viewer'],
+          description: 'editor يضيف مصروفات، viewer يطّلع فقط. الافتراضي editor.',
+        },
+      },
+      required: ['eventTitle'],
+    },
+  },
+  {
+    name: 'restoreItem',
+    description: 'يستعيد حركة أو حساباً من الأرشيف. عكس archiveItem.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        target: {
+          type: 'STRING',
+          enum: ['transaction', 'contact'],
+          description: 'transaction لآخر حركة مؤرشفة للشخص، contact للحساب كلّه.',
+        },
+        contactName: { type: 'STRING', description: 'اسم صاحب الحركة أو الحساب.' },
+      },
+      required: ['target', 'contactName'],
+    },
+  },
+  {
+    name: 'getBalance',
+    description:
+      'يجيب عن الرصيد: رصيد شخص بعينه إن ذُكر اسمه، وإلا الرصيد الإجمالي. ' +
+      'استعمله لأسئلة مثل «كام على سامي؟» و«حسابي كام؟». لا تخمّن رقماً بنفسك.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        contactName: { type: 'STRING', description: 'اسم الشخص، أو فارغ للإجمالي.' },
+      },
+    },
+  },
+  {
+    name: 'getEventSummary',
+    description:
+      'يلخّص مناسبة: عدد المشاركين وإجمالي المصروفات ومن يدفع لمن. ' +
+      'لأسئلة مثل «ملخص الفرح» و«مين عليه كام في الرحلة؟».',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        eventTitle: { type: 'STRING', description: 'اسم المناسبة من قائمة السياق.' },
+      },
+      required: ['eventTitle'],
     },
   },
   {
@@ -258,6 +390,15 @@ function buildSystemInstruction(context: RequestBody['context']): string {
     '- «حذف فاتورة احمد» ⇦ archiveItem(target=transaction, contactName=أحمد)',
     '- «ارشف حساب احمد» ⇦ archiveItem(target=contact, contactName=أحمد)',
     '- قل للمستخدم إنها نُقلت إلى الأرشيف ويمكن استعادتها، لا إنها حُذفت.',
+    '',
+    'أوامر أخرى:',
+    '- «افتح/اعمل/أنشئ مناسبة (فرح/خطوبة/سبوع…) باسم كذا» ⇦ createEvent. بلا اسم ⇦ navigateTo(addEvent).',
+    '- «أضف فلان لمناسبة كذا» ⇦ addEventGuest(eventTitle, name).',
+    '- «سجل مصروف قاعة 5000 في الفرح» ⇦ addSharedExpense، يُقسَم على كل المشاركين.',
+    '- «اعمل دعوة/رابط/كود لمناسبة كذا» ⇦ createEventInvite.',
+    '- «أضف جهة اتصال فلان» ⇦ createContact. «رجّع/استرجع حساب فلان» ⇦ restoreItem.',
+    '- «كام على فلان / رصيد فلان / حسابي كام» ⇦ getBalance. «ملخص مناسبة كذا» ⇦ getEventSummary.',
+    '- طابق عنوان المناسبة بقائمة السياق حرفياً قدر الإمكان.',
     '',
     'الاسم غير الموجود في القائمة:',
     '- سجّل الحركة به كما نطقه المستخدم. التطبيق يُنشئ جهة الاتصال تلقائياً',

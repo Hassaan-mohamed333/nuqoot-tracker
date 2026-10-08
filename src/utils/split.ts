@@ -77,6 +77,7 @@ export function computeEventBalances(
   participants: EventParticipant[],
   expenses: SharedExpenseWithShares[],
   contacts: Contact[],
+  currentUserId?: string | null,
 ): ParticipantBalance[] {
   const contactNames = new Map(
     contacts.map((contact) => [contact.id, contact.full_name]),
@@ -93,7 +94,7 @@ export function computeEventBalances(
     balances.set(participant.id, {
       participantId: participant.id,
       contactId: participant.contact_id,
-      name: participantName(participant, contactNames),
+      name: participantName(participant, contactNames, currentUserId),
       paid: 0,
       owed: 0,
       net: 0,

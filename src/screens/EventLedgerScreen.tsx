@@ -59,8 +59,8 @@ export function EventLedgerScreen() {
   const expenses = useMemo(() => data?.expenses ?? [], [data]);
 
   const balances = useMemo(
-    () => computeEventBalances(participants, expenses, contacts),
-    [participants, expenses, contacts],
+    () => computeEventBalances(participants, expenses, contacts, userId),
+    [participants, expenses, contacts, userId],
   );
 
   const settlements = useMemo(() => settleBalances(balances), [balances]);

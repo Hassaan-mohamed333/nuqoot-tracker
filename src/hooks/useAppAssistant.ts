@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 
 import {
   describeAction,
+  isQueryAction,
   parseToolCall,
   processUserCommand,
   requiresConfirmation,
@@ -10,12 +11,35 @@ import {
   type RawToolCall,
 } from '@/lib/gemini';
 import { foldArabic, parseLocalCommand } from '@/lib/localIntent';
+import { inviteBaseUrl } from '@/lib/appLinks';
+import { APP_NAME } from '@/lib/brand';
 import { logger } from '@/lib/logger';
+import {
+  createSharedExpense,
+  fetchEventLedger,
+  setEventParticipants,
+} from '@/lib/repository';
+import {
+  createInvite,
+  fetchMyEventRole,
+  sharingAvailable,
+} from '@/lib/sharedEvents';
 import { userMessage } from '@/lib/supabaseError';
 import { sanitizeLine } from '@/lib/validation';
 import { navigationRef } from '@/navigation/navigationRef';
+import { useAuth } from '@/store/AuthProvider';
 import { useLedger } from '@/store/LedgerProvider';
-import { formatDate } from '@/utils/ledger';
+import type { QueryAction } from '@/lib/assistantTools';
+import type { NewEventMember } from '@/types';
+import { buildInviteLink, canEditEvent, formatInviteCode } from '@/utils/eventInvite';
+import { DEFAULT_CURRENCY, formatAmount, formatDate } from '@/utils/ledger';
+import {
+  computeEventBalances,
+  participantName,
+  settleBalances,
+  splitEqually,
+  totalEventSpend,
+} from '@/utils/split';
 
 export type MessageRole = 'user' | 'assistant' | 'action';
 
@@ -88,7 +112,7 @@ function nextId(prefix: string): string {
 }
 
 const GREETING =
-  'اطلب ما تريد: «سجّل ٥٠٠ لسامي»، «استلمت ٣٠٠ من سارة»، أو «افتح جهات الاتصال».';
+  'اطلب ما تريد: «سجّل ٥٠٠ لسامي»، «افتح مناسبة جديدة»، «أضف أحمد لمناسبة الفرح»، «كام رصيد سارة؟»، أو «اعمل دعوة لمناسبة الفرح».';
 
 export interface AppAssistant {
   messages: AssistantMessage[];
@@ -115,9 +139,16 @@ export function useAppAssistant(onRequestClose?: () => void): AppAssistant {
     transactions,
     addTransaction,
     addContact,
+    addEvent,
     setArchived,
     setTransactionArchivedState,
+    archivedContacts,
+    archivedTransactions,
+    contactsWithSummary,
+    totals,
+    refresh,
   } = useLedger();
+  const { userId } = useAuth();
 
   const [messages, setMessages] = useState<AssistantMessage[]>([
     { id: 'greeting', role: 'assistant', text: GREETING },
@@ -173,6 +204,30 @@ export function useAppAssistant(onRequestClose?: () => void): AppAssistant {
             navigationRef.navigate(
               DIRECT_ROUTES[screen as keyof typeof DIRECT_ROUTES] as 'AddContact',
             );
+            onRequestClose?.();
+            return null;
+          }
+
+          if (screen === 'profile') {
+            navigationRef.navigate('Profile');
+            onRequestClose?.();
+            return null;
+          }
+
+          if (screen === 'joinEvent') {
+            navigationRef.navigate('JoinEvent');
+            onRequestClose?.();
+            return null;
+          }
+
+          if (screen === 'eventMembers') {
+            const target = matchByName(
+              events,
+              (item) => item.title,
+              action.eventTitle ?? '',
+            );
+            if (!target) return `لا توجد مناسبة باسم «${action.eventTitle}».`;
+            navigationRef.navigate('EventMembers', { eventId: target.id });
             onRequestClose?.();
             return null;
           }
@@ -266,18 +321,250 @@ export function useAppAssistant(onRequestClose?: () => void): AppAssistant {
           if (!action.open) onRequestClose?.();
           return null;
         }
+
+        case 'createContact': {
+          const duplicate = matchByName(
+            contacts,
+            (item) => item.full_name,
+            action.name,
+          );
+          // مطابقة تامة فقط تُرفض: «سامي» و«سامي عبد الله» قد يكونان شخصين.
+          if (
+            duplicate &&
+            foldArabic(sanitizeLine(duplicate.full_name)).toLowerCase() ===
+              foldArabic(action.name).toLowerCase()
+          ) {
+            return `جهة الاتصال «${duplicate.full_name}» موجودة بالفعل.`;
+          }
+          await addContact({
+            full_name: action.name,
+            phone: action.phone,
+            relation: action.relation,
+          });
+          return null;
+        }
+
+        case 'createEvent': {
+          const created = await addEvent({
+            title: action.title,
+            event_type: action.eventType,
+            event_date: action.date ?? new Date().toISOString(),
+            location: action.location,
+          });
+          if (navigationRef.isReady()) {
+            navigationRef.navigate('EventLedger', { eventId: created.id });
+            onRequestClose?.();
+          }
+          return null;
+        }
+
+        case 'addEventGuest': {
+          const event = matchByName(events, (item) => item.title, action.eventTitle);
+          if (!event) return `لا توجد مناسبة باسم «${action.eventTitle}».`;
+
+          const role = await fetchMyEventRole(event.id);
+          if (role !== null && !canEditEvent(role)) {
+            return 'دورك في هذه المناسبة مشاهد؛ لا يمكنك إضافة مشاركين.';
+          }
+
+          const ledger = await fetchEventLedger(event.id);
+          const wanted = foldArabic(action.name).toLowerCase();
+          const exists = ledger.participants.some(
+            (row) =>
+              foldArabic(row.display_name ?? row.shown_name ?? '').toLowerCase() ===
+              wanted,
+          );
+          if (exists) return `«${action.name}» ضمن مشاركي المناسبة بالفعل.`;
+
+          // الحفظ يستبدل القائمة: نعيد ما فيها كما هو ونضيف الاسم الجديد.
+          const members: NewEventMember[] = ledger.participants
+            .filter((row) => !row.member_user_id || !row.display_name)
+            .map((row): NewEventMember => {
+              if (row.contact_id) return { kind: 'contact', contactId: row.contact_id };
+              if (row.display_name) return { kind: 'guest', displayName: row.display_name };
+              return { kind: 'self' };
+            });
+          if (ledger.participants.length === 0) members.unshift({ kind: 'self' });
+          members.push({ kind: 'guest', displayName: action.name });
+
+          await setEventParticipants(event.id, members);
+          return null;
+        }
+
+        case 'addSharedExpense': {
+          const event = matchByName(events, (item) => item.title, action.eventTitle);
+          if (!event) return `لا توجد مناسبة باسم «${action.eventTitle}».`;
+
+          const role = await fetchMyEventRole(event.id);
+          if (role !== null && !canEditEvent(role)) {
+            return 'دورك في هذه المناسبة مشاهد؛ لا يمكنك إضافة مصروفات.';
+          }
+
+          const ledger = await fetchEventLedger(event.id);
+          if (ledger.participants.length === 0) {
+            return 'حدّد مشاركي المناسبة أولاً (مثلاً: «أضف أحمد لمناسبة ' + event.title + '») ثم أعد الطلب.';
+          }
+
+          const names = new Map(contacts.map((item) => [item.id, item.full_name]));
+          const labelOf = (row: (typeof ledger.participants)[number]) =>
+            participantName(row, names, userId);
+
+          // الدافع: من سمّاه المستخدم، وإلا هو نفسه.
+          let payer = ledger.participants.find(
+            (row) =>
+              (userId && row.member_user_id === userId) ||
+              (!row.contact_id && !row.display_name && !row.member_user_id),
+          );
+          if (action.payerName) {
+            payer = matchByName(ledger.participants, labelOf, action.payerName);
+            if (!payer) {
+              return `«${action.payerName}» ليس ضمن مشاركي المناسبة: ${ledger.participants
+                .map(labelOf)
+                .join('، ')}.`;
+            }
+          }
+          if (!payer) payer = ledger.participants[0];
+
+          const amounts = splitEqually(action.amount, ledger.participants.length);
+          await createSharedExpense({
+            event_id: event.id,
+            payer_participant_id: payer.id,
+            description: action.description,
+            amount: action.amount,
+            currency: DEFAULT_CURRENCY,
+            shares: ledger.participants.map((row, index) => ({
+              participant_id: row.id,
+              share_amount: amounts[index],
+            })),
+          });
+          return null;
+        }
+
+        case 'createEventInvite': {
+          const event = matchByName(events, (item) => item.title, action.eventTitle);
+          if (!event) return `لا توجد مناسبة باسم «${action.eventTitle}».`;
+          if (!sharingAvailable()) {
+            return 'الدعوات تحتاج حساباً متصلاً. سجّل الدخول بحسابك أولاً.';
+          }
+
+          const code = await createInvite(event.id, action.role);
+          const link = buildInviteLink(code, inviteBaseUrl());
+          // الكود الخام يُرى هنا فقط: الخادم لا يحتفظ إلا ببصمته.
+          push({
+            id: nextId('msg'),
+            role: 'assistant',
+            text:
+              `دعوة ${APP_NAME} لمناسبة «${event.title}»:\n${link}\n` +
+              `أو الكود: ${formatInviteCode(code)}\nصالحة 72 ساعة.`,
+          });
+          return null;
+        }
+
+        case 'restoreItem': {
+          const pool = [...contactsWithSummary, ...archivedContacts];
+          const contact = matchByName(pool, (item) => item.full_name, action.contactName);
+          if (!contact) return `لا توجد جهة اتصال باسم «${action.contactName}».`;
+
+          if (action.target === 'contact') {
+            if (!archivedContacts.some((row) => row.id === contact.id)) {
+              return `«${contact.full_name}» ليس في الأرشيف.`;
+            }
+            await setArchived(contact.id, false);
+            return null;
+          }
+
+          const latest = archivedTransactions
+            .filter((row) => row.contact_id === contact.id)
+            .sort((a, b) => b.occurred_at.localeCompare(a.occurred_at))[0];
+          if (!latest) return `لا توجد حركات مؤرشفة لـ${contact.full_name}.`;
+          await setTransactionArchivedState(latest.id, false);
+          return null;
+        }
+
+        // أسئلة تُجاب في answerQuery؛ لا تصل إلى هنا.
+        case 'getBalance':
+        case 'getEventSummary':
+          return null;
       }
     },
     [
       addContact,
+      addEvent,
       addTransaction,
+      archivedContacts,
+      archivedTransactions,
       contacts,
+      contactsWithSummary,
       events,
       onRequestClose,
+      push,
       setArchived,
       setTransactionArchivedState,
       transactions,
+      userId,
     ],
+  );
+
+  /**
+   * يجيب سؤالاً من الدفتر نصّاً جاهزاً.
+   *
+   * على الجهاز لا عند الطراز: أرقام الدفتر لا تُرسَل لتُصاغ جملةً، والجواب
+   * حسابٌ لا تقدير فلا يصحّ أن يُترك لنموذج لغوي قد يهلوس رقماً.
+   */
+  const answerQuery = useCallback(
+    async (action: QueryAction): Promise<string> => {
+      if (action.tool === 'getBalance') {
+        if (!action.contactName) {
+          return `إجمالي ما دفعته ${formatAmount(totals.totalOut, totals.currency)} وما استلمته ${formatAmount(totals.totalIn, totals.currency)}. ${
+            totals.net > 0
+              ? `أنت دائن بصافي ${formatAmount(totals.net, totals.currency)}.`
+              : totals.net < 0
+                ? `أنت مدين بصافي ${formatAmount(-totals.net, totals.currency)}.`
+                : 'حسابك متعادل.'
+          }`;
+        }
+        const contact = matchByName(
+          contactsWithSummary,
+          (item) => item.full_name,
+          action.contactName,
+        );
+        if (!contact) return `لا توجد جهة اتصال باسم «${action.contactName}».`;
+        const { net, currency, transactionCount } = contact.summary;
+        if (transactionCount === 0) return `لا حركات مسجّلة مع ${contact.full_name}.`;
+        if (net > 0) {
+          return `أنت دائن لـ${contact.full_name} بمبلغ ${formatAmount(net, currency)}.`;
+        }
+        if (net < 0) {
+          return `أنت مدين لـ${contact.full_name} بمبلغ ${formatAmount(-net, currency)}.`;
+        }
+        return `حسابك مع ${contact.full_name} متعادل.`;
+      }
+
+      const event = matchByName(events, (item) => item.title, action.eventTitle);
+      if (!event) return `لا توجد مناسبة باسم «${action.eventTitle}».`;
+
+      const ledger = await fetchEventLedger(event.id);
+      if (ledger.participants.length === 0) {
+        return `مناسبة «${event.title}» بلا مشاركين بعد.`;
+      }
+      const total = totalEventSpend(ledger.expenses);
+      const balances = computeEventBalances(
+        ledger.participants,
+        ledger.expenses,
+        contacts,
+        userId,
+      );
+      const settlements = settleBalances(balances);
+      const head = `«${event.title}»: ${ledger.participants.length} مشارك، وإجمالي المصروفات ${formatAmount(total, DEFAULT_CURRENCY)}.`;
+      if (settlements.length === 0) return `${head} لا تسويات مطلوبة.`;
+      return `${head} التسوية: ${settlements
+        .map(
+          (row) =>
+            `${row.fromName} يدفع لـ${row.toName} ${formatAmount(row.amount, DEFAULT_CURRENCY)}`,
+        )
+        .join('، ')}.`;
+    },
+    [contacts, contactsWithSummary, events, totals, userId],
   );
 
   /** يعالج نداءات الأدوات: تحقّق، ثم بوّابة موافقة، ثم تنفيذ. */
@@ -342,6 +629,29 @@ export function useAppAssistant(onRequestClose?: () => void): AppAssistant {
           }
         }
 
+        if (isQueryAction(action)) {
+          const id = nextId('act');
+          push({ id, role: 'action', text: description, status: 'running' });
+          try {
+            const answer = await answerQuery(action);
+            setStatus(id, 'done');
+            push({ id: nextId('msg'), role: 'assistant', text: answer });
+            // السجلّ يعرف الجواب فيُحسن متابعة الحوار، بلا جولة جديدة.
+            history.current.push({
+              role: 'model',
+              functionCall: { name: call.name, args: call.args },
+            });
+            history.current.push({
+              role: 'user',
+              functionResponse: { name: call.name, response: { answer } },
+            });
+          } catch (error) {
+            logger.error('assistant', 'فشل الإجابة عن سؤال', error);
+            setStatus(id, 'failed', userMessage(error));
+          }
+          continue;
+        }
+
         if (requiresConfirmation(action)) {
           setPending({ id: nextId('pend'), action, description });
           continue;
@@ -378,7 +688,7 @@ export function useAppAssistant(onRequestClose?: () => void): AppAssistant {
 
       return feedback;
     },
-    [contacts, execute, push, setStatus, transactions],
+    [answerQuery, contacts, execute, push, setStatus, transactions],
   );
 
   const runTurn = useCallback(
