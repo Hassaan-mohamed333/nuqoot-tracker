@@ -50,10 +50,14 @@ export function ReceiptAttach({
   onClear,
 }: ReceiptAttachProps) {
   async function capture() {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      notify('إذن مطلوب', 'فعّل إذن الكاميرا لتصوير الفواتير.');
-      return;
+    // الويب: المنتقي يفتح الكاميرا عبر خاصية capture في حقل الملف، ولا يمرّ
+    // بإذن كاميرا منفصل؛ طلب الإذن هناك قد يرفض دون سبب.
+    if (Platform.OS !== 'web') {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        notify('إذن مطلوب', 'فعّل إذن الكاميرا لتصوير الفواتير.');
+        return;
+      }
     }
     const result = await ImagePicker.launchCameraAsync({
       base64: true,
@@ -71,8 +75,8 @@ export function ReceiptAttach({
     if (!result.canceled && result.assets[0]) onPicked(toPicked(result.assets[0]));
   }
 
-  // متصفّح سطح المكتب لا كاميرا له في المنتقي: زرّ لا يعمل أسوأ من غيابه.
-  const canCapture = Platform.OS !== 'web';
+  // على جوّال المتصفّح تفتح الكاميرا مباشرة، وعلى سطح المكتب يفتح اختيار ملف.
+  const canCapture = true;
 
   return (
     <View>
