@@ -56,6 +56,52 @@ export function DateField({
 
   const display = value ? formatGregorian(value) : placeholder;
 
+  /*
+   * الويب: الحقل الأصلي ظاهراً لا شفافاً.
+   *
+   * كان مدخل التاريخ شفافاً فوق هيكل مرسوم. هذا يعتمد على أن المتصفّح يفتح
+   * المنتقي عند الضغط على عنصر غير مرئي، ولا يفعل ذلك كل متصفّح ولا كل
+   * جهاز — فبدا الحقل معطّلاً. الحقل الظاهر يعمل في كل مكان: الكتابة
+   * مباشرة، وأيقونة التقويم الأصلية، ومنتقي الجوّال عند اللمس.
+   */
+  if (isWeb) {
+    return (
+      <View className={className}>
+        {label ? (
+          <Text className="mb-2 text-right text-sm font-bold text-ink">
+            {label}
+          </Text>
+        ) : null}
+
+        <View
+          className={`flex-row-reverse items-center rounded-tile border bg-surface px-4 ${
+            error ? 'border-danger' : 'border-line'
+          }`}>
+          <CalendarDays size={18} color={palette.muted} />
+          <View className="flex-1">
+            <WebDateInput
+              value={value}
+              onChange={onChange}
+              max={maximumDate}
+              min={minimumDate}
+              label={accessibilityLabel ?? label ?? 'اختيار تاريخ'}
+            />
+          </View>
+        </View>
+
+        {error ? (
+          <Text className="mt-1.5 text-right text-caption text-danger">
+            {error}
+          </Text>
+        ) : hint ? (
+          <Text className="mt-1.5 text-right text-caption text-ink-muted">
+            {hint}
+          </Text>
+        ) : null}
+      </View>
+    );
+  }
+
   return (
     <View className={className}>
       {label ? (
@@ -130,10 +176,11 @@ export function DateField({
 }
 
 /**
- * حقل التاريخ الأصلي للمتصفّح، شفّافاً فوق الهيكل المرئي.
+ * حقل التاريخ الأصلي للمتصفّح، ظاهراً داخل إطار الحقل.
  *
- * شفّاف لا مخفيّ: `display:none` أو `visibility:hidden` يمنع فتح
- * المنتقي، والشفافية تُبقي العنصر قابلاً للنقر ولقارئ الشاشة معاً.
+ * حجم الخط 16px صراحةً: أقلّ منه يكبّر Safari على iPhone الصفحة كلها عند
+ * التركيز. والضغط يستدعي showPicker حيث يُدعم، فيفتح متصفّح الكمبيوتر
+ * التقويم بدل أن يكتفي بتحديد جزء من التاريخ.
  */
 function WebDateInput({
   value,
@@ -148,16 +195,12 @@ function WebDateInput({
   min?: Date;
   label: string;
 }) {
-  // عنصر DOM خام داخل شجرة react-native-web: RNW يصيّر عناصر HTML
-  // حقيقية، فالـ input يجد موضعه الطبيعي بينها.
   return React.createElement('input', {
     type: 'date',
     'aria-label': label,
     value: value ? toDateInputValue(value) : '',
     max: max ? toDateInputValue(max) : undefined,
     min: min ? toDateInputValue(min) : undefined,
-    // متصفّح الكمبيوتر يحدّد جزءاً من التاريخ (يوم/شهر/سنة) عند الضغط ولا يفتح
-    // التقويم، فيبدو الحقل معطّلاً. showPicker يفتحه صراحةً حيث يُدعم.
     onClick: (event: { currentTarget: { showPicker?: () => void } }) => {
       try {
         event.currentTarget.showPicker?.();
@@ -170,17 +213,20 @@ function WebDateInput({
       if (next) onChange(next);
     },
     style: {
-      position: 'absolute',
-      inset: 0,
       width: '100%',
-      height: '100%',
-      opacity: 0,
+      minHeight: 48,
+      boxSizing: 'border-box',
       border: 'none',
-      padding: 0,
+      outline: 'none',
+      background: 'transparent',
+      padding: '12px 8px',
       margin: 0,
-      cursor: 'pointer',
-      // الخط يتبع الصفحة حتى لا يوسّع المتصفّح العنصر عن الهيكل تحته.
+      color: palette.text,
       font: 'inherit',
+      fontSize: 16,
+      textAlign: 'right',
+      direction: 'rtl',
+      cursor: 'pointer',
     },
   });
 }
