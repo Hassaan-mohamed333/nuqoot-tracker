@@ -4,11 +4,9 @@ import { Copy, Link2, Share2, Trash2, UserMinus } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
-  Share,
   Text,
   View,
 } from 'react-native';
@@ -16,7 +14,6 @@ import {
 import { Avatar, Button, SegmentedControl } from '@/components/ui';
 import { confirmAction, notify, reportError } from '@/lib/alerts';
 import { inviteBaseUrl } from '@/lib/appLinks';
-import { APP_NAME } from '@/lib/brand';
 import { palette } from '@/lib/palette';
 import {
   createInvite,
@@ -27,6 +24,7 @@ import {
   setMemberRole,
   sharingAvailable,
 } from '@/lib/sharedEvents';
+import { composeInviteMessage, deliverText } from '@/lib/shareEvent';
 import { logStepFailure, userMessage } from '@/lib/supabaseError';
 import type { RootStackParamList } from '@/navigation/types';
 import { useAuth } from '@/store/AuthProvider';
@@ -36,7 +34,6 @@ import {
   ROLE_HINTS,
   ROLE_LABELS,
   buildInviteLink,
-  buildInviteMessage,
   canManageEvent,
   formatInviteCode,
 } from '@/utils/eventInvite';
@@ -47,18 +44,6 @@ const INVITE_ROLES = [
   { value: 'editor', label: 'محرّر' },
   { value: 'viewer', label: 'مشاهد' },
 ] as const;
-
-async function copyToClipboard(text: string): Promise<boolean> {
-  if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-  return false;
-}
 
 /** أعضاء المناسبة المشتركة: الدعوة وتغيير الأدوار والإزالة. */
 export function EventMembersScreen() {
@@ -123,32 +108,17 @@ export function EventMembersScreen() {
   }
 
   async function handleShare() {
-    if (!inviteCode || !link) return;
-    const message = buildInviteMessage({
-      eventTitle: event?.title ?? 'مناسبة',
-      code: inviteCode,
-      link,
-      appName: APP_NAME,
-    });
-    if (Platform.OS !== 'web') {
-      try {
-        await Share.share({ message });
-      } catch (error) {
-        reportError('تعذّرت المشاركة', error);
-      }
-      return;
-    }
-    if (await copyToClipboard(message)) notify('تم النسخ', 'الصق الدعوة في واتساب أو أي محادثة.');
-    else notify('الدعوة', message);
+    if (!inviteCode || !event) return;
+    const { message } = composeInviteMessage(event, inviteCode);
+    const delivery = await deliverText(message);
+    if (delivery === 'copied') notify('تم النسخ', 'الصق الدعوة في واتساب أو أي محادثة.');
+    else if (delivery === 'shown') notify('الدعوة', message);
   }
-
   async function handleCopyCode() {
     if (!inviteCode) return;
-    if (await copyToClipboard(formatInviteCode(inviteCode))) {
-      notify('تم النسخ', 'نُسخ الكود.');
-    } else {
-      notify('الكود', formatInviteCode(inviteCode));
-    }
+    const delivery = await deliverText(formatInviteCode(inviteCode));
+    if (delivery === 'copied') notify('تم النسخ', 'نُسخ الكود.');
+    else if (delivery === 'shown') notify('الكود', formatInviteCode(inviteCode));
   }
 
   async function handleRevoke() {

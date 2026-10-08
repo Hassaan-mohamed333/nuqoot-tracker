@@ -89,12 +89,20 @@ export const ROLE_HINTS: Record<EventRole, string> = {
 /** رسالة الدعوة التي تُشارَك على واتساب وغيره. */
 export function buildInviteMessage(options: {
   eventTitle: string;
+  /** التاريخ مُنسَّقاً للعرض؛ يُحذف السطر إن غاب. */
+  eventDate?: string | null;
+  location?: string | null;
   code: string;
   link: string;
   appName: string;
 }): string {
+  const details = [options.eventDate, options.location]
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part));
+
   return [
     `ادعوك للانضمام إلى مناسبة «${options.eventTitle}» على ${options.appName}.`,
+    ...(details.length > 0 ? [details.join(' · ')] : []),
     '',
     `الرابط: ${options.link}`,
     `أو أدخل الكود: ${formatInviteCode(options.code)}`,

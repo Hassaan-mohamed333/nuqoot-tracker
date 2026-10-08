@@ -79,6 +79,33 @@ describe('الرابط والرسالة', () => {
     assert.equal(parseInviteCode(buildInviteLink(CODE, 'https://x.io/app/')), CODE);
   });
 
+  test('الرسالة تحمل تاريخ المناسبة ومكانها حين يُعطيان', () => {
+    const message = buildInviteMessage({
+      eventTitle: 'فرح أحمد',
+      eventDate: '١٢ ديسمبر ٢٠٢٦',
+      location: 'قاعة النيل',
+      code: CODE,
+      link: 'https://x.io/?join=' + CODE,
+      appName: 'الكراسة الصفرا',
+    });
+    assert.ok(message.includes('١٢ ديسمبر ٢٠٢٦ · قاعة النيل'));
+  });
+
+  test('الرسالة تتخطى التفاصيل الغائبة بلا فراغات ولا null', () => {
+    const message = buildInviteMessage({
+      eventTitle: 'سبوع',
+      eventDate: '  ',
+      location: null,
+      code: CODE,
+      link: 'https://x.io/?join=' + CODE,
+      appName: 'الكراسة الصفرا',
+    });
+    assert.ok(!message.includes('null') && !message.includes('undefined'));
+    assert.ok(!message.includes(' · '));
+    // سطر العنوان ثم سطر فارغ مباشرةً: لا سطر تفاصيل بينهما.
+    assert.equal(message.split('\n')[1], '');
+  });
+
   test('العرض بمجموعات من أربع خانات', () => {
     assert.equal(formatInviteCode(CODE), 'A1B2-C3D4-E5F6');
   });

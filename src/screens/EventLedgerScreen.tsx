@@ -6,6 +6,7 @@ import {
   CloudOff,
   Pencil,
   Plus,
+  Send,
   Receipt,
   TriangleAlert,
   Users,
@@ -18,6 +19,8 @@ import { BalanceBar, FadeSlideIn, PressableScale, staggerDelay } from '@/compone
 import { Button, Card, SectionTitle } from '@/components/ui';
 import { useEventLedger } from '@/hooks/useEventLedger';
 import { palette } from '@/lib/palette';
+import { notify, reportError } from '@/lib/alerts';
+import { sendEventInvite } from '@/lib/shareEvent';
 import { fetchMyEventRole, sharingAvailable } from '@/lib/sharedEvents';
 import type { RootStackParamList } from '@/navigation/types';
 import { useAuth } from '@/store/AuthProvider';
@@ -58,6 +61,26 @@ export function EventLedgerScreen() {
   const canEdit = role === null || canEditEvent(role);
   // تعديل بيانات المناسبة (العنوان والتاريخ…) لصاحبها وحده؛ والدفتر المحلي لصاحبه.
   const canManage = role === null || role === 'owner';
+  // الدعوة لصاحب المناسبة وحده، ولمناسبة على الخادم لا محلية.
+  const canInvite = role === 'owner' && sharingAvailable();
+  const [sending, setSending] = useState(false);
+
+  async function handleSend() {
+    if (!event || sending) return;
+    setSending(true);
+    try {
+      const { delivery, message } = await sendEventInvite(event);
+      if (delivery === 'copied') {
+        notify('تم النسخ', 'الصق الدعوة في واتساب أو أي محادثة.');
+      } else if (delivery === 'shown') {
+        notify('الدعوة', message);
+      }
+    } catch (sendError) {
+      reportError('تعذّر إرسال المناسبة', sendError);
+    } finally {
+      setSending(false);
+    }
+  }
   const participants = useMemo(() => data?.participants ?? [], [data]);
   const expenses = useMemo(() => data?.expenses ?? [], [data]);
 
@@ -199,6 +222,17 @@ export function EventLedgerScreen() {
             </PressableScale>
             ) : null}
           </View>
+
+          {canInvite ? (
+            <Button
+              title="إرسال المناسبة للأعضاء"
+              size="sm"
+              icon={<Send size={16} color={palette.onPrimary} />}
+              onPress={() => void handleSend()}
+              loading={sending}
+              className="mt-2"
+            />
+          ) : null}
 
           <View className="mt-2 flex-row-reverse">
             {sharingAvailable() ? (
