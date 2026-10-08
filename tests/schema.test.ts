@@ -14,7 +14,10 @@ import { describe, test } from 'node:test';
  */
 
 const ROOT = path.join(import.meta.dirname, '..');
-const SCHEMA = readFileSync(path.join(ROOT, 'supabase', 'schema.sql'), 'utf8');
+const SCHEMA = readFileSync(
+  path.join(ROOT, 'supabase', 'schema.sql'),
+  'utf8',
+).replace(/\r\n/g, '\n');
 
 /** كل جدول في مخطط public. */
 function declaredTables(): string[] {
@@ -24,15 +27,48 @@ function declaredTables(): string[] {
   return [...new Set([...matches].map((match) => match[1]))];
 }
 
-/** آخر تعريف لكل سياسة (الملف يعيد تعريف بعضها للتشديد). */
-function policyBodies(): Map<string, string> {
-  const bodies = new Map<string, string>();
-  const pattern = /create policy "([a-z_]+)" on public\.([a-z_]+)([\s\S]*?);\n/g;
-  for (const match of SCHEMA.matchAll(pattern)) {
-    bodies.set(match[1], match[3]);
-  }
-  return bodies;
+interface Policy {
+  name: string;
+  table: string;
+  body: string;
 }
+
+/**
+ * السياسات الفعّالة بعد تشغيل الملف كاملاً بالترتيب.
+ *
+ * الملف يعيد تعريف بعض السياسات للتشديد، ويحذف أخرى حين تحلّ محلّها سياسات
+ * العضوية؛ فنتتبّع الإنشاء والحذف معاً بدل قراءة كل create policy وكأنها حيّة.
+ */
+function livePolicies(): Policy[] {
+  const live = new Map<string, Policy>();
+  const pattern =
+    /create policy "([a-z_]+)" on public\.([a-z_]+)([\s\S]*?);\n|drop policy if exists "([a-z_]+)" on public\.[a-z_]+;/g;
+  for (const match of SCHEMA.matchAll(pattern)) {
+    if (match[1]) {
+      live.set(match[1], { name: match[1], table: match[2], body: match[3] });
+    } else {
+      live.delete(match[4]);
+    }
+  }
+  return [...live.values()];
+}
+
+/** آخر تعريف لكل سياسة فعّالة. */
+function policyBodies(): Map<string, string> {
+  return new Map(livePolicies().map((policy) => [policy.name, policy.body]));
+}
+
+/** سياسات العضوية: تقيس الانتماء لمناسبة لا ملكية الصف. */
+function isMembershipPolicy(name: string): boolean {
+  return (
+    name.includes('_member_') ||
+    name === 'event_members_owner_update' ||
+    name === 'event_members_remove'
+  );
+}
+
+/** جداول بلا أي وصول من العميل: RLS مفعّل وبلا سياسات، والدخول بالدوال فقط. */
+const NO_CLIENT_ACCESS = ['event_invites'];
 
 describe('أمن الصفوف في المخطط', () => {
   test('كل جدول يفعّل RLS', () => {
@@ -44,12 +80,24 @@ describe('أمن الصفوف في المخطط', () => {
     }
   });
 
-  test('كل جدول له سياسة ملكية', () => {
-    const policies = [...policyBodies().keys()].join(' ');
+  test('كل جدول له سياسة ملكية أو عضوية', () => {
+    const live = livePolicies();
     for (const table of declaredTables()) {
+      const own = live.filter((policy) => policy.table === table);
+      if (NO_CLIENT_ACCESS.includes(table)) {
+        assert.equal(
+          own.length,
+          0,
+          `الجدول ${table} للدوال فقط ولا يجوز أن تكون له سياسات عميل`,
+        );
+        continue;
+      }
       assert.ok(
-        policies.includes(`${table}_owner`),
-        `الجدول ${table} بلا سياسة ملكية`,
+        own.some(
+          (policy) =>
+            policy.name === `${table}_owner` || isMembershipPolicy(policy.name),
+        ),
+        `الجدول ${table} بلا سياسة ملكية ولا عضوية`,
       );
     }
   });
@@ -63,8 +111,26 @@ describe('أمن الصفوف في المخطط', () => {
    */
   const OWNER_COLUMN: Record<string, string> = { profiles_owner: 'id' };
 
-  test('كل سياسة تقيّد القراءة والكتابة بالمالك', () => {
+  test('كل سياسة تقيّد القراءة والكتابة بالمالك أو بالعضوية', () => {
     for (const [name, body] of policyBodies()) {
+      const flat = body.replace(/\s+/g, ' ');
+      const command = /for (select|insert|update|delete|all)/.exec(body)?.[1];
+      const writes = command === 'insert' || command === 'update' || command === 'all';
+
+      if (isMembershipPolicy(name)) {
+        assert.ok(
+          flat.includes('is_event_member('),
+          `سياسة العضوية ${name} لا تستدعي is_event_member`,
+        );
+        if (writes) {
+          assert.ok(
+            flat.includes('with check'),
+            `السياسة ${name} بلا with check — يمكن الكتابة لمناسبة غيرك`,
+          );
+        }
+        continue;
+      }
+
       const column = OWNER_COLUMN[name] ?? 'user_id';
       assert.ok(
         body.includes(`using (auth.uid() = ${column})`),
@@ -74,9 +140,6 @@ describe('أمن الصفوف في المخطط', () => {
         body.includes('with check'),
         `السياسة ${name} بلا with check — يمكن الكتابة لحساب غيرك`,
       );
-      // المسافات تختلف بين سياسة بسيطة وأخرى متعدّدة الشروط، فنوحّدها
-      // قبل المطابقة بدل تثبيت شكل التنسيق في الاختبار.
-      const flat = body.replace(/\s+/g, ' ');
       assert.ok(
         flat.includes(`with check ( auth.uid() = ${column}`) ||
           flat.includes(`with check (auth.uid() = ${column}`),
@@ -89,19 +152,25 @@ describe('أمن الصفوف في المخطط', () => {
     // فحص المفتاح الأجنبي لا يمرّ عبر RLS، فبدون هذا يمكن ربط صفّك
     // بمناسبة أو مصروف يملكه غيرك.
     const bodies = policyBodies();
-    const linked = [
-      'transactions_owner',
-      'events_owner',
-      'event_participants_owner',
-      'shared_expenses_owner',
-      'expense_shares_owner',
-    ];
-    for (const name of linked) {
+    for (const name of ['transactions_owner', 'events_owner']) {
       const body = bodies.get(name) ?? '';
       assert.notEqual(body, '', `السياسة ${name} غير موجودة`);
       assert.ok(
         body.includes('exists (') && body.includes('user_id = auth.uid()'),
         `السياسة ${name} لا تتحقّق من ملكية المراجع`,
+      );
+    }
+    // في المناسبات المشتركة المرجع يُفحص بالانتماء إلى المناسبة نفسها.
+    for (const name of [
+      'event_participants_member_insert',
+      'shared_expenses_member_insert',
+      'expense_shares_member_insert',
+    ]) {
+      const body = (bodies.get(name) ?? '').replace(/\s+/g, ' ');
+      assert.notEqual(body, '', `السياسة ${name} غير موجودة`);
+      assert.ok(
+        body.includes('is_event_member(') && body.includes('auth.uid() = user_id'),
+        `السياسة ${name} لا تختم المنشئ ولا تتحقّق من العضوية`,
       );
     }
   });
@@ -162,5 +231,142 @@ describe('الأسرار في المستودع', () => {
     ]) {
       assert.ok(example.includes(name), `${name} غير موثّق في .env.example`);
     }
+  });
+});
+
+describe('المناسبات المشتركة', () => {
+  const FUNCTIONS = [
+    'event_role',
+    'is_event_member',
+    'add_event_owner',
+    'set_participant_shown_name',
+    'transfer_events_before_user_delete',
+    'create_event_invite',
+    'join_event_by_code',
+    'revoke_event_invites',
+    'event_member_names',
+  ];
+
+  /** متن دالة: من create or replace function إلى $$; الختامية. */
+  function functionBody(name: string): string {
+    const start = SCHEMA.indexOf(`create or replace function public.${name}(`);
+    assert.notEqual(start, -1, `الدالة ${name} غير معرَّفة`);
+    const end = SCHEMA.indexOf('$$;', SCHEMA.indexOf('as $$', start));
+    return SCHEMA.slice(start, end);
+  }
+
+  test('كل دالة security definer بمسار بحث مثبَّت', () => {
+    for (const name of FUNCTIONS) {
+      const body = functionBody(name);
+      assert.ok(body.includes('security definer'), `${name} ليست security definer`);
+      assert.ok(
+        /set search_path = /.test(body),
+        `${name} بلا search_path مثبَّت: تُختطف بكائن بالاسم نفسه`,
+      );
+    }
+  });
+
+  test('الدوال القابلة للاستدعاء مسحوبة من anon', () => {
+    const callable = FUNCTIONS.filter(
+      (name) =>
+        !['add_event_owner', 'set_participant_shown_name'].includes(name),
+    );
+    for (const name of callable) {
+      const pattern = new RegExp(
+        `revoke all on function public\\.${name}\\([^)]*\\)\\s+from public, anon`,
+      );
+      assert.ok(pattern.test(SCHEMA), `${name} قابلة للاستدعاء من anon`);
+    }
+  });
+
+  test('الجداول الجديدة تفعّل RLS', () => {
+    for (const table of ['event_members', 'event_invites']) {
+      assert.ok(
+        SCHEMA.includes(`alter table public.${table} enable row level security`),
+        `الجدول ${table} بلا RLS`,
+      );
+    }
+  });
+
+  test('لا إدراج مباشر في event_members: الانضمام بالكود وحده', () => {
+    const inserts = livePolicies().filter(
+      (policy) =>
+        policy.table === 'event_members' && /for insert/.test(policy.body),
+    );
+    assert.deepEqual(inserts, [], 'سياسة insert تفتح الانضمام بلا دعوة');
+  });
+
+  test('مالك واحد لكل مناسبة بقيد فريد', () => {
+    assert.ok(
+      /create unique index if not exists event_members_one_owner_uniq[\s\S]*?where role = 'owner'/.test(
+        SCHEMA,
+      ),
+      'لا قيد يمنع تعدد المالكين',
+    );
+  });
+
+  test('الدعوة تُخزَّن مُبصَّمة لا خاماً', () => {
+    assert.ok(SCHEMA.includes('code_hash text not null unique'), 'لا بصمة للكود');
+    const body = functionBody('create_event_invite');
+    assert.ok(
+      body.includes("encode(digest(v_code, 'sha256'), 'hex')"),
+      'الكود لا يُبصَّم قبل التخزين',
+    );
+  });
+
+  test('جهات الاتصال والحركات الشخصية لا تُفتح للأعضاء', () => {
+    for (const policy of livePolicies()) {
+      if (policy.table === 'contacts' || policy.table === 'transactions') {
+        assert.ok(
+          !policy.body.includes('is_event_member('),
+          `${policy.name} تكشف بيانات شخصية لأعضاء المناسبة`,
+        );
+      }
+    }
+  });
+
+  test('الكتابة في الدفتر الجماعي تتطلب دور editor على الأقل', () => {
+    for (const policy of livePolicies()) {
+      if (!policy.name.includes('_member_')) continue;
+      if (/for (insert|update|delete)/.test(policy.body)) {
+        assert.ok(
+          policy.body.includes("'editor'") || policy.body.includes("'owner'"),
+          `${policy.name} تسمح لـ viewer بالكتابة`,
+        );
+      }
+    }
+  });
+
+  test('حذف حساب المالك ينقل المناسبة إلى محرّر لا يحذفها', () => {
+    assert.ok(
+      /create trigger users_transfer_events\s+before delete on auth\.users/.test(
+        SCHEMA,
+      ),
+      'لا trigger ينقل المناسبات قبل حذف الحساب',
+    );
+    const body = functionBody('transfer_events_before_user_delete');
+    assert.ok(
+      body.includes("(m.role = 'editor') desc"),
+      'المحرّر لا يُفضَّل على غيره عند النقل',
+    );
+    assert.ok(
+      body.includes('update public.events set user_id = v_target'),
+      'ملكية المناسبة لا تنتقل',
+    );
+    // الحذف قبل الترقية، وإلا اصطدم القيد الفريد (مالكان معاً).
+    assert.ok(
+      body.indexOf('delete from public.event_members') <
+        body.indexOf("set role = 'owner'"),
+      'ترقية المالك الجديد قبل إزالة القديم تخرق قيد المالك الواحد',
+    );
+  });
+
+  test('اسم المشارك يضبطه الخادم لا العميل', () => {
+    assert.ok(
+      /create trigger event_participants_shown_name\s+before insert or update/.test(
+        SCHEMA,
+      ),
+      'اسم المشارك المعروض لا يضبطه trigger',
+    );
   });
 });

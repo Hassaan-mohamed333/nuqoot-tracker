@@ -588,3 +588,633 @@ alter table public.transactions
 create index if not exists transactions_split_group_idx
   on public.transactions (split_group_id)
   where split_group_id is not null;
+
+-- =====================================================================
+-- المناسبات المشتركة (عضوية متعدّدة المستخدمين)
+-- =====================================================================
+-- قبل هذا القسم كانت كل مناسبة ودفترها الجماعي ملكَ مستخدمٍ واحد. الآن
+-- يشترك فيها مستخدمون حقيقيون بأدوار:
+--   owner  : صاحب المناسبة، يدير الأعضاء والدعوات ويحذف المناسبة.
+--   editor : يضيف ويعدّل المصروفات والأعضاء الاسميين.
+--   viewer : يقرأ ويصدّر التقارير فقط.
+--
+-- ما يبقى خاصاً دائماً: جهات الاتصال والحركات الشخصية (contacts و
+-- transactions). لا يراها عضو آخر مهما كان دوره؛ يرى فقط ما يخصّ المناسبة
+-- (المشاركون والمصروفات والحصص). والأسماء داخل المناسبة تؤخذ من
+-- display_name لا من جهة اتصال صاحبها.
+--
+-- القاعدة التي لا تتغيّر: عميلٌ معدَّل لا يستطيع قراءة أو كتابة صفٍّ في
+-- مناسبة ليس عضواً فيها، ولا الإشارة إلى صفٍّ يملكه غيره (فحص المفتاح
+-- الأجنبي لا يمرّ عبر RLS، فكل سياسة كتابة تتحقّق من الانتماء صراحةً).
+
+create table if not exists public.event_members (
+  event_id uuid not null references public.events (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  role text not null default 'viewer'
+    check (role in ('owner', 'editor', 'viewer')),
+  invited_by uuid references auth.users (id) on delete set null,
+  joined_at timestamptz not null default now(),
+  primary key (event_id, user_id)
+);
+
+create index if not exists event_members_user_idx
+  on public.event_members (user_id);
+
+-- مالك واحد لكل مناسبة: يمنع ترقية عضو إلى owner بطريق جانبي.
+create unique index if not exists event_members_one_owner_uniq
+  on public.event_members (event_id)
+  where role = 'owner';
+
+-- دعوات الانضمام. لا يصلها العميل مباشرةً (RLS بلا أي سياسة)، بل عبر
+-- الدوال أدناه فقط. نخزّن بصمة الكود لا الكود: تسريب الجدول لا يكشف
+-- دعوةً صالحة.
+create table if not exists public.event_invites (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid not null references public.events (id) on delete cascade,
+  code_hash text not null unique,
+  role text not null default 'editor' check (role in ('editor', 'viewer')),
+  created_by uuid not null default auth.uid()
+    references auth.users (id) on delete cascade,
+  expires_at timestamptz not null,
+  max_uses integer not null default 5 check (max_uses between 1 and 50),
+  uses integer not null default 0 check (uses >= 0),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists event_invites_event_idx
+  on public.event_invites (event_id);
+
+-- ربط المشارك الاسمي بحساب حقيقي بعد انضمامه (اختياري).
+alter table public.event_participants
+  add column if not exists member_user_id uuid
+  references auth.users (id) on delete set null;
+
+-- المالك الحالي لكل مناسبة قائمة يصير owner.
+insert into public.event_members (event_id, user_id, role)
+select id, user_id, 'owner' from public.events
+on conflict do nothing;
+
+-- ---------------------------------------------------------------------
+-- دوال الانتماء. security definer كي لا تدخل سياسات event_members في
+-- تكرارٍ لا ينتهي (السياسة تقرأ الجدول الذي تحميه)، وsearch_path فارغ
+-- كي لا تُختطف بكائنٍ بالاسم نفسه في مخطط آخر.
+-- ---------------------------------------------------------------------
+
+create or replace function public.event_role(p_event uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select m.role
+  from public.event_members m
+  where m.event_id = p_event and m.user_id = auth.uid();
+$$;
+
+-- min_role: 'viewer' < 'editor' < 'owner'.
+create or replace function public.is_event_member(
+  p_event uuid,
+  p_min_role text default 'viewer'
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(
+    (case public.event_role(p_event)
+       when 'owner' then 3
+       when 'editor' then 2
+       when 'viewer' then 1
+       else 0
+     end)
+    >=
+    (case p_min_role
+       when 'owner' then 3
+       when 'editor' then 2
+       else 1
+     end),
+    false
+  );
+$$;
+
+revoke all on function public.event_role(uuid) from public, anon;
+revoke all on function public.is_event_member(uuid, text) from public, anon;
+grant execute on function public.event_role(uuid) to authenticated;
+grant execute on function public.is_event_member(uuid, text) to authenticated;
+
+-- مناسبة جديدة => صاحبها عضو owner فوراً، بلا اعتماد على العميل.
+create or replace function public.add_event_owner()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.event_members (event_id, user_id, role)
+  values (new.id, new.user_id, 'owner')
+  on conflict do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists events_add_owner on public.events;
+create trigger events_add_owner
+  after insert on public.events
+  for each row execute function public.add_event_owner();
+
+-- ---------------------------------------------------------------------
+-- RLS
+-- ---------------------------------------------------------------------
+
+alter table public.event_members enable row level security;
+alter table public.event_invites enable row level security;
+-- event_invites: بلا سياسات عمداً = ممنوع على العميل كلياً.
+
+-- المناسبة: الأعضاء يقرؤونها. التعديل والحذف يبقيان لـ events_owner.
+drop policy if exists "events_member_read" on public.events;
+create policy "events_member_read" on public.events
+  for select using (public.is_event_member(id));
+
+-- الأعضاء يرون بعضهم داخل المناسبة نفسها فقط.
+drop policy if exists "event_members_member_read" on public.event_members;
+create policy "event_members_member_read" on public.event_members
+  for select using (public.is_event_member(event_id));
+
+-- لا سياسة insert: الانضمام عبر join_event_by_code وحدها.
+
+-- تغيير الدور: المالك فقط، ولا يُرقّى أحد إلى owner ولا يُنزَّل المالك.
+drop policy if exists "event_members_owner_update" on public.event_members;
+create policy "event_members_owner_update" on public.event_members
+  for update using (
+    public.is_event_member(event_id, 'owner') and role <> 'owner'
+  ) with check (
+    public.is_event_member(event_id, 'owner') and role <> 'owner'
+  );
+
+-- الإزالة: المالك يزيل أي عضو غيره، والعضو يغادر بنفسه. المالك لا يُزال.
+drop policy if exists "event_members_remove" on public.event_members;
+create policy "event_members_remove" on public.event_members
+  for delete using (
+    role <> 'owner'
+    and (
+      public.is_event_member(event_id, 'owner')
+      or user_id = auth.uid()
+    )
+  );
+
+-- المشاركون في المناسبة.
+drop policy if exists "event_participants_owner" on public.event_participants;
+drop policy if exists "event_participants_member_read" on public.event_participants;
+create policy "event_participants_member_read" on public.event_participants
+  for select using (public.is_event_member(event_id));
+
+drop policy if exists "event_participants_member_insert" on public.event_participants;
+create policy "event_participants_member_insert" on public.event_participants
+  for insert with check (
+    auth.uid() = user_id
+    and public.is_event_member(event_id, 'editor')
+    and (
+      contact_id is null
+      or exists (
+        select 1 from public.contacts c
+        where c.id = contact_id and c.user_id = auth.uid()
+      )
+    )
+    and (
+      member_user_id is null
+      or exists (
+        select 1 from public.event_members m
+        where m.event_id = event_participants.event_id
+          and m.user_id = member_user_id
+      )
+    )
+  );
+
+drop policy if exists "event_participants_member_update" on public.event_participants;
+create policy "event_participants_member_update" on public.event_participants
+  for update using (
+    public.is_event_member(event_id, 'editor')
+    and (user_id = auth.uid() or public.is_event_member(event_id, 'owner'))
+  ) with check (
+    public.is_event_member(event_id, 'editor')
+    and (
+      contact_id is null
+      or exists (
+        select 1 from public.contacts c
+        where c.id = contact_id and c.user_id = auth.uid()
+      )
+    )
+    and (
+      member_user_id is null
+      or exists (
+        select 1 from public.event_members m
+        where m.event_id = event_participants.event_id
+          and m.user_id = member_user_id
+      )
+    )
+  );
+
+drop policy if exists "event_participants_member_delete" on public.event_participants;
+create policy "event_participants_member_delete" on public.event_participants
+  for delete using (
+    public.is_event_member(event_id, 'editor')
+    and (user_id = auth.uid() or public.is_event_member(event_id, 'owner'))
+  );
+
+-- المصروفات المشتركة.
+drop policy if exists "shared_expenses_owner" on public.shared_expenses;
+drop policy if exists "shared_expenses_member_read" on public.shared_expenses;
+create policy "shared_expenses_member_read" on public.shared_expenses
+  for select using (public.is_event_member(event_id));
+
+drop policy if exists "shared_expenses_member_insert" on public.shared_expenses;
+create policy "shared_expenses_member_insert" on public.shared_expenses
+  for insert with check (
+    auth.uid() = user_id
+    and public.is_event_member(event_id, 'editor')
+    and (
+      payer_participant_id is null
+      or exists (
+        select 1 from public.event_participants p
+        where p.id = payer_participant_id
+          and p.event_id = shared_expenses.event_id
+      )
+    )
+    and (
+      payer_contact_id is null
+      or exists (
+        select 1 from public.contacts c
+        where c.id = payer_contact_id and c.user_id = auth.uid()
+      )
+    )
+  );
+
+drop policy if exists "shared_expenses_member_update" on public.shared_expenses;
+create policy "shared_expenses_member_update" on public.shared_expenses
+  for update using (
+    public.is_event_member(event_id, 'editor')
+    and (user_id = auth.uid() or public.is_event_member(event_id, 'owner'))
+  ) with check (
+    public.is_event_member(event_id, 'editor')
+    and (
+      payer_participant_id is null
+      or exists (
+        select 1 from public.event_participants p
+        where p.id = payer_participant_id
+          and p.event_id = shared_expenses.event_id
+      )
+    )
+    and (
+      payer_contact_id is null
+      or exists (
+        select 1 from public.contacts c
+        where c.id = payer_contact_id and c.user_id = auth.uid()
+      )
+    )
+  );
+
+drop policy if exists "shared_expenses_member_delete" on public.shared_expenses;
+create policy "shared_expenses_member_delete" on public.shared_expenses
+  for delete using (
+    public.is_event_member(event_id, 'editor')
+    and (user_id = auth.uid() or public.is_event_member(event_id, 'owner'))
+  );
+
+-- حصص المصروفات: تتبع مناسبة المصروف الأب.
+drop policy if exists "expense_shares_owner" on public.expense_shares;
+drop policy if exists "expense_shares_member_read" on public.expense_shares;
+create policy "expense_shares_member_read" on public.expense_shares
+  for select using (
+    exists (
+      select 1 from public.shared_expenses e
+      where e.id = expense_id and public.is_event_member(e.event_id)
+    )
+  );
+
+drop policy if exists "expense_shares_member_insert" on public.expense_shares;
+create policy "expense_shares_member_insert" on public.expense_shares
+  for insert with check (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.shared_expenses e
+      where e.id = expense_id and public.is_event_member(e.event_id, 'editor')
+    )
+    and (
+      participant_id is null
+      or exists (
+        select 1
+        from public.event_participants p
+        join public.shared_expenses e on e.event_id = p.event_id
+        where p.id = participant_id and e.id = expense_id
+      )
+    )
+    and (
+      contact_id is null
+      or exists (
+        select 1 from public.contacts c
+        where c.id = contact_id and c.user_id = auth.uid()
+      )
+    )
+  );
+
+drop policy if exists "expense_shares_member_update" on public.expense_shares;
+create policy "expense_shares_member_update" on public.expense_shares
+  for update using (
+    exists (
+      select 1 from public.shared_expenses e
+      where e.id = expense_id
+        and public.is_event_member(e.event_id, 'editor')
+        and (expense_shares.user_id = auth.uid()
+             or public.is_event_member(e.event_id, 'owner'))
+    )
+  ) with check (
+    exists (
+      select 1 from public.shared_expenses e
+      where e.id = expense_id and public.is_event_member(e.event_id, 'editor')
+    )
+    and (
+      participant_id is null
+      or exists (
+        select 1
+        from public.event_participants p
+        join public.shared_expenses e on e.event_id = p.event_id
+        where p.id = participant_id and e.id = expense_id
+      )
+    )
+    and (
+      contact_id is null
+      or exists (
+        select 1 from public.contacts c
+        where c.id = contact_id and c.user_id = auth.uid()
+      )
+    )
+  );
+
+drop policy if exists "expense_shares_member_delete" on public.expense_shares;
+create policy "expense_shares_member_delete" on public.expense_shares
+  for delete using (
+    exists (
+      select 1 from public.shared_expenses e
+      where e.id = expense_id
+        and public.is_event_member(e.event_id, 'editor')
+        and (expense_shares.user_id = auth.uid()
+             or public.is_event_member(e.event_id, 'owner'))
+    )
+  );
+
+-- ---------------------------------------------------------------------
+-- الدعوات والأسماء (دوال security definer، تتحقّق من الصلاحية بنفسها).
+-- ---------------------------------------------------------------------
+
+-- ينشئ دعوة ويعيد الكود الخام مرّةً واحدة؛ لا يُخزَّن ولا يُستعاد.
+create or replace function public.create_event_invite(
+  p_event uuid,
+  p_role text default 'editor',
+  p_ttl_hours integer default 72,
+  p_max_uses integer default 5
+)
+returns text
+language plpgsql
+security definer
+set search_path = extensions, pg_temp
+as $$
+declare
+  v_code text;
+begin
+  if auth.uid() is null or not public.is_event_member(p_event, 'owner') then
+    raise exception 'not_allowed' using errcode = '42501';
+  end if;
+  if p_role not in ('editor', 'viewer') then
+    raise exception 'bad_role' using errcode = '22023';
+  end if;
+
+  v_code := upper(encode(gen_random_bytes(6), 'hex'));
+  insert into public.event_invites (
+    event_id, code_hash, role, created_by, expires_at, max_uses
+  ) values (
+    p_event,
+    encode(digest(v_code, 'sha256'), 'hex'),
+    p_role,
+    auth.uid(),
+    now() + make_interval(hours => least(greatest(p_ttl_hours, 1), 24 * 14)),
+    least(greatest(p_max_uses, 1), 50)
+  );
+  return v_code;
+end;
+$$;
+
+-- ينضمّ بكود. رسالة خطأ واحدة لكل الأسباب كي لا يُستدلّ على وجود الكود.
+create or replace function public.join_event_by_code(p_code text)
+returns uuid
+language plpgsql
+security definer
+set search_path = extensions, pg_temp
+as $$
+declare
+  v_invite public.event_invites;
+begin
+  if auth.uid() is null then
+    raise exception 'not_allowed' using errcode = '42501';
+  end if;
+
+  select * into v_invite
+  from public.event_invites
+  where code_hash = encode(digest(upper(trim(p_code)), 'sha256'), 'hex')
+    and expires_at > now()
+    and uses < max_uses
+  for update;
+
+  if not found then
+    raise exception 'invalid_invite' using errcode = 'P0002';
+  end if;
+
+  insert into public.event_members (event_id, user_id, role, invited_by)
+  values (v_invite.event_id, auth.uid(), v_invite.role, v_invite.created_by)
+  on conflict do nothing;
+
+  if found then
+    update public.event_invites set uses = uses + 1 where id = v_invite.id;
+  end if;
+
+  return v_invite.event_id;
+end;
+$$;
+
+create or replace function public.revoke_event_invites(p_event uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if auth.uid() is null or not public.is_event_member(p_event, 'owner') then
+    raise exception 'not_allowed' using errcode = '42501';
+  end if;
+  delete from public.event_invites where event_id = p_event;
+end;
+$$;
+
+-- أسماء الأعضاء الحقيقيين داخل مناسبة. profiles خاص بصاحبه، فلا يُقرأ
+-- مباشرةً؛ هذه الدالة تكشف الاسم وحده، وللأعضاء فقط.
+create or replace function public.event_member_names(p_event uuid)
+returns table (user_id uuid, full_name text, role text)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select m.user_id, p.full_name, m.role
+  from public.event_members m
+  left join public.profiles p on p.id = m.user_id
+  where m.event_id = p_event
+    and public.is_event_member(p_event);
+$$;
+
+revoke all on function public.create_event_invite(uuid, text, integer, integer)
+  from public, anon;
+revoke all on function public.join_event_by_code(text) from public, anon;
+revoke all on function public.revoke_event_invites(uuid) from public, anon;
+revoke all on function public.event_member_names(uuid) from public, anon;
+grant execute on function public.create_event_invite(uuid, text, integer, integer)
+  to authenticated;
+grant execute on function public.join_event_by_code(text) to authenticated;
+grant execute on function public.revoke_event_invites(uuid) to authenticated;
+grant execute on function public.event_member_names(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------
+-- أسماء المشاركين تُرى من الأعضاء الآخرين
+-- ---------------------------------------------------------------------
+-- جهات الاتصال خاصة بصاحبها، فعضو آخر لا يستطيع قراءة اسم مشارك أُضيف من
+-- جهة اتصال غيره. نحتفظ بنسخة من الاسم في الصف نفسه، يضبطها الخادم لا
+-- العميل: اسم يرسله العميل يستطيع تزويره.
+-- الأسماء الحرة (display_name) باقية: مشاركون بلا حساب ولا جهة اتصال.
+
+alter table public.event_participants
+  add column if not exists shown_name text;
+
+create or replace function public.set_participant_shown_name()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.contact_id is not null then
+    select c.full_name into new.shown_name
+    from public.contacts c
+    where c.id = new.contact_id;
+  else
+    new.shown_name := new.display_name;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists event_participants_shown_name on public.event_participants;
+create trigger event_participants_shown_name
+  before insert or update of contact_id, display_name
+  on public.event_participants
+  for each row execute function public.set_participant_shown_name();
+
+-- الصفوف القائمة.
+update public.event_participants p
+set shown_name = coalesce(p.display_name, c.full_name)
+from public.contacts c
+where p.contact_id = c.id and p.shown_name is null;
+
+-- ---------------------------------------------------------------------
+-- حذف حساب المالك: تنتقل المناسبة إلى محرّر
+-- ---------------------------------------------------------------------
+-- بلا هذا يحذف ON DELETE CASCADE كل مناسبة يملكها الحساب المحذوف، ومعها
+-- مصروفات الأعضاء الآخرين. الترتيب عند الحذف:
+--   1) محرّر أقدم انضماماً يصير المالك (فإن لم يوجد فأقدم عضو آخر).
+--   2) ما أنشأه الحساب المحذوف داخل المناسبة (مصروفات، مشاركون، حصص)
+--      يُنقل إلى المالك الجديد بدل أن يُحذف معه.
+--   3) المشاركون الذين أُضيفوا من جهات اتصاله يتحوّلون إلى أسماء حرّة،
+--      لأن جهات اتصاله تُحذف مع حسابه وكانت ستسحب صفوفهم معها.
+-- مناسبة لا عضو فيها غيره تُحذف مع حسابه.
+-- والعضو غير المالك: ما أنشأه ينتقل إلى مالك المناسبة.
+
+create or replace function public.transfer_events_before_user_delete()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_member record;
+  v_target uuid;
+  v_part record;
+begin
+  for v_member in
+    select m.event_id, m.role
+    from public.event_members m
+    where m.user_id = old.id
+  loop
+    if v_member.role = 'owner' then
+      select m.user_id into v_target
+      from public.event_members m
+      where m.event_id = v_member.event_id and m.user_id <> old.id
+      order by (m.role = 'editor') desc, m.joined_at asc
+      limit 1;
+
+      -- لا أحد غيره: تُحذف المناسبة مع حسابه كما كان.
+      continue when v_target is null;
+
+      -- القيد الفريد يمنع مالكَين معاً: نزيل القديم قبل ترقية الجديد.
+      delete from public.event_members
+      where event_id = v_member.event_id and user_id = old.id;
+      update public.event_members set role = 'owner'
+      where event_id = v_member.event_id and user_id = v_target;
+      update public.events set user_id = v_target
+      where id = v_member.event_id;
+    else
+      select e.user_id into v_target
+      from public.events e where e.id = v_member.event_id;
+    end if;
+
+    -- ما أنشأه الحساب المحذوف ينتقل، فلا تسحبه سلسلة الحذف.
+    update public.shared_expenses set user_id = v_target
+    where event_id = v_member.event_id and user_id = old.id;
+    update public.event_participants set user_id = v_target
+    where event_id = v_member.event_id and user_id = old.id;
+    update public.expense_shares set user_id = v_target
+    where user_id = old.id
+      and expense_id in (
+        select id from public.shared_expenses where event_id = v_member.event_id
+      );
+
+    -- مشاركون من جهات اتصاله يصيرون أسماءً حرّة. صفّاً صفّاً: تعارض اسمٍ
+    -- مع آخر في المناسبة يجب ألا يُفشل حذف الحساب.
+    for v_part in
+      select p.id, c.full_name
+      from public.event_participants p
+      join public.contacts c on c.id = p.contact_id
+      where p.event_id = v_member.event_id and c.user_id = old.id
+    loop
+      begin
+        update public.event_participants
+        set display_name = v_part.full_name, contact_id = null
+        where id = v_part.id;
+      exception when unique_violation then
+        update public.event_participants
+        set display_name = v_part.full_name || ' ' || left(v_part.id::text, 4),
+            contact_id = null
+        where id = v_part.id;
+      end;
+    end loop;
+  end loop;
+
+  return old;
+end;
+$$;
+
+revoke all on function public.transfer_events_before_user_delete() from public, anon, authenticated;
+
+drop trigger if exists users_transfer_events on auth.users;
+create trigger users_transfer_events
+  before delete on auth.users
+  for each row execute function public.transfer_events_before_user_delete();

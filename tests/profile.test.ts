@@ -183,7 +183,10 @@ describe('تعديل الملف الشخصي', () => {
 });
 
 describe('مخطّط الملف الشخصي ودلو الصور', () => {
-  const SCHEMA = readFileSync(path.join(ROOT, 'supabase', 'schema.sql'), 'utf8');
+  const SCHEMA = readFileSync(
+    path.join(ROOT, 'supabase', 'schema.sql'),
+    'utf8',
+  ).replace(/\r\n/g, '\n');
 
   test('جدول profiles مؤمَّن بالمفتاح الأساسي نفسه', () => {
     assert.match(SCHEMA, /create table if not exists public\.profiles/);
