@@ -1281,3 +1281,22 @@ drop trigger if exists users_transfer_events on auth.users;
 create trigger users_transfer_events
   before delete on auth.users
   for each row execute function public.transfer_events_before_user_delete();
+
+-- ===== فواتير المصروفات المشتركة: يقرؤها أعضاء المناسبة =====
+-- الصورة تُرفع في مجلد من رفعها، فسياسة receipts_read_own وحدها تحجبها عن
+-- بقية الأعضاء. هذه تفتحها لمن يرى المصروف الذي يشير إليها، لا أكثر: مسارٌ
+-- لا يشير إليه مصروف يبقى لصاحبه وحده.
+create index if not exists shared_expenses_receipt_idx
+  on public.shared_expenses (receipt_url)
+  where receipt_url is not null;
+
+drop policy if exists "receipts_read_event_member" on storage.objects;
+create policy "receipts_read_event_member" on storage.objects
+  for select using (
+    bucket_id = 'receipts'
+    and exists (
+      select 1 from public.shared_expenses e
+      where e.receipt_url = storage.objects.name
+        and public.is_event_member(e.event_id)
+    )
+  );

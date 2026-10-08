@@ -195,6 +195,18 @@ describe('تخزين الإيصالات', () => {
     }
   });
 
+  test('أعضاء المناسبة يقرؤون فاتورة مصروف يرونه، لا أي ملف', () => {
+    const body = SCHEMA.match(
+      /create policy "receipts_read_event_member" on storage\.objects([\s\S]*?);\n/,
+    )?.[1].replace(/\s+/g, ' ');
+    assert.ok(body, 'سياسة قراءة الأعضاء للفواتير غير موجودة');
+    assert.ok(body.includes('for select'), 'يجب أن تكون للقراءة فقط');
+    assert.ok(body.includes("bucket_id = 'receipts'"), 'غير محصورة في دلو الفواتير');
+    // الربط بمصروف حقيقي والعضوية معاً: أيّ شرط وحده يفتح ملفات غير مقصودة.
+    assert.ok(body.includes('e.receipt_url = storage.objects.name'), 'غير مربوطة بمصروف');
+    assert.ok(body.includes('is_event_member(e.event_id)'), 'لا تتحقق من العضوية');
+  });
+
   test('الدلو محدود الحجم والأنواع', () => {
     assert.ok(SCHEMA.includes('file_size_limit'), 'لا سقف لحجم الرفع');
     assert.ok(SCHEMA.includes('allowed_mime_types'), 'لا قائمة أنواع مسموحة');

@@ -309,21 +309,24 @@ export function EventMembersScreen() {
                 {link}
               </Text>
 
-              <View className="mt-3 flex-row-reverse justify-center">
-                <Button
-                  title="مشاركة"
-                  size="sm"
-                  icon={<Share2 size={14} color={palette.onPrimary} />}
-                  onPress={() => void handleShare()}
-                />
-                <View className="w-2" />
-                <Button
-                  title="نسخ الكود"
-                  size="sm"
-                  variant="outline"
-                  icon={<Copy size={14} color={palette.text} />}
-                  onPress={() => void handleCopyCode()}
-                />
+              <View className="mt-3 flex-row-reverse gap-2">
+                <View className="flex-1">
+                  <Button
+                    title="مشاركة"
+                    size="sm"
+                    icon={<Share2 size={14} color={palette.onPrimary} />}
+                    onPress={() => void handleShare()}
+                  />
+                </View>
+                <View className="flex-1">
+                  <Button
+                    title="نسخ الكود"
+                    size="sm"
+                    variant="outline"
+                    icon={<Copy size={14} color={palette.text} />}
+                    onPress={() => void handleCopyCode()}
+                  />
+                </View>
               </View>
               <Text className="mt-3 text-center text-[11px] text-ink-subtle">
                 لا يُعرض الكود مرة أخرى بعد إغلاق هذه الشاشة.

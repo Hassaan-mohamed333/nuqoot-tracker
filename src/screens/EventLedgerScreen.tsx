@@ -4,6 +4,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   ArrowLeftRight,
   CloudOff,
+  Paperclip,
   Pencil,
   Plus,
   Send,
@@ -12,7 +13,15 @@ import {
   Users,
 } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Linking,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BalanceBar, FadeSlideIn, PressableScale, staggerDelay } from '@/components/motion';
@@ -20,6 +29,7 @@ import { Button, Card, SectionTitle } from '@/components/ui';
 import { useEventLedger } from '@/hooks/useEventLedger';
 import { palette } from '@/lib/palette';
 import { notify, reportError } from '@/lib/alerts';
+import { getReceiptUrl } from '@/lib/repository';
 import { sendEventInvite } from '@/lib/shareEvent';
 import { fetchMyEventRole, sharingAvailable } from '@/lib/sharedEvents';
 import type { RootStackParamList } from '@/navigation/types';
@@ -194,7 +204,7 @@ export function EventLedgerScreen() {
             </View>
           </View>
 
-          <View className="mt-4 flex-row-reverse">
+          <View className="mt-4 flex-row-reverse gap-2">
             <Button
               title="مصروف جماعي"
               size="sm"
@@ -214,7 +224,7 @@ export function EventLedgerScreen() {
               accessibilityRole="button"
               accessibilityLabel="المشاركون"
               activeScale={0.955}
-              className="mr-2 flex-1 flex-row-reverse items-center justify-center rounded-full border border-hero-fg/25 px-4 py-2.5">
+              className="flex-1 flex-row-reverse items-center justify-center rounded-full border border-hero-fg/25 px-4 py-2.5">
               <Users size={16} color={palette.onHero} />
               <Text className="mr-2 text-center text-xs font-bold text-hero-fg">
                 المشاركون
@@ -234,7 +244,7 @@ export function EventLedgerScreen() {
             />
           ) : null}
 
-          <View className="mt-2 flex-row-reverse">
+          <View className="mt-2 flex-row-reverse gap-2">
             {sharingAvailable() ? (
               <PressableScale
                 onPress={() =>
@@ -256,9 +266,7 @@ export function EventLedgerScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="تعديل المناسبة"
                 activeScale={0.955}
-                className={`flex-1 flex-row-reverse items-center justify-center rounded-full border border-hero-fg/25 px-4 py-2.5 ${
-                  sharingAvailable() ? 'mr-2' : ''
-                }`}>
+                className="flex-1 flex-row-reverse items-center justify-center rounded-full border border-hero-fg/25 px-4 py-2.5">
                 <Pencil size={16} color={palette.onHero} />
                 <Text className="mr-2 text-center text-xs font-bold text-hero-fg">
                   تعديل المناسبة
@@ -390,11 +398,57 @@ export function EventLedgerScreen() {
                   {formatDate(expense.occurred_at)} · مقسومة على{' '}
                   {expense.shares.length}
                 </Text>
+                {expense.receipt_url ? (
+                  <ReceiptLink path={expense.receipt_url} />
+                ) : null}
               </Card>
             </FadeSlideIn>
           ))
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+/**
+ * رابط فاتورة المصروف. الدلو خاص، فالرابط يُولَّد موقّعاً عند الضغط لا عند
+ * رسم القائمة: مصروفات كثيرة تعني طلبات توقيع كثيرة لا يضغط عليها أحد.
+ */
+function ReceiptLink({ path }: { path: string }) {
+  const [opening, setOpening] = useState(false);
+
+  async function open() {
+    if (opening) return;
+    setOpening(true);
+    try {
+      const url = await getReceiptUrl(path);
+      if (!url) {
+        notify('تعذّر فتح الفاتورة', 'لا تملك صلاحية عرضها، أو تعذّر الوصول للخادم.');
+        return;
+      }
+      await Linking.openURL(url);
+    } catch (openError) {
+      reportError('تعذّر فتح الفاتورة', openError);
+    } finally {
+      setOpening(false);
+    }
+  }
+
+  return (
+    <Pressable
+      onPress={() => void open()}
+      accessibilityRole="link"
+      accessibilityLabel="عرض صورة الفاتورة"
+      hitSlop={8}
+      className="mt-2 min-h-[44px] flex-row-reverse items-center gap-1.5 self-end">
+      {opening ? (
+        <ActivityIndicator size="small" color={palette.primaryStrong} />
+      ) : (
+        <Paperclip size={14} color={palette.primaryStrong} />
+      )}
+      <Text className="text-caption font-bold text-primary-strong">
+        عرض الفاتورة
+      </Text>
+    </Pressable>
   );
 }

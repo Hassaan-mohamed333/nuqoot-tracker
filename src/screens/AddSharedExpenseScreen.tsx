@@ -10,6 +10,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Text, TextInput, View } from 'react-native';
 
 import { BalanceBar, FadeSlideIn } from '@/components/motion';
+import { ReceiptAttach, type PickedReceipt } from '@/components/ReceiptAttach';
 import {
   Button,
   Card,
@@ -21,15 +22,21 @@ import {
   SegmentedControl,
 } from '@/components/ui';
 import { reportError } from '@/lib/alerts';
+import { isAiAvailable, scanReceipt } from '@/lib/ai';
 import { palette } from '@/lib/palette';
 import type { EventLedger } from '@/lib/repository';
-import { createSharedExpense, fetchEventLedger } from '@/lib/repository';
+import {
+  createSharedExpense,
+  fetchEventLedger,
+  uploadReceipt,
+} from '@/lib/repository';
+import { isSupabaseReady } from '@/lib/supabase';
 import { logStepFailure, userMessage } from '@/lib/supabaseError';
 import type { RootStackParamList } from '@/navigation/types';
 import { useAuth } from '@/store/AuthProvider';
 import { useLedger } from '@/store/LedgerProvider';
 import type { EventParticipant, SplitMode } from '@/types';
-import { DEFAULT_CURRENCY, formatAmount } from '@/utils/ledger';
+import { DEFAULT_CURRENCY, formatAmount, formatDate } from '@/utils/ledger';
 import { participantName, sharesMatchAmount, splitEqually } from '@/utils/split';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
@@ -64,6 +71,11 @@ export function AddSharedExpenseScreen() {
   const [includedKeys, setIncludedKeys] = useState<Set<string>>(new Set());
   const [customShares, setCustomShares] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [receiptUri, setReceiptUri] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanNote, setScanNote] = useState<{ text: string; warning: boolean } | null>(
+    null,
+  );
 
   const contactNames = useMemo(
     () => new Map(contacts.map((contact) => [contact.id, contact.full_name])),
@@ -204,16 +216,87 @@ export function AddSharedExpenseScreen() {
     setCustomShares(seeded);
   }
 
+  /**
+   * يقرأ الفاتورة ويملأ ما لم يكتبه المستخدم بعد. ما كتبه بيده يبقى كما هو:
+   * القراءة الآلية تخطئ أحياناً، وإعادة كتابة حقل أدخله المستخدم أسوأ من تركه.
+   */
+  async function handleReceipt({ uri, payload }: PickedReceipt) {
+    setReceiptUri(uri);
+    setScanNote(null);
+
+    if (!payload) {
+      setScanNote({
+        text: 'تعذّرت قراءة الصورة، لكنها ستُرفق. أكمل البيانات يدوياً.',
+        warning: true,
+      });
+      return;
+    }
+    if (!isAiAvailable()) {
+      setScanNote({
+        text: 'الصورة مرفقة. القراءة التلقائية تحتاج إعداد Supabase.',
+        warning: false,
+      });
+      return;
+    }
+
+    setScanning(true);
+    try {
+      const scan = await scanReceipt(payload);
+      if (scan.total !== null && scan.total > 0) {
+        setAmount((current) => {
+          if (current.trim() !== '') return current;
+          return String(scan.total);
+        });
+      }
+      const label = (scan.merchant ?? scan.summary ?? '').trim();
+      if (label.length >= 2) {
+        setDescription((current) => {
+          if (current.trim() !== '') return current;
+          return label.slice(0, 200);
+        });
+      }
+
+      setScanNote({
+        text:
+          scan.total === null && !label
+            ? 'لم نستطع قراءة تفاصيل الفاتورة. أكمل البيانات يدوياً.'
+            : [
+                scan.merchant ? `المتجر: ${scan.merchant}` : null,
+                scan.total !== null
+                  ? `الإجمالي: ${formatAmount(scan.total, scan.currency ?? DEFAULT_CURRENCY)}`
+                  : null,
+                scan.date ? `التاريخ: ${formatDate(scan.date)}` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ') + ' — راجعها قبل الحفظ.',
+        warning: false,
+      });
+    } catch (caught) {
+      setScanNote({
+        text:
+          (caught instanceof Error ? caught.message : 'تعذّرت قراءة الفاتورة.') +
+          ' الصورة مرفقة، فأكمل البيانات يدوياً.',
+        warning: true,
+      });
+    } finally {
+      setScanning(false);
+    }
+  }
+
   async function handleSave() {
     if (!isValid || saving) return;
     setSaving(true);
     try {
+      // الرفع قبل الإدراج: فشله يوقف الحفظ بدل مصروف بلا فاتورته.
+      const receiptPath =
+        receiptUri && isSupabaseReady() ? await uploadReceipt(receiptUri) : null;
       await createSharedExpense({
         event_id: params.eventId,
         payer_participant_id: payerId,
         description,
         amount: parsedAmount,
         currency: DEFAULT_CURRENCY,
+        receipt_url: receiptPath,
         shares,
       });
       navigation.goBack();
@@ -253,6 +336,20 @@ export function AddSharedExpenseScreen() {
         />
       }>
       <FadeSlideIn index={0}>
+        <ReceiptAttach
+          uri={receiptUri}
+          scanning={scanning}
+          note={scanNote?.text ?? null}
+          noteIsWarning={scanNote?.warning}
+          onPicked={(picked) => void handleReceipt(picked)}
+          onClear={() => {
+            setReceiptUri(null);
+            setScanNote(null);
+          }}
+        />
+      </FadeSlideIn>
+
+      <FadeSlideIn index={1} className="mt-6">
         <Field
           label="الوصف"
           value={description}
@@ -261,7 +358,7 @@ export function AddSharedExpenseScreen() {
         />
       </FadeSlideIn>
 
-      <FadeSlideIn index={1} className="mt-6">
+      <FadeSlideIn index={2} className="mt-6">
         <Field
           label="المبلغ الإجمالي"
           value={amount}
