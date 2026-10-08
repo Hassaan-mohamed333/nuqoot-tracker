@@ -2,7 +2,7 @@ import type { RouteProp } from '@react-navigation/native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Check } from 'lucide-react-native';
-import React, { useMemo, useState } from 'react';
+import React, { useLayoutEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -37,16 +37,24 @@ const EVENT_TYPES: { key: EventType; label: string }[] = [
 export function AddEventScreen() {
   const navigation = useNavigation<Navigation>();
   const { params } = useRoute<AddEventRoute>();
-  const { contacts, addEvent } = useLedger();
+  const { contacts, addEvent, editEvent, getEventById } = useLedger();
 
-  const [title, setTitle] = useState('');
-  const [eventType, setEventType] = useState<EventType>('wedding');
-  const [hostContactId, setHostContactId] = useState<string | null>(
-    params?.hostContactId ?? null,
+  /** وضع التعديل: المناسبة القائمة، أو undefined للإنشاء. */
+  const editingId = params?.eventId;
+  const existing = editingId ? getEventById(editingId) : undefined;
+
+  const [title, setTitle] = useState(existing?.title ?? '');
+  const [eventType, setEventType] = useState<EventType>(
+    existing?.event_type ?? 'wedding',
   );
-  const [eventDate, setEventDate] = useState(new Date());
-  const [location, setLocation] = useState('');
-  const [notes, setNotes] = useState('');
+  const [hostContactId, setHostContactId] = useState<string | null>(
+    existing ? existing.host_contact_id : (params?.hostContactId ?? null),
+  );
+  const [eventDate, setEventDate] = useState(
+    existing ? new Date(existing.event_date) : new Date(),
+  );
+  const [location, setLocation] = useState(existing?.location ?? '');
+  const [notes, setNotes] = useState(existing?.notes ?? '');
   const [saving, setSaving] = useState(false);
 
   const sortedContacts = useMemo(
@@ -57,10 +65,29 @@ export function AddEventScreen() {
 
   const isValid = title.trim().length >= 2;
 
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: editingId ? 'تعديل المناسبة' : 'مناسبة جديدة',
+    });
+  }, [editingId, navigation]);
+
   async function handleSave() {
     if (!isValid || saving) return;
     setSaving(true);
     try {
+      if (editingId) {
+        await editEvent(editingId, {
+          title,
+          event_type: eventType,
+          host_contact_id: hostContactId,
+          event_date: eventDate.toISOString(),
+          location,
+          notes,
+        });
+        navigation.goBack();
+        return;
+      }
+
       const created = await addEvent({
         title,
         event_type: eventType,
@@ -181,7 +208,7 @@ export function AddEventScreen() {
         />
 
         <Button
-          title="حفظ المناسبة"
+          title={editingId ? 'حفظ التعديلات' : 'حفظ المناسبة'}
           onPress={() => void handleSave()}
           disabled={!isValid || saving}
           loading={saving}

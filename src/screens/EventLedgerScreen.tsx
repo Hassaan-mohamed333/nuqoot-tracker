@@ -4,6 +4,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   ArrowLeftRight,
   CloudOff,
+  Pencil,
   Plus,
   Receipt,
   TriangleAlert,
@@ -55,6 +56,8 @@ export function EventLedgerScreen() {
     };
   }, [params.eventId]);
   const canEdit = role === null || canEditEvent(role);
+  // تعديل بيانات المناسبة (العنوان والتاريخ…) لصاحبها وحده؛ والدفتر المحلي لصاحبه.
+  const canManage = role === null || role === 'owner';
   const participants = useMemo(() => data?.participants ?? [], [data]);
   const expenses = useMemo(() => data?.expenses ?? [], [data]);
 
@@ -197,21 +200,38 @@ export function EventLedgerScreen() {
             ) : null}
           </View>
 
-          {sharingAvailable() ? (
-            <PressableScale
-              onPress={() =>
-                navigation.navigate('EventMembers', { eventId: event.id })
-              }
-              accessibilityRole="button"
-              accessibilityLabel="الأعضاء والدعوة"
-              activeScale={0.955}
-              className="mt-2 flex-row-reverse items-center justify-center rounded-full border border-hero-fg/25 px-4 py-2.5">
-              <Users size={16} color={palette.onHero} />
-              <Text className="mr-2 text-center text-xs font-bold text-hero-fg">
-                الأعضاء والدعوة
-              </Text>
-            </PressableScale>
-          ) : null}
+          <View className="mt-2 flex-row-reverse">
+            {sharingAvailable() ? (
+              <PressableScale
+                onPress={() =>
+                  navigation.navigate('EventMembers', { eventId: event.id })
+                }
+                accessibilityRole="button"
+                accessibilityLabel="الأعضاء والدعوة"
+                activeScale={0.955}
+                className="flex-1 flex-row-reverse items-center justify-center rounded-full border border-hero-fg/25 px-4 py-2.5">
+                <Users size={16} color={palette.onHero} />
+                <Text className="mr-2 text-center text-xs font-bold text-hero-fg">
+                  الأعضاء والدعوة
+                </Text>
+              </PressableScale>
+            ) : null}
+            {canManage ? (
+              <PressableScale
+                onPress={() => navigation.navigate('AddEvent', { eventId: event.id })}
+                accessibilityRole="button"
+                accessibilityLabel="تعديل المناسبة"
+                activeScale={0.955}
+                className={`flex-1 flex-row-reverse items-center justify-center rounded-full border border-hero-fg/25 px-4 py-2.5 ${
+                  sharingAvailable() ? 'mr-2' : ''
+                }`}>
+                <Pencil size={16} color={palette.onHero} />
+                <Text className="mr-2 text-center text-xs font-bold text-hero-fg">
+                  تعديل المناسبة
+                </Text>
+              </PressableScale>
+            ) : null}
+          </View>
         </View>
 
         {noParticipants && canEdit ? (

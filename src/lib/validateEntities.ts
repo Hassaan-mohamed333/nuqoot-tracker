@@ -446,6 +446,77 @@ export function validateContactPatch(patch: ContactPatch): ContactPatch {
   return clean;
 }
 
+/** تعديل مناسبة: الحقول الغائبة تبقى كما هي. */
+export type EventPatch = Partial<NewEventInput>;
+
+export function validateEventPatch(patch: EventPatch): EventPatch {
+  const issues: ValidationIssue[] = [];
+  const clean: EventPatch = {};
+
+  if (patch.title !== undefined) {
+    const title = checkText('title', patch.title, {
+      label: 'عنوان المناسبة',
+      max: LIMITS.title,
+      min: 2,
+      required: true,
+    });
+    if (title.ok) clean.title = title.value as string;
+    else issues.push(...title.issues);
+  }
+
+  if (patch.event_type !== undefined) {
+    clean.event_type = requireEnum<EventType>(
+      patch.event_type,
+      EVENT_TYPES,
+      'event_type',
+      'نوع المناسبة',
+    );
+  }
+
+  if (patch.event_date !== undefined) {
+    const date = checkIsoDate('event_date', patch.event_date, 'تاريخ المناسبة');
+    if (date.ok) clean.event_date = date.value;
+    else issues.push(...date.issues);
+  }
+
+  if (patch.host_contact_id !== undefined) {
+    if (patch.host_contact_id === null || patch.host_contact_id === '') {
+      clean.host_contact_id = null;
+    } else {
+      const host = checkRowId('host_contact_id', patch.host_contact_id, 'مضيف المناسبة');
+      if (host.ok) clean.host_contact_id = host.value;
+      else issues.push(...host.issues);
+    }
+  }
+
+  if (patch.location !== undefined) {
+    const location = checkText('location', patch.location, {
+      label: 'المكان',
+      max: LIMITS.location,
+    });
+    if (location.ok) clean.location = location.value;
+    else issues.push(...location.issues);
+  }
+
+  if (patch.notes !== undefined) {
+    const notes = checkText('notes', patch.notes, {
+      label: 'الملاحظات',
+      max: LIMITS.note,
+      multiline: true,
+    });
+    if (notes.ok) clean.notes = notes.value;
+    else issues.push(...notes.issues);
+  }
+
+  if (issues.length) throw new ValidationError(issues);
+  if (Object.keys(clean).length === 0) {
+    throw new ValidationError([
+      { field: 'patch', code: 'empty', message: 'لا يوجد ما يُعدَّل.' },
+    ]);
+  }
+  return clean;
+}
+
 /**
  * تعديل الملف الشخصي.
  *

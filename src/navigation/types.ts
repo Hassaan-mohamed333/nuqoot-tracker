@@ -34,7 +34,10 @@ export type RootStackParamList = {
     | undefined;
   /** returnTo: يعود إلى شاشة الحركة ويختار ما أُنشئ للتوّ. */
   AddContact: { returnTo?: 'AddTransaction' } | undefined;
-  AddEvent: { returnTo?: 'AddTransaction'; hostContactId?: string } | undefined;
+  /** eventId: وضع التعديل لمناسبة قائمة بدل إنشاء جديدة. */
+  AddEvent:
+    | { returnTo?: 'AddTransaction'; hostContactId?: string; eventId?: string }
+    | undefined;
   /** الدفتر الجماعي لمناسبة: المشاركون، المصاريف، ومن يدين لمن. */
   EventLedger: { eventId: string };
   AddSharedExpense: {

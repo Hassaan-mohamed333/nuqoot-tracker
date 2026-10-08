@@ -5,6 +5,11 @@ import { Platform, Pressable, Text, View } from 'react-native';
 
 import { palette } from '@/lib/palette';
 
+import { fromDateInputValue, toDateInputValue } from './dateValue';
+
+// ما زال يُستورد من هنا في بقية التطبيق.
+export { fromDateInputValue, toDateInputValue };
+
 interface DateFieldProps {
   label?: string;
   /** القيمة الحالية، أو `null` لحقل لم يُملأ بعد. */
@@ -19,26 +24,6 @@ interface DateFieldProps {
   error?: string | null;
   accessibilityLabel?: string;
   className?: string;
-}
-
-/** `YYYY-MM-DD` بالتوقيت المحلي. */
-export function toDateInputValue(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
-/**
- * يبني تاريخاً من `YYYY-MM-DD` بالتوقيت المحلي.
- *
- * `new Date('1990-05-01')` يفسّره المحرّك على أنه UTC، فيصير ٣٠ أبريل
- * لكل من يسكن غرب غرينتش. تمرير المكوّنات منفصلةً يبني اليوم المقصود.
- */
-export function fromDateInputValue(text: string): Date | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
-  if (!match) return null;
-  const [year, month, day] = match.slice(1).map(Number);
-  const date = new Date(year, month - 1, day);
-  return Number.isFinite(date.getTime()) ? date : null;
 }
 
 /**
@@ -171,6 +156,15 @@ function WebDateInput({
     value: value ? toDateInputValue(value) : '',
     max: max ? toDateInputValue(max) : undefined,
     min: min ? toDateInputValue(min) : undefined,
+    // متصفّح الكمبيوتر يحدّد جزءاً من التاريخ (يوم/شهر/سنة) عند الضغط ولا يفتح
+    // التقويم، فيبدو الحقل معطّلاً. showPicker يفتحه صراحةً حيث يُدعم.
+    onClick: (event: { currentTarget: { showPicker?: () => void } }) => {
+      try {
+        event.currentTarget.showPicker?.();
+      } catch {
+        // بعض المتصفّحات ترفضه خارج تفاعل مباشر: يبقى التحرير بالكتابة.
+      }
+    },
     onChange: (event: { target: { value: string } }) => {
       const next = fromDateInputValue(event.target.value);
       if (next) onChange(next);

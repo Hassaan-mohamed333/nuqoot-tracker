@@ -6,6 +6,8 @@ import {
   validateContactInput,
   validateContactPatch,
   validateEventInput,
+  validateEventPatch,
+  type EventPatch,
   validateEventMembers,
   validateProfilePatch,
   validateSharedExpenseInput,
@@ -856,6 +858,39 @@ export async function setContactArchived(
 }
 
 /** يضيف مناسبة جديدة. */
+/**
+ * يعدّل مناسبة قائمة؛ الحقول الغائبة تبقى كما هي.
+ *
+ * على الخادم يمرّ التعديل على RLS: صاحب المناسبة وحده يعدّلها. من ليس صاحبها
+ * لا يتأثّر أي صفّ عنده، فيصله خطأ واضح لا نجاحٌ كاذب.
+ */
+export async function updateEvent(
+  eventId: string,
+  updates: EventPatch,
+): Promise<Event> {
+  const patch = validateEventPatch(updates);
+
+  const updated = rowLivesOnServer(eventId)
+    ? await updateRow<Event>(
+        TABLES.events,
+        eventId,
+        patch,
+        'تعديل المناسبة',
+        'تعذّر تعديل المناسبة: ليست من مناسباتك. صاحبها وحده يعدّلها.',
+      )
+    : null;
+
+  const cached = await readJson<Event[]>(STORAGE_KEYS.events, []);
+  const next = cached.map((event) =>
+    event.id === eventId ? { ...event, ...patch } : event,
+  );
+  await writeJson(STORAGE_KEYS.events, next);
+
+  const result = updated ?? next.find((event) => event.id === eventId);
+  if (!result) throw new Error('المناسبة غير موجودة.');
+  return result;
+}
+
 export async function createEvent(input: NewEventInput): Promise<Event> {
   const nowIso = new Date().toISOString();
 

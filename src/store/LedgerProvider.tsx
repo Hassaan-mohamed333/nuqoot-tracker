@@ -18,10 +18,12 @@ import {
   setContactArchived,
   setTransactionArchived,
   updateContact,
+  updateEvent,
   updateTransaction,
 } from '@/lib/repository';
 import type {
   ContactPatch,
+  EventPatch,
   TransactionPatch,
 } from '@/lib/validateEntities';
 import { runLegacySeedCleanup } from '@/lib/storage';
@@ -88,6 +90,8 @@ interface LedgerContextValue {
   ) => Promise<Transaction>;
   /** يعدّل بيانات جهة اتصال؛ الحقول الغائبة تبقى كما هي. */
   editContact: (contactId: string, updates: ContactPatch) => Promise<Contact>;
+  /** يعدّل مناسبة (صاحبها وحده)؛ الحقول الغائبة تبقى كما هي. */
+  editEvent: (eventId: string, updates: EventPatch) => Promise<Event>;
   /** يحذف جهة اتصال ومعها حركاتها. يعيد عدد الحركات المحذوفة. */
   removeContact: (contactId: string) => Promise<number>;
   /** يؤرشف جهة اتصال أو يستعيدها. */
@@ -195,6 +199,14 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
     },
     [],
   );
+
+  const editEvent = useCallback(async (eventId: string, updates: EventPatch) => {
+    const saved = await updateEvent(eventId, updates);
+    setEvents((current) =>
+      current.map((event) => (event.id === eventId ? saved : event)),
+    );
+    return saved;
+  }, []);
 
   const removeContact = useCallback(async (contactId: string) => {
     const { removedTransactions } = await deleteContact(contactId);
@@ -310,6 +322,7 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       removeTransaction,
       setTransactionArchivedState,
       editContact,
+      editEvent,
       removeContact,
       setArchived,
       getContactById: (contactId) =>
@@ -352,6 +365,7 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       removeTransaction,
       setTransactionArchivedState,
       editContact,
+      editEvent,
       removeContact,
       setArchived,
     ],
