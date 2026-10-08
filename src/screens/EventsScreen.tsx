@@ -1,6 +1,6 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { CalendarPlus, Plus } from 'lucide-react-native';
+import { CalendarPlus, Plus, Users } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -59,13 +59,22 @@ export function EventsScreen() {
           <Text className="text-right text-2xl font-bold text-ink">
             المناسبات
           </Text>
-          <Pressable
-            onPress={() => navigation.navigate('AddEvent')}
-            accessibilityRole="button"
-            accessibilityLabel="إضافة مناسبة"
-            className="h-11 w-11 items-center justify-center rounded-full bg-primary">
-            <Plus size={20} color={palette.onPrimary} />
-          </Pressable>
+          <View className="flex-row-reverse items-center">
+            <Pressable
+              onPress={() => navigation.navigate('AddEvent')}
+              accessibilityRole="button"
+              accessibilityLabel="إضافة مناسبة"
+              className="h-11 w-11 items-center justify-center rounded-full bg-primary">
+              <Plus size={20} color={palette.onPrimary} />
+            </Pressable>
+            <Pressable
+              onPress={() => navigation.navigate('JoinEvent')}
+              accessibilityRole="button"
+              accessibilityLabel="الانضمام إلى مناسبة بكود"
+              className="ml-2 h-11 w-11 items-center justify-center rounded-full border border-line-strong bg-surface">
+              <Users size={20} color={palette.text} />
+            </Pressable>
+          </View>
         </View>
 
         <View className="mt-3 flex-row-reverse">

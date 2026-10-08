@@ -165,7 +165,25 @@ export interface EventParticipant {
   contact_id: string | null;
   /** اسم حر لعضو ليس في جهات الاتصال؛ null للمستخدم أو لجهة اتصال. */
   display_name: string | null;
+  /**
+   * اسم يضبطه الخادم (اسم جهة الاتصال أو الاسم الحر) كي يقرأه أعضاء المناسبة
+   * الآخرون: جهات الاتصال خاصة بأصحابها فلا يصلون إلى اسمها بغير هذا.
+   */
+  shown_name?: string | null;
+  /** الحساب الذي يمثّله هذا المشارك في مناسبة مشتركة؛ null لجهة اتصال أو اسم حر. */
+  member_user_id?: string | null;
   created_at: string;
+}
+
+/** دور المستخدم داخل مناسبة مشتركة. */
+export type EventRole = 'owner' | 'editor' | 'viewer';
+
+/** عضو حقيقي (له حساب) في مناسبة مشتركة. */
+export interface EventMember {
+  user_id: string;
+  /** من ملفه الشخصي؛ قد يكون فارغاً إن لم يملأه. */
+  full_name: string | null;
+  role: EventRole;
 }
 
 /** كيف يُضاف العضو: أنا، جهة اتصال، أو اسم حر. */

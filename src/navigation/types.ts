@@ -43,6 +43,10 @@ export type RootStackParamList = {
     prefill?: { description?: string; amount?: number; receiptUri?: string };
   };
   EventParticipants: { eventId: string };
+  /** أعضاء المناسبة المشتركة: الدعوة والأدوار. */
+  EventMembers: { eventId: string };
+  /** الانضمام بكود؛ `code` يصل مملوءاً من رابط الدعوة. */
+  JoinEvent: { code?: string } | undefined;
   SmartInput: undefined;
   ScanReceipt: undefined;
   /** الملف الشخصي لصاحب الحساب. */

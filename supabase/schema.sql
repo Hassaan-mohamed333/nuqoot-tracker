@@ -1015,6 +1015,7 @@ set search_path = extensions, pg_temp
 as $$
 declare
   v_invite public.event_invites;
+  v_name text;
 begin
   if auth.uid() is null then
     raise exception 'not_allowed' using errcode = '42501';
@@ -1037,6 +1038,26 @@ begin
 
   if found then
     update public.event_invites set uses = uses + 1 where id = v_invite.id;
+
+    -- المنضمّ يصير مشاركاً في قسمة المناسبة باسمه من ملفه الشخصي.
+    select coalesce(nullif(trim(p.full_name), ''), 'عضو')
+    into v_name
+    from (select 1) one
+    left join public.profiles p on p.id = auth.uid();
+
+    begin
+      insert into public.event_participants (
+        user_id, event_id, display_name, member_user_id
+      ) values (auth.uid(), v_invite.event_id, v_name, auth.uid());
+    exception when unique_violation then
+      -- اسم مأخوذ في المناسبة: نميّزه بجزء من المعرّف بدل رفض الانضمام.
+      insert into public.event_participants (
+        user_id, event_id, display_name, member_user_id
+      ) values (
+        auth.uid(), v_invite.event_id,
+        v_name || ' ' || left(auth.uid()::text, 4), auth.uid()
+      );
+    end;
   end if;
 
   return v_invite.event_id;
@@ -1106,8 +1127,15 @@ begin
     select c.full_name into new.shown_name
     from public.contacts c
     where c.id = new.contact_id;
-  else
+  elsif new.display_name is not null then
     new.shown_name := new.display_name;
+  else
+    -- صفّ «أنا»: صاحبه حساب بعينه. بلا الربط يظهر «أنا» لكل عضو آخر.
+    new.member_user_id := coalesce(new.member_user_id, new.user_id);
+    select p.full_name into new.shown_name
+    from public.profiles p
+    where p.id = new.member_user_id;
+    new.shown_name := coalesce(nullif(trim(new.shown_name), ''), 'صاحب المناسبة');
   end if;
   return new;
 end;
@@ -1121,9 +1149,24 @@ create trigger event_participants_shown_name
 
 -- الصفوف القائمة.
 update public.event_participants p
-set shown_name = coalesce(p.display_name, c.full_name)
+set shown_name = c.full_name
 from public.contacts c
 where p.contact_id = c.id and p.shown_name is null;
+
+update public.event_participants
+set shown_name = display_name
+where shown_name is null and contact_id is null and display_name is not null;
+
+-- صفّ «أنا» القديم: صاحبه من أنشأه.
+update public.event_participants p
+set member_user_id = p.user_id,
+    shown_name = coalesce(
+      nullif(trim((select pr.full_name from public.profiles pr where pr.id = p.user_id)), ''),
+      'صاحب المناسبة'
+    )
+where p.contact_id is null
+  and p.display_name is null
+  and p.member_user_id is null;
 
 -- ---------------------------------------------------------------------
 -- حذف حساب المالك: تنتقل المناسبة إلى محرّر
@@ -1186,6 +1229,26 @@ begin
       and expense_id in (
         select id from public.shared_expenses where event_id = v_member.event_id
       );
+
+    -- صفّه هو («أنا» أو منضمّاً بدعوة) يصير اسماً حرّاً بدل صفٍّ بلا هوية.
+    for v_part in
+      select p.id, coalesce(nullif(trim(p.shown_name), ''), 'عضو سابق') as full_name
+      from public.event_participants p
+      where p.event_id = v_member.event_id
+        and p.member_user_id = old.id
+        and p.contact_id is null
+    loop
+      begin
+        update public.event_participants
+        set display_name = v_part.full_name, member_user_id = null
+        where id = v_part.id;
+      exception when unique_violation then
+        update public.event_participants
+        set display_name = v_part.full_name || ' ' || left(v_part.id::text, 4),
+            member_user_id = null
+        where id = v_part.id;
+      end;
+    end loop;
 
     -- مشاركون من جهات اتصاله يصيرون أسماءً حرّة. صفّاً صفّاً: تعارض اسمٍ
     -- مع آخر في المناسبة يجب ألا يُفشل حذف الحساب.

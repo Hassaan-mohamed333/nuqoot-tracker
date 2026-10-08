@@ -26,6 +26,7 @@ import type { EventLedger } from '@/lib/repository';
 import { createSharedExpense, fetchEventLedger } from '@/lib/repository';
 import { logStepFailure, userMessage } from '@/lib/supabaseError';
 import type { RootStackParamList } from '@/navigation/types';
+import { useAuth } from '@/store/AuthProvider';
 import { useLedger } from '@/store/LedgerProvider';
 import type { EventParticipant, SplitMode } from '@/types';
 import { DEFAULT_CURRENCY, formatAmount } from '@/utils/ledger';
@@ -44,6 +45,7 @@ export function AddSharedExpenseScreen() {
   const navigation = useNavigation<Navigation>();
   const { params } = useRoute<ExpenseRoute>();
   const { contacts } = useLedger();
+  const { userId } = useAuth();
 
   const [participants, setParticipants] = useState<EventParticipant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,7 +71,7 @@ export function AddSharedExpenseScreen() {
   );
 
   const nameOf = (participant: EventParticipant) =>
-    participantName(participant, contactNames);
+    participantName(participant, contactNames, userId);
 
   /** أعضاء آخر تحميل، للتمييز بين من استُبعد يدوياً ومن استجدّ. */
   const knownIds = useRef<Set<string>>(new Set());
@@ -96,13 +98,16 @@ export function AddSharedExpenseScreen() {
     setPayerId((current) => {
       if (current && ids.includes(current)) return current;
       // الدافع الافتراضي: المستخدم نفسه إن كان ضمن الأعضاء.
-      const self = rows.find((row) => !row.contact_id && !row.display_name);
+      // صفّي أنا: المرتبط بحسابي، وإلا صفّ «أنا» القديم في الدفتر المحلي.
+      const self =
+        rows.find((row) => userId && row.member_user_id === userId) ??
+        rows.find((row) => !row.contact_id && !row.display_name);
       return self?.id ?? ids[0] ?? '';
     });
 
     knownIds.current = new Set(ids);
     hydrated.current = true;
-  }, []);
+  }, [userId]);
 
   // useFocusEffect لا useEffect: العودة من شاشة المشاركين تعيد التحميل،
   // وإلا بقيت القائمة فارغة بعد إضافة الأعضاء للتوّ.

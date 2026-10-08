@@ -9,7 +9,7 @@ import {
   TriangleAlert,
   Users,
 } from 'lucide-react-native';
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -17,8 +17,12 @@ import { BalanceBar, FadeSlideIn, PressableScale, staggerDelay } from '@/compone
 import { Button, Card, SectionTitle } from '@/components/ui';
 import { useEventLedger } from '@/hooks/useEventLedger';
 import { palette } from '@/lib/palette';
+import { fetchMyEventRole, sharingAvailable } from '@/lib/sharedEvents';
 import type { RootStackParamList } from '@/navigation/types';
+import { useAuth } from '@/store/AuthProvider';
 import { useLedger } from '@/store/LedgerProvider';
+import type { EventRole } from '@/types';
+import { canEditEvent } from '@/utils/eventInvite';
 import { formatAmount, formatDate } from '@/utils/ledger';
 import {
   computeEventBalances,
@@ -38,6 +42,19 @@ export function EventLedgerScreen() {
   const { data, loading, error, refresh } = useEventLedger(params.eventId);
 
   const event = data?.event ?? getEventById(params.eventId) ?? null;
+  const { userId } = useAuth();
+  // null = دفتر محلي أو لست عضواً مشاركاً: لا قيود دور. القيد يسري على الأعضاء فقط.
+  const [role, setRole] = useState<EventRole | null>(null);
+  useEffect(() => {
+    let active = true;
+    void fetchMyEventRole(params.eventId).then((next) => {
+      if (active) setRole(next);
+    });
+    return () => {
+      active = false;
+    };
+  }, [params.eventId]);
+  const canEdit = role === null || canEditEvent(role);
   const participants = useMemo(() => data?.participants ?? [], [data]);
   const expenses = useMemo(() => data?.expenses ?? [], [data]);
 
@@ -69,7 +86,7 @@ export function EventLedgerScreen() {
   function payerName(payerParticipantId: string | null): string {
     if (!payerParticipantId) return 'غير معروف';
     const member = participantsById.get(payerParticipantId);
-    return member ? participantName(member, contactNames) : 'عضو محذوف';
+    return member ? participantName(member, contactNames, userId) : 'عضو محذوف';
   }
 
   if (!event) {
@@ -156,13 +173,14 @@ export function EventLedgerScreen() {
               title="مصروف جماعي"
               size="sm"
               block={false}
-              disabled={noParticipants}
+              disabled={noParticipants || !canEdit}
               onPress={() =>
                 navigation.navigate('AddSharedExpense', { eventId: event.id })
               }
               icon={<Plus size={16} color={palette.onPrimary} />}
               className="flex-1"
             />
+            {canEdit ? (
             <PressableScale
               onPress={() =>
                 navigation.navigate('EventParticipants', { eventId: event.id })
@@ -176,10 +194,27 @@ export function EventLedgerScreen() {
                 المشاركون
               </Text>
             </PressableScale>
+            ) : null}
           </View>
+
+          {sharingAvailable() ? (
+            <PressableScale
+              onPress={() =>
+                navigation.navigate('EventMembers', { eventId: event.id })
+              }
+              accessibilityRole="button"
+              accessibilityLabel="الأعضاء والدعوة"
+              activeScale={0.955}
+              className="mt-2 flex-row-reverse items-center justify-center rounded-full border border-hero-fg/25 px-4 py-2.5">
+              <Users size={16} color={palette.onHero} />
+              <Text className="mr-2 text-center text-xs font-bold text-hero-fg">
+                الأعضاء والدعوة
+              </Text>
+            </PressableScale>
+          ) : null}
         </View>
 
-        {noParticipants ? (
+        {noParticipants && canEdit ? (
           <Card variant="surface" className="mt-4 items-center" index={1}>
             <Text className="text-center text-body text-ink-muted">
               حدّد المشاركين أولاً لتتمكن من تقسيم المصاريف.

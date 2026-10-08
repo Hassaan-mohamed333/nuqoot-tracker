@@ -12,17 +12,33 @@ export const ME_LABEL = 'أنا';
 /**
  * الاسم المعروض لعضو المناسبة.
  *
- * ثلاث حالات: المستخدم نفسه، جهة اتصال مسجّلة، أو اسم حر لعضو خارج دفتر
- * جهات الاتصال.
+ * الحالات: المستخدم نفسه («أنا»)، جهة اتصال مسجّلة، اسم حر لعضو بلا حساب،
+ * أو عضو حقيقي في مناسبة مشتركة.
+ *
+ * `currentUserId` يحسم «أنا»: الصف المرتبط بحسابي يظهر لي «أنا» ولغيري
+ * اسمي. وبلا هذا المعامل (الدفتر المحلي) الصف الذي بلا جهة اتصال ولا اسم هو أنا.
  */
 export function participantName(
   participant: EventParticipant,
   contactNames: Map<string, string>,
+  currentUserId?: string | null,
 ): string {
-  if (participant.contact_id) {
-    return contactNames.get(participant.contact_id) ?? 'غير معروف';
+  if (currentUserId && participant.member_user_id === currentUserId) {
+    return ME_LABEL;
   }
-  return participant.display_name?.trim() || ME_LABEL;
+  if (participant.contact_id) {
+    // جهة الاتصال خاصة بصاحبها: لدى عضو آخر لا يوجد اسمها محلياً، فنقرأ النسخة
+    // التي حفظها الخادم في الصف.
+    return (
+      contactNames.get(participant.contact_id) ??
+      participant.shown_name?.trim() ??
+      'غير معروف'
+    );
+  }
+  const named =
+    participant.display_name?.trim() || participant.shown_name?.trim();
+  if (named) return named;
+  return ME_LABEL;
 }
 
 /**

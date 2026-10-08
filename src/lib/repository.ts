@@ -341,31 +341,86 @@ export async function setEventParticipants(
   if (rowLivesOnServer(eventId)) {
     const client = requireSupabase();
 
-    // استبدال كامل: أبسط من مقارنة الفروق، والمناسبات صغيرة.
-    const { error: deleteError } = await client
+    /*
+     * مقارنة فروق لا استبدال كامل.
+     *
+     * الاستبدال الكامل كان يمسح كل صفوف المناسبة ثم يعيد إدراجها، وحذف مشارك
+     * يحذف معه حصصه (ON DELETE CASCADE). في مناسبة مشتركة هذا يمسح صفوف الأعضاء
+     * الحقيقيين الذين انضمّوا بدعوة وحصصهم، ولا يملك محرّرٌ صلاحية حذفها أصلاً.
+     * فنحذف ما استُبعد فقط، ونضيف ما استجدّ فقط، ونترك صفوف الأعضاء كما هي.
+     */
+    const { data: existingData, error: existingError } = await client
       .from(TABLES.eventParticipants)
-      .delete()
+      .select('*')
       .eq('event_id', eventId);
-    if (deleteError) {
-      logStepFailure('حذف مشاركي المناسبة', deleteError);
-      throw deleteError;
+    if (existingError) {
+      logStepFailure('قراءة مشاركي المناسبة', existingError);
+      throw existingError;
+    }
+    const existing = (existingData ?? []) as EventParticipant[];
+
+    const isMemberRow = (row: EventParticipant) =>
+      Boolean(row.member_user_id) && Boolean(row.display_name);
+    const isSelfRow = (row: EventParticipant) =>
+      !row.contact_id && !row.display_name;
+
+    const wantsSelf = rows.some((row) => !row.contact_id && !row.display_name);
+    const wantedContacts = new Set(
+      rows.map((row) => row.contact_id).filter((id): id is string => id !== null),
+    );
+    const wantedGuests = new Set(
+      rows.map((row) => row.display_name).filter((name): name is string => name !== null),
+    );
+
+    const toDelete = existing.filter((row) => {
+      if (isMemberRow(row)) return false;
+      if (isSelfRow(row)) return !wantsSelf;
+      if (row.contact_id) return !wantedContacts.has(row.contact_id);
+      return !wantedGuests.has(row.display_name ?? '');
+    });
+
+    if (toDelete.length > 0) {
+      const { error: deleteError } = await client
+        .from(TABLES.eventParticipants)
+        .delete()
+        .in('id', toDelete.map((row) => row.id));
+      if (deleteError) {
+        logStepFailure('حذف مشاركي المناسبة', deleteError);
+        throw deleteError;
+      }
     }
 
-    if (rows.length === 0) {
-      await replaceLocalParticipants(eventId, []);
-      return [];
+    const kept = existing.filter((row) => !toDelete.includes(row));
+    const toInsert = rows.filter((row) => {
+      if (!row.contact_id && !row.display_name) {
+        return !kept.some(isSelfRow);
+      }
+      if (row.contact_id) {
+        return !kept.some((existingRow) => existingRow.contact_id === row.contact_id);
+      }
+      return !kept.some(
+        (existingRow) => existingRow.display_name === row.display_name,
+      );
+    });
+
+    if (toInsert.length > 0) {
+      const { error } = await client.from(TABLES.eventParticipants).insert(toInsert);
+      if (error) {
+        logStepFailure('إضافة مشاركي المناسبة', error);
+        throw error;
+      }
     }
 
-    const { data, error } = await client
+    const { data: savedData, error: savedError } = await client
       .from(TABLES.eventParticipants)
-      .insert(rows)
-      .select();
-    if (error) {
-      logStepFailure('إضافة مشاركي المناسبة', error);
-      throw error;
+      .select('*')
+      .eq('event_id', eventId);
+    if (savedError) {
+      logStepFailure('قراءة مشاركي المناسبة بعد الحفظ', savedError);
+      throw savedError;
     }
 
-    const saved = (data ?? []) as EventParticipant[];
+    const saved = (savedData ?? []) as EventParticipant[];
     await replaceLocalParticipants(eventId, saved);
     return saved;
   }

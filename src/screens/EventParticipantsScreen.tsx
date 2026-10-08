@@ -69,6 +69,8 @@ export function EventParticipantsScreen() {
         );
         setGuests(
           ledger.participants
+            // الأعضاء الحقيقيون يُدارون من شاشة الأعضاء، لا كأسماء حرة هنا.
+            .filter((row) => !row.member_user_id)
             .map((row) => row.display_name)
             .filter((name): name is string => Boolean(name)),
         );

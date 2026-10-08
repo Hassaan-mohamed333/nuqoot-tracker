@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -9,10 +9,14 @@ import './global.css';
 // `className` على أوّل عنصر متحرّك يُركَّب.
 import '@/components/motion/animated';
 import { PolicyGate } from '@/components/PolicyConsent';
+import { startInviteCapture } from '@/lib/pendingInvite';
 import { AppGate } from '@/navigation/AppGate';
 import { AuthProvider } from '@/store/AuthProvider';
 
 export default function App() {
+  // رابط الدعوة يُلتقط عند الإقلاع قبل شاشة الدخول: إعادة التحميل بعد Google تمحو الذاكرة.
+  useEffect(() => startInviteCapture(), []);
+
   return (
     <SafeAreaProvider>
       <AuthProvider>

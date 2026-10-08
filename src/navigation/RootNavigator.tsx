@@ -5,7 +5,7 @@ import {
 } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { CalendarDays, Home, Plus, Sparkles, Users } from 'lucide-react-native';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -21,7 +21,10 @@ import { AddTransactionScreen } from '@/screens/AddTransactionScreen';
 import { ContactProfileScreen } from '@/screens/ContactProfileScreen';
 import { ContactsListScreen } from '@/screens/ContactsListScreen';
 import { EventLedgerScreen } from '@/screens/EventLedgerScreen';
+import { EventMembersScreen } from '@/screens/EventMembersScreen';
 import { EventParticipantsScreen } from '@/screens/EventParticipantsScreen';
+import { JoinEventScreen } from '@/screens/JoinEventScreen';
+import { onPendingInvite, takePendingInvite } from '@/lib/pendingInvite';
 import { EventsScreen } from '@/screens/EventsScreen';
 import { ArchiveScreen } from '@/screens/ArchiveScreen';
 import { HomeScreen } from '@/screens/HomeScreen';
@@ -202,7 +205,17 @@ function TabsNavigator() {
   );
 }
 
+/** يفتح شاشة الانضمام إن كانت هناك دعوة معلّقة (وصلت قبل تسجيل الدخول أو أثناءه). */
+async function openPendingInvite(): Promise<void> {
+  if (!navigationRef.isReady()) return;
+  const code = await takePendingInvite();
+  if (code) navigationRef.navigate('JoinEvent', { code });
+}
+
 export function RootNavigator() {
+  // رابط يصل والتطبيق مفتوح: المتنقّل جاهز، فنفتح الدعوة فوراً.
+  useEffect(() => onPendingInvite(() => void openPendingInvite()), []);
+
   /**
    * سمة التنقّل تُضبط هنا أيضاً، لا في أصناف الشاشات وحدها: الخلفية بين
    * الشاشات أثناء الانتقال يرسمها المتنقّل نفسه، فتبقى على رماديّ
@@ -224,6 +237,7 @@ export function RootNavigator() {
     <NavigationContainer
       ref={navigationRef}
       theme={navigationTheme}
+      onReady={() => void openPendingInvite()}
       /*
        * عنوان التبويب في المتصفّح.
        *
@@ -303,6 +317,16 @@ export function RootNavigator() {
           name="EventParticipants"
           component={EventParticipantsScreen}
           options={{ title: 'المشاركون', presentation: 'modal' }}
+        />
+        <Stack.Screen
+          name="EventMembers"
+          component={EventMembersScreen}
+          options={{ title: 'أعضاء المناسبة' }}
+        />
+        <Stack.Screen
+          name="JoinEvent"
+          component={JoinEventScreen}
+          options={{ title: 'انضمام إلى مناسبة', presentation: 'modal' }}
         />
         <Stack.Screen
           name="AddSharedExpense"
