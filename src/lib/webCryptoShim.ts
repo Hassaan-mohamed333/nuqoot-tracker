@@ -38,6 +38,24 @@ export function installWebCryptoShim(): void {
   const cryptoObject = globalObject.crypto;
   if (!cryptoObject) return;
 
+  /*
+   * getRandomValues قبل أي شيء، ولو كان subtle موجوداً.
+   *
+   * إنشاء كائن crypto فارغ أعلاه يخدع supabase-js: يرى crypto معرَّفاً
+   * فيستدعي crypto.getRandomValues لتوليد مُتحقِّق PKCE، فإن لم تكن موجودة
+   * سقط تسجيل الدخول بـ «undefined is not a function». وهو سقوط لا يظهر
+   * على الويب لأن المتصفّح يوفّرها.
+   */
+  if (typeof cryptoObject.getRandomValues !== 'function') {
+    Object.defineProperty(cryptoObject, 'getRandomValues', {
+      value: <T extends ArrayBufferView | null>(array: T): T => {
+        if (array) Crypto.getRandomValues(array as unknown as Uint8Array);
+        return array;
+      },
+      configurable: true,
+    });
+  }
+
   // موجود أصلاً (الويب): لا نلمسه.
   if (cryptoObject.subtle && typeof cryptoObject.subtle.digest === 'function') {
     return;
