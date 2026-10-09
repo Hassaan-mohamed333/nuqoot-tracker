@@ -434,12 +434,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ]);
     }
 
-    const redirectTo = oauthRedirectTo();
+    /**
+     * يسمّي الخطوة الفاشلة. خطأ مثل «undefined is not a function» لا يدلّ على
+     * موضعه، وعلى الموبايل لا يوجد سجلّ أمام المستخدم: فيصل الاسم إلى الشاشة.
+     */
+    const step = async <T,>(name: string, run: () => T | Promise<T>): Promise<T> => {
+      try {
+        return await run();
+      } catch (caught) {
+        logger.error('auth', `فشلت خطوة Google: ${name}`, caught);
+        const reason = caught instanceof Error ? caught.message : String(caught);
+        throw new Error(`${name}: ${reason}`);
+      }
+    };
+
+    const redirectTo = await step('تجهيز عنوان العودة', oauthRedirectTo);
     // وجهة العودة وحدها في السجل: هي أول ما يجب مطابقته مع قائمة
     // Redirect URLs، وهي عنوانٌ عامّ لا سرّ فيه.
     logger.debug('auth', `google sign-in, redirectTo = ${redirectTo}`);
 
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    const { data, error } = await step('طلب رابط Google من Supabase', () => supabase!.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo,
@@ -452,7 +466,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
          */
         skipBrowserRedirect: true,
       },
-    });
+    }));
 
     if (error) {
       logger.error('auth', 'signInWithOAuth رفض الطلب', error);
@@ -464,7 +478,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // الطلب، ولا داعي لبقائهما في سجلّ المتصفّح.
     logger.debug(
       'auth',
-      `provider = ${data?.url ? new URL(data.url).origin : '(none)'}`,
+      `provider = ${data?.url ? data.url.split('/').slice(0, 3).join('/') : '(none)'}`,
     );
 
     if (Platform.OS === 'web') {
@@ -484,7 +498,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('لم يُرجع Supabase رابط مصادقة.');
     }
 
-    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+    const authUrl = data.url;
+    const result = await step('فتح نافذة Google', () =>
+      WebBrowser.openAuthSessionAsync(authUrl, redirectTo),
+    );
 
     if (result.type === 'cancel' || result.type === 'dismiss') {
       throw new Error('أُلغي تسجيل الدخول.');
@@ -494,19 +511,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // PKCE: العنوان العائد يحمل code نُبدّله بجلسة.
-    const returnedUrl = new URL(result.url);
-    const code = returnedUrl.searchParams.get('code');
-    const oauthError =
-      returnedUrl.searchParams.get('error_description') ??
-      returnedUrl.searchParams.get('error');
+    const returned = result.url;
+    const { code, oauthError } = await step('قراءة الرد من Google', () => {
+      const params = Linking.parse(returned).queryParams ?? {};
+      const pick = (key: string) =>
+        typeof params[key] === 'string' ? (params[key] as string) : null;
+      return {
+        code: pick('code'),
+        oauthError: pick('error_description') ?? pick('error'),
+      };
+    });
 
     if (oauthError) throw new Error(oauthError);
     if (!code) {
       throw new Error('لم يصل رمز المصادقة من Google.');
     }
 
-    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(
-      code,
+    const { error: exchangeError } = await step('تبديل الرمز بجلسة', () =>
+      supabase!.auth.exchangeCodeForSession(code),
     );
     if (exchangeError) {
       logStepFailure('تبديل رمز OAuth بجلسة', exchangeError);
